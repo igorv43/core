@@ -41,7 +41,7 @@ func (k Keeper) ApplySwapToPool(ctx sdk.Context, offerCoin sdk.Coin, askCoin sdk
 	}
 
 	k.SetTerraPoolDelta(ctx, terraPoolDelta)
-
+ 
 	return nil
 }
 
@@ -51,7 +51,7 @@ func (k Keeper) ApplySwapToPool(ctx sdk.Context, offerCoin sdk.Coin, askCoin sdk
 // to trade is too small.
 func (k Keeper) NewComputeInternalSwap(ctx sdk.Context, offerCoin sdk.Coin, askDenom string) (sdk.DecCoin, error) {
 
-	if offerCoin.Denom == core.MicroUSDDenom {
+	if offerCoin.Denom != core.MicroUSDDenom {
 		priceMarketUSD := k.OracleKeeper.GetPriceMarket(ctx, []byte("PriceMarketx"+core.MicroUSDDenom))
 		qUSDR := priceMarketUSD.Quo(k.OracleKeeper.GetPriceMarket(ctx, []byte("PriceMarketx"+core.MicroSDRDenom)))
 		newOfferCoin := sdk.NewCoin(core.MicroSDRDenom, (offerCoin.Amount.Quo(qUSDR.TruncateInt())))
