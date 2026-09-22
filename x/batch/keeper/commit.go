@@ -111,6 +111,17 @@ func (k Keeper) RevealBid(ctx sdk.Context, msg *types.MsgRevealBid) error {
 		return err
 	}
 
+	var kept []types.Level
+	discarded := uint32(0)
+	if market.Type == types.MARKET_TYPE_PERP {
+		// perp levels reserve initial margin in x/perp instead of escrow (spec §14.3)
+		kept, discarded, err = k.reservePerpLevels(ctx, msg.Solver, market, msg.Bid.Levels)
+		if err != nil {
+			return err
+		}
+		return k.finishReveal(ctx, params, key, c, msg, kept, discarded)
+	}
+
 	// keep only the levels the escrow covers, in order; slash once if any is dropped
 	quoteFree, err := k.escrowBalance(ctx, msg.Solver, market.QuoteDenom)
 	if err != nil {
@@ -129,8 +140,6 @@ func (k Keeper) RevealBid(ctx sdk.Context, msg *types.MsgRevealBid) error {
 		return err
 	}
 	quoteFree, baseFree = quoteFree.Sub(reservedQuote), baseFree.Sub(reservedBase)
-	var kept []types.Level
-	discarded := uint32(0)
 	for _, l := range msg.Bid.Levels {
 		if !l.Price.Quo(market.TickSize).IsInteger() || l.Qty.LT(market.MinQty) {
 			discarded++
@@ -153,8 +162,37 @@ func (k Keeper) RevealBid(ctx sdk.Context, msg *types.MsgRevealBid) error {
 		}
 		kept = append(kept, l)
 	}
+	return k.finishReveal(ctx, params, key, c, msg, kept, discarded)
+}
+
+// reservePerpLevels reserves margin for each valid level through the hook;
+// levels the account cannot cover are discarded.
+func (k Keeper) reservePerpLevels(ctx sdk.Context, solver string, market types.Market, levels []types.Level) ([]types.Level, uint32, error) {
+	if k.marginHook == nil {
+		return nil, uint32(len(levels)), nil
+	}
+	addr := sdk.MustAccAddressFromBech32(solver)
+	var kept []types.Level
+	discarded := uint32(0)
+	for _, l := range levels {
+		if !l.Price.Quo(market.TickSize).IsInteger() || l.Qty.LT(market.MinQty) {
+			discarded++
+			continue
+		}
+		if err := k.marginHook.Reserve(ctx, addr, market, l.Side, l.Qty, l.Price); err != nil {
+			discarded++
+			continue
+		}
+		kept = append(kept, l)
+	}
+	return kept, discarded, nil
+}
+
+// finishReveal records the kept levels, slashes once when any level was
+// dropped and counts the reveal.
+func (k Keeper) finishReveal(ctx sdk.Context, params types.Params, key collections.Triple[uint64, string, string], c types.Commit, msg *types.MsgRevealBid, kept []types.Level, discarded uint32) error {
 	if discarded > 0 {
-		if err := k.slashSolver(ctx, msg.Solver, params.SlashNoReveal, "level without escrow coverage"); err != nil {
+		if err := k.slashSolver(ctx, msg.Solver, params.SlashNoReveal, "level without coverage"); err != nil {
 			return err
 		}
 	}

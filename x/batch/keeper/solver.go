@@ -177,7 +177,8 @@ func (k Keeper) reservedEscrow(ctx sdk.Context, addr, denom string) (math.Int, e
 			return false, nil
 		}
 		market, err := k.GetMarket(ctx, c.MarketId)
-		if err != nil {
+		if err != nil || market.Type != types.MARKET_TYPE_SPOT {
+			// perp levels reserve margin in x/perp, not escrow
 			return false, nil
 		}
 		reserved = reserved.Add(bidRequirement(market, *c.Bid, denom))

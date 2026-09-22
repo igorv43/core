@@ -36,6 +36,9 @@ func (k Keeper) ResolveBatch(ctx sdk.Context, batch uint64) error {
 }
 
 func (k Keeper) resolveMarket(ctx sdk.Context, params types.Params, market types.Market, batch uint64) error {
+	if market.Type == types.MARKET_TYPE_PERP {
+		return k.resolvePerpMarket(ctx, params, market, batch)
+	}
 	result := types.BatchResult{BatchId: batch, MarketId: market.Id, Height: ctx.BlockHeight(),
 		ClearingPrice: math.LegacyZeroDec(), Volume: math.ZeroInt(), ReferencePrice: math.LegacyZeroDec()}
 

@@ -98,6 +98,11 @@ message Intent {
   int64 created_height = 11;
   // frontend is the integrator attributed to the order (optional, §23.2).
   string frontend = 12 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // reduce_only marks a perpetual order that may only reduce a position and
+  // reserves no margin (spec §14.3). Perp intents have a zero amount_in and
+  // `remaining` in base units on both sides; the margin hook of x/perp
+  // reserves and settles them.
+  bool reduce_only = 13;
 }
 
 // Level is one price level of a solver bid.

@@ -93,6 +93,13 @@ func NewKeeper(
 // SetMarginHook registers the perpetuals margin hook (x/perp).
 func (k *Keeper) SetMarginHook(h types.MarginHook) { k.marginHook = h }
 
+// SetFeeSink replaces the fee sink (x/perp routes fees to the insurance fund
+// and the allocation cascade once it exists, spec §23).
+func (k *Keeper) SetFeeSink(s types.FeeSink) { k.feeSink = s }
+
+// MarginHookRegistered reports whether x/perp registered its hook.
+func (k Keeper) MarginHookRegistered() bool { return k.marginHook != nil }
+
 // GetAuthority returns the module authority.
 func (k Keeper) GetAuthority() string { return k.authority }
 

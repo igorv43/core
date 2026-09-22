@@ -14,6 +14,10 @@ import (
 // SubmitIntent escrows amount_in and records a limit order for the batch
 // sealed at this height (spec §14). Returns the intent id and batch id.
 func (k Keeper) SubmitIntent(ctx sdk.Context, msg *types.MsgSubmitIntent) (uint64, uint64, error) {
+	return k.submitIntent(ctx, msg, true)
+}
+
+func (k Keeper) submitIntent(ctx sdk.Context, msg *types.MsgSubmitIntent, chargeFee bool) (uint64, uint64, error) {
 	params, err := k.GetParams(ctx)
 	if err != nil {
 		return 0, 0, err
@@ -49,40 +53,17 @@ func (k Keeper) SubmitIntent(ctx sdk.Context, msg *types.MsgSubmitIntent) (uint6
 	if qty.LT(market.MinQty) {
 		return 0, 0, errorsmod.Wrapf(types.ErrInvalidIntent, "quantity %s below the market minimum %s", qty, market.MinQty)
 	}
-	// expiry within the TTL
 	height := ctx.BlockHeight()
-	if msg.ExpiryHeight <= height || msg.ExpiryHeight > height+params.IntentTtlBlocks {
-		return 0, 0, errorsmod.Wrapf(types.ErrInvalidIntent, "expiry_height must be within (%d, %d]", height, height+params.IntentTtlBlocks)
-	}
-	// per-account and per-market bounds (spec §12)
-	open := 0
-	if err := k.IntentsByAccount.Walk(ctx, collections.NewPrefixedPairRange[string, uint64](msg.Sender),
-		func(_ collections.Pair[string, uint64]) (bool, error) {
-			open++
-			return open >= types.MaxIntentsPerAccount, nil
-		}); err != nil {
+	if err := k.checkIntentBounds(ctx, params, market, msg.Sender, msg.ExpiryHeight); err != nil {
 		return 0, 0, err
 	}
-	if open >= types.MaxIntentsPerAccount {
-		return 0, 0, errorsmod.Wrapf(types.ErrTooManyIntents, "max %d open intents per account", types.MaxIntentsPerAccount)
-	}
-	if n, err := k.ActiveIntentCount(ctx, market.Id); err != nil {
+	frontend, err := k.attribution(ctx, msg.Sender, msg.Frontend)
+	if err != nil {
 		return 0, 0, err
-	} else if n >= uint64(params.MaxIntentsPerBatch) {
-		return 0, 0, errorsmod.Wrapf(types.ErrTooManyIntents, "market %s is at max_intents_per_batch (%d)", market.Id, params.MaxIntentsPerBatch)
-	}
-	// integrator attribution only when approved by the sender (spec §23.2 rule 3)
-	frontend := ""
-	if msg.Frontend != "" {
-		if approved, err := k.frontendApproved(ctx, msg.Sender, msg.Frontend); err != nil {
-			return 0, 0, err
-		} else if approved {
-			frontend = msg.Frontend
-		}
 	}
 
 	// anti-spam fee to the chain fee collector, then the escrow
-	if params.IntentFee.IsPositive() {
+	if chargeFee && params.IntentFee.IsPositive() {
 		if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, authtypes.FeeCollectorName, sdk.NewCoins(params.IntentFee)); err != nil {
 			return 0, 0, err
 		}
@@ -120,6 +101,45 @@ func (k Keeper) SubmitIntent(ctx sdk.Context, msg *types.MsgSubmitIntent) (uint6
 		return 0, 0, err
 	}
 	return id, batchID, nil
+}
+
+// checkIntentBounds enforces the expiry TTL and the per-account and
+// per-market bounds of spec §12.
+func (k Keeper) checkIntentBounds(ctx sdk.Context, params types.Params, market types.Market, sender string, expiry int64) error {
+	height := ctx.BlockHeight()
+	if expiry <= height || expiry > height+params.IntentTtlBlocks {
+		return errorsmod.Wrapf(types.ErrInvalidIntent, "expiry_height must be within (%d, %d]", height, height+params.IntentTtlBlocks)
+	}
+	open := 0
+	if err := k.IntentsByAccount.Walk(ctx, collections.NewPrefixedPairRange[string, uint64](sender),
+		func(_ collections.Pair[string, uint64]) (bool, error) {
+			open++
+			return open >= types.MaxIntentsPerAccount, nil
+		}); err != nil {
+		return err
+	}
+	if open >= types.MaxIntentsPerAccount {
+		return errorsmod.Wrapf(types.ErrTooManyIntents, "max %d open intents per account", types.MaxIntentsPerAccount)
+	}
+	if n, err := k.ActiveIntentCount(ctx, market.Id); err != nil {
+		return err
+	} else if n >= uint64(params.MaxIntentsPerBatch) {
+		return errorsmod.Wrapf(types.ErrTooManyIntents, "market %s is at max_intents_per_batch (%d)", market.Id, params.MaxIntentsPerBatch)
+	}
+	return nil
+}
+
+// attribution returns the integrator to attribute an order to: only when the
+// sender approved it (spec §23.2 rule 3), otherwise empty.
+func (k Keeper) attribution(ctx sdk.Context, sender, frontend string) (string, error) {
+	if frontend == "" {
+		return "", nil
+	}
+	approved, err := k.frontendApproved(ctx, sender, frontend)
+	if err != nil || !approved {
+		return "", err
+	}
+	return frontend, nil
 }
 
 func (k Keeper) setIntent(ctx sdk.Context, in types.Intent) error {
@@ -170,8 +190,15 @@ func (k Keeper) CancelIntent(ctx sdk.Context, sender string, id uint64) (sdk.Coi
 	return refund, ctx.EventManager().EmitTypedEvent(&types.EventIntentCancelled{IntentId: id, Refunded: refund.String()})
 }
 
-// closeIntent removes an intent and refunds its remaining escrow.
+// closeIntent removes an intent and refunds its remaining escrow (spot) or
+// releases its remaining margin reservation (perp).
 func (k Keeper) closeIntent(ctx sdk.Context, in types.Intent) (sdk.Coin, error) {
+	if market, err := k.GetMarket(ctx, in.MarketId); err == nil && market.Type == types.MARKET_TYPE_PERP {
+		if err := k.releasePerpReservation(ctx, market, in); err != nil {
+			return sdk.Coin{}, err
+		}
+		return sdk.NewCoin(in.AmountIn.Denom, math.ZeroInt()), k.removeIntent(ctx, in)
+	}
 	refund := sdk.NewCoin(in.AmountIn.Denom, in.Remaining)
 	if refund.IsPositive() {
 		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, sdk.MustAccAddressFromBech32(in.Sender), sdk.NewCoins(refund)); err != nil {
