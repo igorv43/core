@@ -8,6 +8,7 @@ import (
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
 	treasurytypes "github.com/classic-terra/core/v4/x/treasury/types"
+	warpledgertypes "github.com/classic-terra/core/v4/x/warpledger/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 )
 
@@ -28,6 +29,12 @@ func init() {
 
 	// oracle
 	setWhitelistedQuery("/terra.oracle.v1beta1.Query/ExchangeRate", &oracletypes.QueryExchangeRateResponse{})
+
+	// warpledger (Proof of Collateralization, spec §9.7): lets CosmWasm
+	// contracts (DEXes, integrators) read the solvency ledger on-chain
+	setWhitelistedQuery("/terra.warpledger.v1.Query/Params", &warpledgertypes.QueryParamsResponse{})
+	setWhitelistedQuery("/terra.warpledger.v1.Query/WarpLedger", &warpledgertypes.QueryWarpLedgerResponse{})
+	setWhitelistedQuery("/terra.warpledger.v1.Query/DepositAddress", &warpledgertypes.QueryDepositAddressResponse{})
 }
 
 // GetWhitelistedQuery returns the whitelisted query at the provided path.

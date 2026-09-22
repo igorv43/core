@@ -634,6 +634,8 @@ cosmossdk.io/schema v1.1.0 h1:mmpuz3dzouCoyjjcMcA/xHBEmMChN+EHh8EHxHRHhzE=
 cosmossdk.io/schema v1.1.0/go.mod h1:Gb7pqO+tpR+jLW5qDcNOSv0KtppYs7881kfzakguhhI=
 cosmossdk.io/store v1.1.2 h1:3HOZG8+CuThREKv6cn3WSohAc6yccxO3hLzwK6rBC7o=
 cosmossdk.io/store v1.1.2/go.mod h1:60rAGzTHevGm592kFhiUVkNC9w7gooSEn5iUBPzHQ6A=
+cosmossdk.io/x/circuit v0.2.0 h1:RJPMBQWCQU77EcM9HDTBnqRhq21fcUxgWZl7BZylJZo=
+cosmossdk.io/x/circuit v0.2.0/go.mod h1:CjiGXDeZs64nMv0fG+QmvGVTcn7n3Sv4cDszMRR2JqU=
 cosmossdk.io/x/evidence v0.2.0 h1:o72zbmgCM7U0v7z7b0XnMB+NqX0tFamqb1HHkQbhrZ0=
 cosmossdk.io/x/evidence v0.2.0/go.mod h1:zx/Xqy+hnGVzkqVuVuvmP9KsO6YCl4SfbAetYi+k+sE=
 cosmossdk.io/x/feegrant v0.2.0 h1:oq3WVpoJdxko/XgWmpib63V1mYy9ZQN/1qxDajwGzJ8=
@@ -713,6 +715,8 @@ github.com/aws/aws-sdk-go v1.44.122/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX
 github.com/aws/aws-sdk-go v1.55.8 h1:JRmEUbU52aJQZ2AjX4q4Wu7t4uZjOu71uyNmaWlUkJQ=
 github.com/aws/aws-sdk-go v1.55.8/go.mod h1:ZkViS9AqA6otK+JBBNH2++sx1sgxrPKcSzPPvQkUtXk=
 github.com/aws/aws-sdk-go-v2 v0.18.0/go.mod h1:JWVYvqSMppoMJC0x5wdwiImzgXTI9FuZwxzkQq9wy+g=
+github.com/bcp-innovations/hyperlane-cosmos v1.2.0-rc.0 h1:HxiZXAIuPnufsOGZmb89VnZ3O5dlnaYb1oGoM27YD4Y=
+github.com/bcp-innovations/hyperlane-cosmos v1.2.0-rc.0/go.mod h1:NP59yKAk2qFaT7+FSCh7kkoKKLlTxXNdIlxMstAJ5no=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
@@ -1355,6 +1359,8 @@ github.com/onsi/ginkgo v1.12.1/go.mod h1:zj2OWP4+oCPe1qIXoGWkgMRwljMUYCdkwsT2108
 github.com/onsi/ginkgo v1.14.0/go.mod h1:iSB4RoI2tjJc9BBv4NKIKWKya62Rps+oPG/Lv9klQyY=
 github.com/onsi/ginkgo v1.16.5 h1:8xi0RTUf59SOSfEtZMvwTvXYMzG4gV23XVHOZiXNtnE=
 github.com/onsi/ginkgo v1.16.5/go.mod h1:+E8gABHa3K6zRBolWtd+ROzc/U5bkGt0FwiG042wbpU=
+github.com/onsi/ginkgo/v2 v2.7.0 h1:/XxtEV3I3Eif/HobnVx9YmJgk8ENdRsuUmM+fLCFNow=
+github.com/onsi/ginkgo/v2 v2.7.0/go.mod h1:yjiuMwPokqY1XauOgju45q3sJt6VzQ/Fict1LFVcsAo=
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7JYyY=
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=

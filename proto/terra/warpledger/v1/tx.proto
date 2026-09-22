@@ -1,0 +1,99 @@
+syntax = "proto3";
+package terra.warpledger.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos/msg/v1/msg.proto";
+import "amino/amino.proto";
+import "cosmos_proto/cosmos.proto";
+import "terra/warpledger/v1/warpledger.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/warpledger/types";
+
+// Msg defines the x/warpledger Msg service.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  // UpdateParams updates the module parameters (governance only).
+  rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
+  // SetDomainCap sets the net exposure cap of a (token, domain) pair (governance only).
+  rpc SetDomainCap(MsgSetDomainCap) returns (MsgSetDomainCapResponse);
+  // SweepMigration forwards the balance of a derived migration deposit address
+  // to its (domain, recipient) through the native warp route. Permissionless.
+  rpc SweepMigration(MsgSweepMigration) returns (MsgSweepMigrationResponse);
+}
+
+// MsgUpdateParams is the Msg/UpdateParams request type.
+message MsgUpdateParams {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/warpledger/MsgUpdateParams";
+
+  // authority is the address that controls the module (defaults to x/gov).
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // params defines the x/warpledger parameters to update. All must be supplied.
+  Params params = 2 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+// MsgUpdateParamsResponse defines the Msg/UpdateParams response type.
+message MsgUpdateParamsResponse {}
+
+// MsgSetDomainCap is the Msg/SetDomainCap request type.
+message MsgSetDomainCap {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/warpledger/MsgSetDomainCap";
+
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // token_id is the hyperlane id of the warp token.
+  string token_id = 2 [
+    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable)   = false
+  ];
+  // domain is the remote hyperlane domain id.
+  uint32 domain = 3;
+  // cap is the maximum allowed net exposure (sent - received) for the pair.
+  string cap = 4 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
+}
+
+// MsgSetDomainCapResponse defines the Msg/SetDomainCap response type.
+message MsgSetDomainCapResponse {}
+
+// MsgSweepMigration is the Msg/SweepMigration request type (spec §10.2).
+message MsgSweepMigration {
+  option (cosmos.msg.v1.signer) = "sender";
+  option (amino.name)           = "terra/warpledger/MsgSweepMigration";
+
+  // sender pays the gas of the sweep; it can be any account.
+  string sender = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // token_id is the native warp collateral token used for the second leg.
+  string token_id = 2 [
+    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable)   = false
+  ];
+  // domain is the destination hyperlane domain id.
+  uint32 domain = 3;
+  // recipient is the 32-byte recipient on the destination domain.
+  string recipient = 4 [
+    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable)   = false
+  ];
+}
+
+// MsgSweepMigrationResponse defines the Msg/SweepMigration response type.
+message MsgSweepMigrationResponse {
+  // message_id is the hyperlane message id of the dispatched transfer.
+  string message_id = 1 [
+    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable)   = false
+  ];
+  // amount is the amount transferred after the interchain gas fee was deducted.
+  string amount = 2 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
+  // deposit_address is the derived address that was swept.
+  string deposit_address = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}

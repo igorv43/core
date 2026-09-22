@@ -1,0 +1,47 @@
+syntax = "proto3";
+package terra.warpledger.v1;
+
+option go_package = "github.com/classic-terra/core/v4/x/warpledger/types";
+
+// EventRecordSent is emitted when an outbound warp transfer is accounted.
+message EventRecordSent {
+  string token_id = 1;
+  uint32 domain   = 2;
+  string amount   = 3;
+  string sent     = 4;
+  string received = 5;
+  string exposure = 6;
+}
+
+// EventRecordReceived is emitted when an inbound warp transfer is accounted.
+message EventRecordReceived {
+  string token_id = 1;
+  uint32 domain   = 2;
+  string amount   = 3;
+  string sent     = 4;
+  string received = 5;
+  string exposure = 6;
+}
+
+// EventInvariantBroken is emitted in EndBlock when the local solvency
+// invariant `BankBalance(warp, denom) >= sum of exposures` is violated
+// (spec §9.3). Outbound transfers are tripped in x/circuit.
+message EventInvariantBroken {
+  string denom            = 1;
+  string bank_balance     = 2;
+  string sum_exposure     = 3;
+  int64  height           = 4;
+  string disabled_msg_url = 5;
+}
+
+// EventMigrationSwept is emitted when a derived deposit address is swept
+// through the native warp route (spec §10).
+message EventMigrationSwept {
+  string token_id        = 1;
+  uint32 domain          = 2;
+  string recipient       = 3;
+  string deposit_address = 4;
+  string amount          = 5;
+  string fee             = 6;
+  string message_id      = 7;
+}

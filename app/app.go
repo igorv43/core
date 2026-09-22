@@ -31,6 +31,7 @@ import (
 	v14_1 "github.com/classic-terra/core/v4/app/upgrades/v14_1"
 	v14_2 "github.com/classic-terra/core/v4/app/upgrades/v14_2"
 	v14_3 "github.com/classic-terra/core/v4/app/upgrades/v14_3"
+	v15 "github.com/classic-terra/core/v4/app/upgrades/v15"
 	v2 "github.com/classic-terra/core/v4/app/upgrades/v2"
 	v3 "github.com/classic-terra/core/v4/app/upgrades/v3"
 	v4 "github.com/classic-terra/core/v4/app/upgrades/v4"
@@ -71,6 +72,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
@@ -109,6 +111,7 @@ var (
 		v14_1.Upgrade,
 		v14_2.Upgrade,
 		v14_3.Upgrade,
+		v15.Upgrade,
 	}
 
 	// Forks defines forks to be applied to the network
@@ -300,6 +303,8 @@ func NewTerraApp(
 			StakingKeeper:      app.StakingKeeper,
 			TaxKeeper:          &app.TaxKeeper,
 			Cdc:                app.appCodec,
+			CircuitKeeper:      &app.CircuitKeeper,
+			GovAuthority:       authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 		},
 	)
 	if err != nil {

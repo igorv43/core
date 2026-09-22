@@ -1,6 +1,8 @@
 package app
 
 import (
+	"cosmossdk.io/x/circuit"
+	circuittypes "cosmossdk.io/x/circuit/types"
 	"cosmossdk.io/x/evidence"
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
@@ -8,6 +10,10 @@ import (
 	"cosmossdk.io/x/upgrade"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	hyperlanecore "github.com/bcp-innovations/hyperlane-cosmos/x/core"
+	hyperlanetypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
+	"github.com/bcp-innovations/hyperlane-cosmos/x/warp"
+	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	terraappparams "github.com/classic-terra/core/v4/app/params"
 	// unnamed import of statik for swagger UI support
 	_ "github.com/classic-terra/core/v4/client/docs/statik"
@@ -19,11 +25,13 @@ import (
 	customevidence "github.com/classic-terra/core/v4/custom/evidence"
 	customfeegrant "github.com/classic-terra/core/v4/custom/feegrant"
 	customgov "github.com/classic-terra/core/v4/custom/gov"
+	customhyperlane "github.com/classic-terra/core/v4/custom/hyperlane"
 	custommint "github.com/classic-terra/core/v4/custom/mint"
 	customparams "github.com/classic-terra/core/v4/custom/params"
 	customslashing "github.com/classic-terra/core/v4/custom/slashing"
 	customstaking "github.com/classic-terra/core/v4/custom/staking"
 	customupgrade "github.com/classic-terra/core/v4/custom/upgrade"
+	customwarp "github.com/classic-terra/core/v4/custom/warp"
 	customwasm "github.com/classic-terra/core/v4/custom/wasm"
 	"github.com/classic-terra/core/v4/x/dyncomm"
 	dyncommtypes "github.com/classic-terra/core/v4/x/dyncomm/types"
@@ -41,6 +49,8 @@ import (
 	treasuryclient "github.com/classic-terra/core/v4/x/treasury/client"
 	treasurytypes "github.com/classic-terra/core/v4/x/treasury/types"
 	"github.com/classic-terra/core/v4/x/vesting"
+	"github.com/classic-terra/core/v4/x/warpledger"
+	warpledgertypes "github.com/classic-terra/core/v4/x/warpledger/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -115,6 +125,11 @@ var (
 		ibchooks.AppModuleBasic{},
 		consensus.AppModuleBasic{},
 		taxmodule.AppModuleBasic{},
+		// Liquidity Fabric (phase 1)
+		circuit.AppModuleBasic{},
+		hyperlanecore.AppModule{},
+		warp.AppModule{},
+		warpledger.AppModuleBasic{},
 	)
 	// module account permissions
 	maccPerms = map[string][]string{
@@ -131,6 +146,11 @@ var (
 		ibctransfertypes.ModuleName:    {authtypes.Minter, authtypes.Burner},
 		icatypes.ModuleName:            nil,
 		wasmtypes.ModuleName:           {authtypes.Burner},
+		// Liquidity Fabric (phase 1): hyperlane core holds IGP fees; warp mints
+		// and burns synthetic denoms and custodies collateral. Neither may
+		// receive plain MsgSend (not in allowedReceivingModAcc).
+		hyperlanetypes.ModuleName: nil,
+		warptypes.ModuleName:      {authtypes.Minter, authtypes.Burner},
 	}
 	// module accounts that are allowed to receive tokens
 	allowedReceivingModAcc = map[string]bool{
@@ -173,6 +193,11 @@ func appModules(
 		ibchooks.NewAppModule(app.AccountKeeper),
 		consensus.NewAppModule(appCodec, app.ConsensusParamsKeeper),
 		taxmodule.NewAppModule(appCodec, app.TaxKeeper),
+		// Liquidity Fabric (phase 1)
+		circuit.NewAppModule(appCodec, app.CircuitKeeper),
+		customhyperlane.NewAppModule(appCodec, app.HyperlaneKeeper, app.WarpLedgerKeeper),
+		customwarp.NewAppModule(appCodec, app.WarpKeeper, app.WarpLedgerKeeper),
+		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
 	}
 }
 
@@ -234,6 +259,11 @@ func orderBeginBlockers() []string {
 		wasmtypes.ModuleName,
 		dyncommtypes.ModuleName,
 		taxtypes.ModuleName,
+		// Liquidity Fabric (phase 1)
+		circuittypes.ModuleName,
+		hyperlanetypes.ModuleName,
+		warptypes.ModuleName,
+		warpledgertypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -268,6 +298,11 @@ func orderEndBlockers() []string {
 		wasmtypes.ModuleName,
 		dyncommtypes.ModuleName,
 		taxtypes.ModuleName,
+		// Liquidity Fabric (phase 1)
+		circuittypes.ModuleName,
+		hyperlanetypes.ModuleName,
+		warptypes.ModuleName,
+		warpledgertypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -302,6 +337,11 @@ func orderInitGenesis() []string {
 		wasmtypes.ModuleName,
 		dyncommtypes.ModuleName,
 		taxtypes.ModuleName,
+		// Liquidity Fabric (phase 1)
+		circuittypes.ModuleName,
+		hyperlanetypes.ModuleName,
+		warptypes.ModuleName,
+		warpledgertypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}

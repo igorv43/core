@@ -1,0 +1,84 @@
+syntax = "proto3";
+package terra.warpledger.v1;
+
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
+import "terra/warpledger/v1/warpledger.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/warpledger/types";
+
+// Query defines the x/warpledger gRPC query service (spec §9.7, Anexo E.1).
+service Query {
+  // Params returns the module parameters.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/terra/warpledger/v1/params";
+  }
+  // WarpLedger returns the per-domain ledger and solvency figures of a warp token.
+  rpc WarpLedger(QueryWarpLedgerRequest) returns (QueryWarpLedgerResponse) {
+    option (google.api.http).get = "/terra/warpledger/v1/ledgers/{token_id}";
+  }
+  // WarpLedgers returns the ledgers of every tracked warp token.
+  rpc WarpLedgers(QueryWarpLedgersRequest) returns (QueryWarpLedgersResponse) {
+    option (google.api.http).get = "/terra/warpledger/v1/ledgers";
+  }
+  // DepositAddress derives the migration deposit address for (token, domain, recipient).
+  rpc DepositAddress(QueryDepositAddressRequest) returns (QueryDepositAddressResponse) {
+    option (google.api.http).get = "/terra/warpledger/v1/deposit_address/{token_id}/{domain}/{recipient}";
+  }
+}
+
+message QueryParamsRequest {}
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryWarpLedgerRequest {
+  // token_id is the hex id of the warp token.
+  string token_id = 1;
+}
+
+// DomainExposure is a DomainLedger with the derived exposure and effective cap.
+message DomainExposure {
+  uint32 domain   = 1;
+  string sent     = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string received = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // exposure = sent - received.
+  string exposure = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // cap is the effective cap (explicit or default).
+  string cap = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  bool has_cap = 6;
+}
+
+message QueryWarpLedgerResponse {
+  string token_id   = 1;
+  string denom      = 2;
+  string token_type = 3;
+  // collateral_balance is the collateral counted by x/warp for this token.
+  string collateral_balance = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // bank_balance is the x/warp module account balance of the denom (shared by
+  // all tokens of the same denom).
+  string bank_balance = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // sum_exposure is the sum of the per-domain exposures of this token.
+  string sum_exposure = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  repeated DomainExposure domains = 7 [(gogoproto.nullable) = false];
+  int64 height = 8;
+}
+
+message QueryWarpLedgersRequest {}
+message QueryWarpLedgersResponse {
+  repeated QueryWarpLedgerResponse ledgers = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryDepositAddressRequest {
+  string token_id  = 1;
+  uint32 domain    = 2;
+  // recipient is the 32-byte hex recipient on the destination domain.
+  string recipient = 3;
+}
+message QueryDepositAddressResponse {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string denom   = 2;
+  // balance is the current sweepable balance of the deposit address in denom.
+  string balance = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}

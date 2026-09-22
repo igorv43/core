@@ -1,0 +1,57 @@
+syntax = "proto3";
+package terra.warpledger.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "amino/amino.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/warpledger/types";
+
+// Params defines the x/warpledger parameters.
+message Params {
+  option (amino.name)      = "terra/warpledger/Params";
+  option (gogoproto.equal) = true;
+
+  // default_domain_cap is the net exposure cap applied to a (token, domain)
+  // pair that has no explicit cap set by governance. Zero blocks outbound
+  // transfers on such pairs until MsgSetDomainCap is executed.
+  string default_domain_cap = 1 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false,
+    (amino.dont_omitempty) = true
+  ];
+}
+
+// DomainLedger is the per (warp token, remote domain) accounting record kept
+// in consensus. Net exposure is `sent - received` (spec §9.1).
+message DomainLedger {
+  // token_id is the hyperlane id of the warp token (32-byte hex address).
+  string token_id = 1 [
+    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable)   = false
+  ];
+  // domain is the remote hyperlane domain id.
+  uint32 domain = 2;
+  // sent is the cumulative amount dispatched from Terra Classic to the domain.
+  string sent = 3 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
+  // received is the cumulative amount processed on Terra Classic from the domain.
+  string received = 4 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
+  // cap is the maximum allowed net exposure for the pair. Only meaningful when
+  // has_cap is true; otherwise Params.default_domain_cap applies.
+  string cap = 5 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
+  // has_cap is true once governance has set an explicit cap for the pair.
+  bool has_cap = 6;
+}

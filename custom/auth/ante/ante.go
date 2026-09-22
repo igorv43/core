@@ -3,6 +3,7 @@ package ante
 import (
 	corestoretypes "cosmossdk.io/core/store"
 	errorsmod "cosmossdk.io/errors"
+	circuitante "cosmossdk.io/x/circuit/ante"
 	txsigning "cosmossdk.io/x/tx/signing"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
@@ -43,6 +44,10 @@ type HandlerOptions struct {
 	StakingKeeper          *stakingkeeper.Keeper
 	TaxKeeper              *taxkeeper.Keeper
 	Cdc                    codec.BinaryCodec
+	// Liquidity Fabric (phase 1): x/circuit breaker and the governance
+	// authority that alone may reset a tripped breaker.
+	CircuitKeeper circuitante.CircuitBreaker
+	GovAuthority  string
 }
 
 // NewAnteHandler returns an AnteHandler that checks and increments sequence
@@ -81,6 +86,14 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 		return nil, errorsmod.Wrap(sdkerrors.ErrLogic, "tax handler is required for ante builder")
 	}
 
+	if options.CircuitKeeper == nil {
+		return nil, errorsmod.Wrap(sdkerrors.ErrLogic, "circuit keeper is required for ante builder")
+	}
+
+	if options.GovAuthority == "" {
+		return nil, errorsmod.Wrap(sdkerrors.ErrLogic, "governance authority is required for ante builder")
+	}
+
 	return sdk.ChainAnteDecorators(
 		ante.NewSetUpContextDecorator(), // outermost AnteDecorator. SetUpContext must be called first
 		wasmkeeper.NewLimitSimulationGasDecorator(options.WasmConfig.SimulationGasLimit),
@@ -88,6 +101,10 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 		wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()),
 		ante.NewExtensionOptionsDecorator(options.ExtensionOptionChecker),
 		ante.NewValidateBasicDecorator(),
+		// x/circuit: reject messages whose type is currently tripped (same position as simapp);
+		// reset is restricted to governance (spec §6.3, D-03)
+		circuitante.NewCircuitBreakerDecorator(options.CircuitKeeper),
+		NewCircuitResetGuardDecorator(options.GovAuthority),
 		ante.NewTxTimeoutHeightDecorator(),
 		ante.NewValidateMemoDecorator(options.AccountKeeper),
 		// SpammingPreventionDecorator prevents spamming oracle vote tx attempts at same height

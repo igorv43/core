@@ -6,6 +6,8 @@ import (
 
 	sdklog "cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
+	circuitkeeper "cosmossdk.io/x/circuit/keeper"
+	circuittypes "cosmossdk.io/x/circuit/types"
 	evidencekeeper "cosmossdk.io/x/evidence/keeper"
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
@@ -15,6 +17,10 @@ import (
 	wasm "github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	hyperlanekeeper "github.com/bcp-innovations/hyperlane-cosmos/x/core/keeper"
+	hyperlanetypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
+	warpkeeper "github.com/bcp-innovations/hyperlane-cosmos/x/warp/keeper"
+	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	customstaking "github.com/classic-terra/core/v4/custom/staking"
 	customwasmkeeper "github.com/classic-terra/core/v4/custom/wasm/keeper"
 	terrawasm "github.com/classic-terra/core/v4/wasmbinding"
@@ -30,6 +36,8 @@ import (
 	taxexemptiontypes "github.com/classic-terra/core/v4/x/taxexemption/types"
 	treasurykeeper "github.com/classic-terra/core/v4/x/treasury/keeper"
 	treasurytypes "github.com/classic-terra/core/v4/x/treasury/types"
+	warpledgerkeeper "github.com/classic-terra/core/v4/x/warpledger/keeper"
+	warpledgertypes "github.com/classic-terra/core/v4/x/warpledger/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/address"
@@ -106,6 +114,12 @@ type AppKeepers struct {
 	ConsensusParamsKeeper consensusparamkeeper.Keeper
 	TaxKeeper             taxkeeper.Keeper
 
+	// Liquidity Fabric (phase 1): SDK circuit breaker and native Hyperlane
+	CircuitKeeper    circuitkeeper.Keeper
+	HyperlaneKeeper  *hyperlanekeeper.Keeper // pointer: warp and the app router hold a reference
+	WarpKeeper       warpkeeper.Keeper
+	WarpLedgerKeeper warpledgerkeeper.Keeper
+
 	Ics20WasmHooks  *ibchooks.WasmHooks
 	IBCHooksWrapper *ibchooks.ICS4Middleware
 	TransferStack   ibctransfer.IBCModule
@@ -149,6 +163,10 @@ func NewAppKeepers(
 		wasmtypes.StoreKey:           storetypes.NewKVStoreKey(wasmtypes.StoreKey),
 		dyncommtypes.StoreKey:        storetypes.NewKVStoreKey(dyncommtypes.StoreKey),
 		taxtypes.StoreKey:            storetypes.NewKVStoreKey(taxtypes.StoreKey),
+		circuittypes.StoreKey:        storetypes.NewKVStoreKey(circuittypes.StoreKey),
+		hyperlanetypes.ModuleName:    storetypes.NewKVStoreKey(hyperlanetypes.ModuleName),
+		warptypes.ModuleName:         storetypes.NewKVStoreKey(warptypes.ModuleName),
+		warpledgertypes.StoreKey:     storetypes.NewKVStoreKey(warpledgertypes.StoreKey),
 	}
 	tkeys := map[string]*storetypes.TransientStoreKey{
 		paramstypes.TStoreKey: storetypes.NewTransientStoreKey(paramstypes.TStoreKey),
@@ -474,6 +492,54 @@ func NewAppKeepers(
 		appKeepers.keys[dyncommtypes.StoreKey],
 		appKeepers.GetSubspace(dyncommtypes.ModuleName),
 		appKeepers.StakingKeeper,
+	)
+
+	// Liquidity Fabric (phase 1)
+	// x/circuit: pause by message type. Trip permissions are granted by
+	// governance; reset is restricted to governance by the ante handler.
+	appKeepers.CircuitKeeper = circuitkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[circuittypes.StoreKey]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		accAddrCodec,
+	)
+
+	// Hyperlane x/core (mailbox, ISM, hooks, IGP), owned by governance.
+	hyperlaneKeeper := hyperlanekeeper.NewKeeper(
+		appCodec,
+		accAddrCodec,
+		runtime.NewKVStoreService(appKeepers.keys[hyperlanetypes.ModuleName]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.BankKeeper,
+	)
+	appKeepers.HyperlaneKeeper = &hyperlaneKeeper
+
+	// Hyperlane x/warp (collateral + synthetic tokens). Registers itself in the
+	// core app router with token type ids 1 and 2.
+	appKeepers.WarpKeeper = warpkeeper.NewKeeper(
+		appCodec,
+		accAddrCodec,
+		runtime.NewKVStoreService(appKeepers.keys[warptypes.ModuleName]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.BankKeeper,
+		appKeepers.HyperlaneKeeper,
+		[]int32{
+			int32(warptypes.HYP_TOKEN_TYPE_COLLATERAL),
+			int32(warptypes.HYP_TOKEN_TYPE_SYNTHETIC),
+		},
+	)
+
+	// x/warpledger: per-domain exposure ledger, caps, solvency invariant and
+	// migration sweeps. Interposed on warp/core message servers (custom/warp,
+	// custom/hyperlane); trips x/circuit on invariant violation.
+	appKeepers.WarpLedgerKeeper = warpledgerkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[warpledgertypes.StoreKey]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.BankKeeper,
+		&appKeepers.WarpKeeper,
+		warpledgerkeeper.NewCircuitAdapter(&appKeepers.CircuitKeeper),
+		bApp.MsgServiceRouter(),
 	)
 
 	// Create static IBC router, add transfer route, then set and seal it

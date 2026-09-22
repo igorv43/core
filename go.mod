@@ -7,17 +7,20 @@ module github.com/classic-terra/core/v4
 require (
 	cosmossdk.io/api v0.9.2
 	cosmossdk.io/client/v2 v2.0.0-beta.8
+	cosmossdk.io/collections v1.3.1
 	cosmossdk.io/core v0.11.3
 	cosmossdk.io/errors v1.0.2
 	cosmossdk.io/log v1.6.1
 	cosmossdk.io/math v1.5.3
 	cosmossdk.io/store v1.1.2
+	cosmossdk.io/x/circuit v0.2.0
 	cosmossdk.io/x/evidence v0.2.0
 	cosmossdk.io/x/feegrant v0.2.0
 	cosmossdk.io/x/tx v1.1.0
 	cosmossdk.io/x/upgrade v0.2.0
 	github.com/CosmWasm/wasmd v0.61.8
 	github.com/CosmWasm/wasmvm/v3 v3.0.3
+	github.com/bcp-innovations/hyperlane-cosmos v1.2.0-rc.0
 	github.com/cometbft/cometbft v0.38.21
 	github.com/cosmos/cosmos-db v1.1.3
 	github.com/cosmos/cosmos-sdk v0.53.6
@@ -46,7 +49,6 @@ require (
 	cloud.google.com/go/auth v0.16.4 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/monitoring v1.24.2 // indirect
-	cosmossdk.io/collections v1.3.1 // indirect
 	cosmossdk.io/depinject v1.2.1 // indirect
 	cosmossdk.io/schema v1.1.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect

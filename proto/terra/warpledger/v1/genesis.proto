@@ -1,0 +1,14 @@
+syntax = "proto3";
+package terra.warpledger.v1;
+
+import "gogoproto/gogo.proto";
+import "amino/amino.proto";
+import "terra/warpledger/v1/warpledger.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/warpledger/types";
+
+// GenesisState defines the x/warpledger module's genesis state.
+message GenesisState {
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+  repeated DomainLedger ledgers = 2 [(gogoproto.nullable) = false];
+}
