@@ -8,6 +8,7 @@ const (
 	EventTypeFeedDelegate       = "feed_delegate"
 	EventTypeAggregatePrevote   = "aggregate_prevote"
 	EventTypeAggregateVote      = "aggregate_vote"
+	EventTypeAssetPriceUpdate   = "asset_price_update"
 
 	AttributeKeyDenom         = "denom"
 	AttributeKeyVoter         = "voter"
@@ -15,6 +16,9 @@ const (
 	AttributeKeyExchangeRates = "exchange_rates"
 	AttributeKeyOperator      = "operator"
 	AttributeKeyFeeder        = "feeder"
+	AttributeKeyAsset         = "asset"
+	AttributeKeyPrice         = "price"
+	AttributeKeyDepth         = "depth"
 
 	AttributeValueCategory = ModuleName
 )

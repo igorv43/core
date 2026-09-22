@@ -92,6 +92,18 @@ service Query {
   rpc RateHistory(QueryRateHistoryRequest) returns (QueryRateHistoryResponse) {
     option (google.api.http).get = "/terra/oracle/v1beta1/denoms/{denom}/rate_history";
   }
+  // AssetPrice returns the USD price and Depth2% of an asset (spec §21.6 stage 2).
+  rpc AssetPrice(QueryAssetPriceRequest) returns (QueryAssetPriceResponse) {
+    option (google.api.http).get = "/terra/oracle/v1beta1/assets/{asset}/price";
+  }
+  // AssetPrices returns the USD prices of every asset with consensus this period.
+  rpc AssetPrices(QueryAssetPricesRequest) returns (QueryAssetPricesResponse) {
+    option (google.api.http).get = "/terra/oracle/v1beta1/assets/prices";
+  }
+  // AssetTargets returns the active asset vote targets.
+  rpc AssetTargets(QueryAssetTargetsRequest) returns (QueryAssetTargetsResponse) {
+    option (google.api.http).get = "/terra/oracle/v1beta1/assets/targets";
+  }
 }
 
 // QueryExchangeRateRequest is the request type for the Query/ExchangeRate RPC method.
@@ -321,4 +333,46 @@ message QueryRateHistoryRequest {
 // QueryRateHistoryResponse is the response type for the Query/RateHistory RPC method.
 message QueryRateHistoryResponse {
   repeated RateSample samples = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryAssetPriceRequest is the request type for the Query/AssetPrice RPC method.
+message QueryAssetPriceRequest {
+  option (gogoproto.equal)           = false;
+  option (gogoproto.goproto_getters) = false;
+
+  string asset = 1;
+}
+
+// QueryAssetPriceResponse is the response type for the Query/AssetPrice RPC method.
+message QueryAssetPriceResponse {
+  // price is the consensus USD price per unit of the asset.
+  string price = 1 [
+    (cosmos_proto.scalar)  = "cosmos.Dec",
+    (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
+    (gogoproto.nullable)   = false
+  ];
+  // depth is the consensus Depth2% in USD micro units (0 when not reported).
+  string depth = 2 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
+}
+
+// QueryAssetPricesRequest is the request type for the Query/AssetPrices RPC method.
+message QueryAssetPricesRequest {}
+
+// QueryAssetPricesResponse is the response type for the Query/AssetPrices RPC method.
+message QueryAssetPricesResponse {
+  // prices lists asset name, USD price and depth.
+  repeated ExchangeRateTuple prices = 1
+      [(gogoproto.castrepeated) = "ExchangeRateTuples", (gogoproto.nullable) = false];
+}
+
+// QueryAssetTargetsRequest is the request type for the Query/AssetTargets RPC method.
+message QueryAssetTargetsRequest {}
+
+// QueryAssetTargetsResponse is the response type for the Query/AssetTargets RPC method.
+message QueryAssetTargetsResponse {
+  repeated Asset asset_targets = 1 [(gogoproto.castrepeated) = "AssetList", (gogoproto.nullable) = false];
 }

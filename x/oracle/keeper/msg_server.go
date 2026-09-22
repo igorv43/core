@@ -95,9 +95,10 @@ func (ms msgServer) AggregateExchangeRateVote(goCtx context.Context, msg *types.
 		return nil, errorsmod.Wrap(sdkerrors.ErrInvalidCoins, err.Error())
 	}
 
-	// check all denoms are in the vote target
+	// check all denoms are in the vote target (denoms of the LUNC-centric
+	// whitelist or assets priced in USD, spec §21.6 stage 2)
 	for _, tuple := range exchangeRateTuples {
-		if !ms.IsVoteTarget(ctx, tuple.Denom) {
+		if !ms.IsVoteTarget(ctx, tuple.Denom) && !ms.IsAssetTarget(ctx, tuple.Denom) {
 			return nil, errorsmod.Wrap(types.ErrUnknownDenom, tuple.Denom)
 		}
 	}

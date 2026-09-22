@@ -44,6 +44,25 @@ message Params {
     (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
     (gogoproto.nullable)   = false
   ];
+  // asset_whitelist lists the assets priced in USD by the same ballot
+  // (Liquidity Fabric spec §21.6 stage 2). Names must not collide with the
+  // denom whitelist; an asset vote is "USD per unit of the asset", not
+  // "LUNC in the asset".
+  repeated Asset asset_whitelist = 9 [
+    (gogoproto.moretags)     = "yaml:\"asset_whitelist\"",
+    (gogoproto.castrepeated) = "AssetList",
+    (gogoproto.nullable)     = false
+  ];
+}
+
+// Asset is an entry of the asset whitelist: an asset priced directly in USD
+// (spec §21.6 stage 2), e.g. "ubtc" or "ueth". It is not a bank denom.
+message Asset {
+  option (gogoproto.equal)            = false;
+  option (gogoproto.goproto_getters)  = false;
+  option (gogoproto.goproto_stringer) = false;
+
+  string name = 1 [(gogoproto.moretags) = "yaml:\"name\""];
 }
 
 // Denom - the object to hold configurations of each denom
@@ -103,6 +122,15 @@ message ExchangeRateTuple {
     (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
     (gogoproto.nullable)   = false
   ];
+  // depth is the aggregated order-book depth at ±2% reported by the feeder
+  // for an asset, in USD micro units (spec §21.3 Depth2%). Zero when not
+  // reported; ignored for denoms of the LUNC-centric whitelist.
+  string depth = 3 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.moretags)   = "yaml:\"depth\"",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
 }
 
 // RateSample is the consensus exchange rate of a denom at the end of one vote
@@ -128,4 +156,11 @@ message RateSample {
   uint64 vote_period = 4;
   int64  height      = 5;
   google.protobuf.Timestamp time = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+  // depth is the voting-power weighted median of the Depth2% reported for an
+  // asset (USD micro units); zero for denoms and when no feeder reported it.
+  string depth = 7 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
 }

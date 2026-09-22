@@ -17,8 +17,9 @@ type BankKeeper interface {
 
 // OracleKeeper is the subset of x/oracle used for the reference price.
 type OracleKeeper interface {
-	// GetLunaExchangeRate returns the LUNC price in the given denom.
-	GetLunaExchangeRate(ctx sdk.Context, denom string) (math.LegacyDec, error)
+	// GetPrice returns the reference price of a name: the USD price of an
+	// asset target or the LUNC exchange rate in a whitelisted denom.
+	GetPrice(ctx sdk.Context, name string) (math.LegacyDec, error)
 }
 
 // FeeSink receives protocol fees and slashes. Until the insurance fund of

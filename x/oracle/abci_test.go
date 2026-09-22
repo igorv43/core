@@ -701,3 +701,143 @@ func makeAggregatePrevoteAndVote(t *testing.T, input keeper.TestInput, h types.M
 	_, err = h.AggregateExchangeRateVote(input.Ctx.WithBlockHeight(height+1), voteMsg)
 	require.NoError(t, err)
 }
+
+// makeAggregatePrevoteAndVoteStr is makeAggregatePrevoteAndVote for a raw
+// exchange-rate string (needed for the "@depth" syntax of asset votes).
+func makeAggregatePrevoteAndVoteStr(t *testing.T, input keeper.TestInput, h types.MsgServer, height int64, rates string, idx int) {
+	salt := "1"
+	hash := types.GetAggregateVoteHash(salt, rates, keeper.ValAddrs[idx])
+
+	prevoteMsg := types.NewMsgAggregateExchangeRatePrevote(hash, keeper.Addrs[idx], keeper.ValAddrs[idx])
+	_, err := h.AggregateExchangeRatePrevote(input.Ctx.WithBlockHeight(height), prevoteMsg)
+	require.NoError(t, err)
+
+	voteMsg := types.NewMsgAggregateExchangeRateVote(salt, rates, keeper.Addrs[idx], keeper.ValAddrs[idx])
+	_, err = h.AggregateExchangeRateVote(input.Ctx.WithBlockHeight(height+1), voteMsg)
+	require.NoError(t, err)
+}
+
+// enableAsset whitelists an asset and activates it as a vote target; the
+// denom whitelist is narrowed to SDR so the miss rule counts SDR + asset.
+func enableAsset(t *testing.T, input keeper.TestInput, name string) {
+	params := input.OracleKeeper.GetParams(input.Ctx)
+	params.Whitelist = types.DenomList{{Name: core.MicroSDRDenom, TobinTax: types.DefaultTobinTax}}
+	params.AssetWhitelist = types.AssetList{{Name: name}}
+	input.OracleKeeper.SetParams(input.Ctx, params)
+	input.OracleKeeper.ClearTobinTaxes(input.Ctx)
+	input.OracleKeeper.SetTobinTax(input.Ctx, core.MicroSDRDenom, types.DefaultTobinTax)
+	input.OracleKeeper.ApplyAssetWhitelist(input.Ctx, params.AssetWhitelist)
+	require.True(t, input.OracleKeeper.IsAssetTarget(input.Ctx, name))
+}
+
+func TestAssetVoteTallyAndDepth(t *testing.T) {
+	input, h := setup(t)
+	enableAsset(t, input, "ubtc")
+	sdr := randomExchangeRate.String() + core.MicroSDRDenom
+
+	// three validators of equal power inside the reward band: price median 65000, depth median 1500
+	makeAggregatePrevoteAndVoteStr(t, input, h, 0, "64900.0ubtc@1000,"+sdr, 0)
+	makeAggregatePrevoteAndVoteStr(t, input, h, 0, "65000.0ubtc@1500,"+sdr, 1)
+	makeAggregatePrevoteAndVoteStr(t, input, h, 0, "65100.0ubtc@2000,"+sdr, 2)
+
+	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
+
+	price, depth, err := input.OracleKeeper.GetAssetPrice(input.Ctx, "ubtc")
+	require.NoError(t, err)
+	require.Equal(t, "65000.000000000000000000", price.String())
+	require.Equal(t, "1500", depth.String())
+
+	// GetPrice resolves assets and denoms alike
+	p, err := input.OracleKeeper.GetPrice(input.Ctx, "ubtc")
+	require.NoError(t, err)
+	require.True(t, p.Equal(price))
+	p, err = input.OracleKeeper.GetPrice(input.Ctx, core.MicroSDRDenom)
+	require.NoError(t, err)
+	require.True(t, p.Equal(randomExchangeRate))
+
+	// the rate sample carries the depth for the listing criterion (§21.3)
+	sample, err := input.OracleKeeper.GetRateSample(input.Ctx, "ubtc")
+	require.NoError(t, err)
+	require.Equal(t, "1500", sample.Depth.String())
+	require.True(t, sample.Dispersion.IsPositive())
+
+	// everyone was inside the band: no misses
+	for i := 0; i < 3; i++ {
+		require.Equal(t, uint64(0), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[i]))
+	}
+
+	// a period without asset votes clears the price (no stale data) and
+	// counts no miss: the failed ballot is not held against validators
+	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: randomExchangeRate}}, 0)
+	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: randomExchangeRate}}, 1)
+	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: randomExchangeRate}}, 2)
+	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
+	_, _, err = input.OracleKeeper.GetAssetPrice(input.Ctx, "ubtc")
+	require.Error(t, err)
+	for i := 0; i < 3; i++ {
+		require.Equal(t, uint64(0), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[i]))
+	}
+}
+
+func TestAssetVoteMissAndDepthOptional(t *testing.T) {
+	input, h := setup(t)
+	enableAsset(t, input, "ueth")
+	sdr := randomExchangeRate.String() + core.MicroSDRDenom
+
+	// two validators vote the asset (ballot passes at 2/3 power), the third
+	// does not: it misses. Only one reports depth: the depth median is his.
+	makeAggregatePrevoteAndVoteStr(t, input, h, 0, "3000.0ueth@777,"+sdr, 0)
+	makeAggregatePrevoteAndVoteStr(t, input, h, 0, "3000.0ueth,"+sdr, 1)
+	makeAggregatePrevoteAndVoteStr(t, input, h, 0, sdr, 2)
+
+	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
+
+	price, depth, err := input.OracleKeeper.GetAssetPrice(input.Ctx, "ueth")
+	require.NoError(t, err)
+	require.Equal(t, "3000.000000000000000000", price.String())
+	require.Equal(t, "777", depth.String())
+	require.Equal(t, uint64(0), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[0]))
+	require.Equal(t, uint64(0), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[1]))
+	require.Equal(t, uint64(1), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[2]))
+}
+
+func TestAssetVoteRejectedWhenNotTarget(t *testing.T) {
+	input, h := setup(t)
+	rates := "65000.0ubtc@1000," + randomExchangeRate.String() + core.MicroSDRDenom
+	hash := types.GetAggregateVoteHash("1", rates, keeper.ValAddrs[0])
+	_, err := h.AggregateExchangeRatePrevote(input.Ctx.WithBlockHeight(0), types.NewMsgAggregateExchangeRatePrevote(hash, keeper.Addrs[0], keeper.ValAddrs[0]))
+	require.NoError(t, err)
+	_, err = h.AggregateExchangeRateVote(input.Ctx.WithBlockHeight(1), types.NewMsgAggregateExchangeRateVote("1", rates, keeper.Addrs[0], keeper.ValAddrs[0]))
+	require.ErrorIs(t, err, types.ErrUnknownDenom)
+}
+
+func TestAssetWhitelistApplyAndGenesis(t *testing.T) {
+	input, _ := setup(t)
+	params := input.OracleKeeper.GetParams(input.Ctx)
+	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}
+	input.OracleKeeper.SetParams(input.Ctx, params)
+
+	// applied at the end of the period, like the denom whitelist
+	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
+	require.Equal(t, types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
+
+	params.AssetWhitelist = types.AssetList{{Name: "ueth"}}
+	input.OracleKeeper.SetParams(input.Ctx, params)
+	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
+	require.Equal(t, types.AssetList{{Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
+
+	// genesis round-trip keeps targets and prices
+	input.OracleKeeper.SetAssetPrice(input.Ctx, "ueth", sdkmath.LegacyNewDec(3000))
+	gs := oracle.ExportGenesis(input.Ctx, input.OracleKeeper)
+	require.Equal(t, types.AssetList{{Name: "ueth"}}, gs.AssetTargets)
+	require.Len(t, gs.AssetPrices, 1)
+	require.NoError(t, types.ValidateGenesis(gs))
+
+	// a name shared with the denom whitelist is invalid
+	params.AssetWhitelist = types.AssetList{{Name: core.MicroSDRDenom}}
+	require.Error(t, params.Validate())
+	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ubtc"}}
+	require.Error(t, params.Validate())
+	params.AssetWhitelist = types.AssetList{{Name: core.MicroLunaDenom}}
+	require.Error(t, params.Validate())
+}

@@ -70,3 +70,12 @@ func (k Keeper) GetParams(ctx sdk.Context) (params types.Params) {
 func (k Keeper) SetParams(ctx sdk.Context, params types.Params) {
 	k.paramSpace.SetParamSet(ctx, &params)
 }
+
+// EnsureAssetWhitelistParam writes an empty asset whitelist when the key does
+// not exist yet (chains upgraded from before spec §21.6 stage 2), so that
+// GetParams does not panic on the missing key. Called by the upgrade handler.
+func (k Keeper) EnsureAssetWhitelistParam(ctx sdk.Context) {
+	if !k.paramSpace.Has(ctx, types.KeyAssetWhitelist) {
+		k.paramSpace.Set(ctx, types.KeyAssetWhitelist, types.AssetList{})
+	}
+}

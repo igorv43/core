@@ -270,3 +270,38 @@ func (q querier) RateHistory(c context.Context, req *types.QueryRateHistoryReque
 	}
 	return &types.QueryRateHistoryResponse{Samples: samples}, nil
 }
+
+// AssetPrice queries the consensus USD price and Depth2% of an asset (spec §21.6 stage 2)
+func (q querier) AssetPrice(c context.Context, req *types.QueryAssetPriceRequest) (*types.QueryAssetPriceResponse, error) {
+	if req == nil || len(req.Asset) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "empty asset")
+	}
+	ctx := sdk.UnwrapSDKContext(c)
+	price, depth, err := q.GetAssetPrice(ctx, req.Asset)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	return &types.QueryAssetPriceResponse{Price: price, Depth: depth}, nil
+}
+
+// AssetPrices queries the consensus USD prices of every asset
+func (q querier) AssetPrices(c context.Context, _ *types.QueryAssetPricesRequest) (*types.QueryAssetPricesResponse, error) {
+	ctx := sdk.UnwrapSDKContext(c)
+	prices := types.ExchangeRateTuples{}
+	q.IterateAssetPrices(ctx, func(asset string, price math.LegacyDec) (stop bool) {
+		_, depth, _ := q.GetAssetPrice(ctx, asset)
+		prices = append(prices, types.ExchangeRateTuple{Denom: asset, ExchangeRate: price, Depth: depth})
+		return false
+	})
+	return &types.QueryAssetPricesResponse{Prices: prices}, nil
+}
+
+// AssetTargets queries the active asset vote targets
+func (q querier) AssetTargets(c context.Context, _ *types.QueryAssetTargetsRequest) (*types.QueryAssetTargetsResponse, error) {
+	ctx := sdk.UnwrapSDKContext(c)
+	targets := q.GetAssetTargets(ctx)
+	if targets == nil {
+		targets = types.AssetList{}
+	}
+	return &types.QueryAssetTargetsResponse{AssetTargets: targets}, nil
+}

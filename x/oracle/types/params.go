@@ -5,6 +5,7 @@ import (
 
 	"cosmossdk.io/math"
 	core "github.com/classic-terra/core/v4/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"gopkg.in/yaml.v2"
 )
@@ -19,6 +20,7 @@ var (
 	KeySlashFraction            = []byte("SlashFraction")
 	KeySlashWindow              = []byte("SlashWindow")
 	KeyMinValidPerWindow        = []byte("MinValidPerWindow")
+	KeyAssetWhitelist           = []byte("AssetWhitelist")
 )
 
 // Default parameter values
@@ -56,6 +58,7 @@ func DefaultParams() Params {
 		SlashFraction:            DefaultSlashFraction,
 		SlashWindow:              DefaultSlashWindow,
 		MinValidPerWindow:        DefaultMinValidPerWindow,
+		AssetWhitelist:           AssetList{},
 	}
 }
 
@@ -76,6 +79,7 @@ func (p *Params) ParamSetPairs() paramstypes.ParamSetPairs {
 		paramstypes.NewParamSetPair(KeySlashFraction, &p.SlashFraction, validateSlashFraction),
 		paramstypes.NewParamSetPair(KeySlashWindow, &p.SlashWindow, validateSlashWindow),
 		paramstypes.NewParamSetPair(KeyMinValidPerWindow, &p.MinValidPerWindow, validateMinValidPerWindow),
+		paramstypes.NewParamSetPair(KeyAssetWhitelist, &p.AssetWhitelist, validateAssetWhitelist),
 	}
 }
 
@@ -120,6 +124,17 @@ func (p Params) Validate() error {
 		}
 		if len(denom.Name) == 0 {
 			return fmt.Errorf("oracle parameter Whitelist Denom must have name")
+		}
+	}
+
+	// spec §21.6 stage 2: assets are priced in USD and must not collide with
+	// the LUNC-centric denom whitelist
+	if err := validateAssetWhitelist(p.AssetWhitelist); err != nil {
+		return err
+	}
+	for _, denom := range p.Whitelist {
+		if p.AssetWhitelist.Contains(denom.Name) {
+			return fmt.Errorf("oracle parameter AssetWhitelist must not contain the whitelisted denom %s", denom.Name)
 		}
 	}
 	return nil
@@ -200,6 +215,27 @@ func validateWhitelist(i interface{}) error {
 		}
 	}
 
+	return nil
+}
+
+func validateAssetWhitelist(i interface{}) error {
+	v, ok := i.(AssetList)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", i)
+	}
+	seen := make(map[string]struct{}, len(v))
+	for _, a := range v {
+		if err := sdk.ValidateDenom(a.Name); err != nil {
+			return fmt.Errorf("oracle parameter AssetWhitelist has an invalid asset name %q: %w", a.Name, err)
+		}
+		if a.Name == core.MicroLunaDenom {
+			return fmt.Errorf("oracle parameter AssetWhitelist must not contain %s (LUNC is the base of the denom whitelist)", core.MicroLunaDenom)
+		}
+		if _, dup := seen[a.Name]; dup {
+			return fmt.Errorf("oracle parameter AssetWhitelist has a duplicated asset %s", a.Name)
+		}
+		seen[a.Name] = struct{}{}
+	}
 	return nil
 }
 

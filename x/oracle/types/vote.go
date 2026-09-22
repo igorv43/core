@@ -41,8 +41,8 @@ func (v AggregateExchangeRateVote) String() string {
 // NewExchangeRateTuple creates a ExchangeRateTuple instance
 func NewExchangeRateTuple(denom string, exchangeRate math.LegacyDec) ExchangeRateTuple {
 	return ExchangeRateTuple{
-		denom,
-		exchangeRate,
+		Denom:        denom,
+		ExchangeRate: exchangeRate,
 	}
 }
 
@@ -61,6 +61,11 @@ func (tuples ExchangeRateTuples) String() string {
 	return string(out)
 }
 
+// DepthSeparator separates the optional Depth2% of an asset tuple:
+// "65000.0ubtc@1500000000000" (spec §21.3, §21.6 stage 2). The hash of the
+// prevote covers the whole string, so the depth is committed with the price.
+const DepthSeparator = "@"
+
 // ParseExchangeRateTuples ExchangeRateTuple parser
 func ParseExchangeRateTuples(tuplesStr string) (ExchangeRateTuples, error) {
 	tuplesStr = strings.TrimSpace(tuplesStr)
@@ -72,7 +77,8 @@ func ParseExchangeRateTuples(tuplesStr string) (ExchangeRateTuples, error) {
 	tuples := make(ExchangeRateTuples, len(tupleStrs))
 	duplicateCheckMap := make(map[string]bool)
 	for i, tupleStr := range tupleStrs {
-		decCoin, err := sdk.ParseDecCoin(tupleStr)
+		coinStr, depthStr, hasDepth := strings.Cut(tupleStr, DepthSeparator)
+		decCoin, err := sdk.ParseDecCoin(coinStr)
 		if err != nil {
 			return nil, err
 		}
@@ -80,6 +86,13 @@ func ParseExchangeRateTuples(tuplesStr string) (ExchangeRateTuples, error) {
 		tuples[i] = ExchangeRateTuple{
 			Denom:        decCoin.Denom,
 			ExchangeRate: decCoin.Amount,
+		}
+		if hasDepth {
+			depth, ok := math.NewIntFromString(depthStr)
+			if !ok || depth.IsNegative() {
+				return nil, fmt.Errorf("invalid depth %q for %s: must be a non-negative integer", depthStr, decCoin.Denom)
+			}
+			tuples[i].Depth = depth
 		}
 
 		if _, ok := duplicateCheckMap[decCoin.Denom]; ok {

@@ -138,7 +138,7 @@ func (k Keeper) GetMarket(ctx sdk.Context, id string) (types.Market, error) {
 
 // ReferencePrice returns P_ref of a market (quote per base) from x/oracle.
 func (k Keeper) ReferencePrice(ctx sdk.Context, market types.Market) (math.LegacyDec, error) {
-	rate, err := k.oracleKeeper.GetLunaExchangeRate(ctx, market.OracleDenom)
+	rate, err := k.oracleKeeper.GetPrice(ctx, market.OracleDenom)
 	if err != nil || !rate.IsPositive() {
 		return math.LegacyZeroDec(), types.ErrReferencePriceUnset.Wrap(market.Id)
 	}

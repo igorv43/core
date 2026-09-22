@@ -67,6 +67,20 @@ func InitGenesis(ctx sdk.Context, keeper keeper.Keeper, data *types.GenesisState
 		}
 	}
 
+	if len(data.AssetTargets) > 0 {
+		for _, a := range data.AssetTargets {
+			keeper.SetAssetTarget(ctx, a)
+		}
+	} else {
+		for _, a := range data.Params.AssetWhitelist {
+			keeper.SetAssetTarget(ctx, a)
+		}
+	}
+
+	for _, ap := range data.AssetPrices {
+		keeper.SetAssetPrice(ctx, ap.Denom, ap.ExchangeRate)
+	}
+
 	keeper.SetParams(ctx, data.Params)
 
 	// check if the module account exists
@@ -123,11 +137,23 @@ func ExportGenesis(ctx sdk.Context, keeper keeper.Keeper) *types.GenesisState {
 		return false
 	})
 
-	return types.NewGenesisState(params,
+	assetPrices := []types.ExchangeRateTuple{}
+	keeper.IterateAssetPrices(ctx, func(asset string, price math.LegacyDec) (stop bool) {
+		assetPrices = append(assetPrices, types.ExchangeRateTuple{Denom: asset, ExchangeRate: price})
+		return false
+	})
+
+	gs := types.NewGenesisState(params,
 		exchangeRates,
 		feederDelegations,
 		missCounters,
 		aggregateExchangeRatePrevotes,
 		aggregateExchangeRateVotes,
 		tobinTaxes)
+	gs.AssetTargets = keeper.GetAssetTargets(ctx)
+	if gs.AssetTargets == nil {
+		gs.AssetTargets = types.AssetList{}
+	}
+	gs.AssetPrices = assetPrices
+	return gs
 }

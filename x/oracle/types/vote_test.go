@@ -28,3 +28,22 @@ func TestParseExchangeRateTuples(t *testing.T) {
 	_, err = types.ParseExchangeRateTuples(abstainCoinsWithValid)
 	require.NoError(t, err)
 }
+
+func TestParseExchangeRateTuplesWithDepth(t *testing.T) {
+	// spec §21.6 stage 2: "<price><asset>@<depth>" commits the Depth2% with the price
+	tuples, err := types.ParseExchangeRateTuples("65000.5ubtc@1500000000000,0.0001uusd")
+	require.NoError(t, err)
+	require.Len(t, tuples, 2)
+	require.Equal(t, "ubtc", tuples[0].Denom)
+	require.Equal(t, "65000.500000000000000000", tuples[0].ExchangeRate.String())
+	require.Equal(t, "1500000000000", tuples[0].Depth.String())
+	require.Equal(t, "uusd", tuples[1].Denom)
+	require.True(t, tuples[1].Depth.IsNil())
+
+	_, err = types.ParseExchangeRateTuples("65000.5ubtc@-1")
+	require.Error(t, err)
+	_, err = types.ParseExchangeRateTuples("65000.5ubtc@abc")
+	require.Error(t, err)
+	_, err = types.ParseExchangeRateTuples("65000.5ubtc@1@2")
+	require.Error(t, err)
+}

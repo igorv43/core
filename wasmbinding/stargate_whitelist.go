@@ -32,6 +32,7 @@ func init() {
 	setWhitelistedQuery("/terra.oracle.v1beta1.Query/ExchangeRate", &oracletypes.QueryExchangeRateResponse{})
 	setWhitelistedQuery("/terra.oracle.v1beta1.Query/Dispersion", &oracletypes.QueryDispersionResponse{})
 	setWhitelistedQuery("/terra.oracle.v1beta1.Query/Twap", &oracletypes.QueryTwapResponse{})
+	setWhitelistedQuery("/terra.oracle.v1beta1.Query/AssetPrice", &oracletypes.QueryAssetPriceResponse{})
 
 	// warpledger (Proof of Collateralization, spec §9.7): lets CosmWasm
 	// contracts (DEXes, integrators) read the solvency ledger on-chain

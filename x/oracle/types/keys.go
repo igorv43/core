@@ -38,6 +38,10 @@ const (
 // - 0x07<denom_Bytes>: RateSample (latest vote period, with dispersion)
 //
 // - 0x08<len(denom)><denom_Bytes><vote_period_BE64>: RateSample (bounded history for TWAP)
+//
+// - 0x09<asset_Bytes>: sdk.Dec (USD price of an asset, spec §21.6 stage 2)
+//
+// - 0x0A<asset_Bytes>: Asset (active asset vote target)
 var (
 	// Keys for store prefixes
 	ExchangeRateKey                 = []byte{0x01} // prefix for each key to a rate
@@ -48,6 +52,8 @@ var (
 	TobinTaxKey                     = []byte{0x06} // prefix for each key to a tobin tax
 	DispersionKey                   = []byte{0x07} // prefix for the latest rate sample (with dispersion) of a denom
 	RateHistoryKey                  = []byte{0x08} // prefix for the rate sample history of a denom
+	AssetPriceKey                   = []byte{0x09} // prefix for each key to an asset USD price
+	AssetTargetKey                  = []byte{0x0A} // prefix for each key to an asset vote target
 )
 
 // MaxRateHistory bounds the number of rate samples kept per denom: one day of
@@ -106,4 +112,14 @@ func GetRateHistoryKey(denom string, votePeriod uint64) []byte {
 	bz := make([]byte, 8)
 	binary.BigEndian.PutUint64(bz, votePeriod)
 	return append(GetRateHistoryPrefix(denom), bz...)
+}
+
+// GetAssetPriceKey - stored by *asset* name
+func GetAssetPriceKey(asset string) []byte {
+	return append(AssetPriceKey, []byte(asset)...)
+}
+
+// GetAssetTargetKey - stored by *asset* name
+func GetAssetTargetKey(asset string) []byte {
+	return append(AssetTargetKey, []byte(asset)...)
 }

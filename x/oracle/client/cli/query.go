@@ -31,6 +31,8 @@ func GetQueryCmd() *cobra.Command {
 		GetCmdQueryAggregateVote(),
 		GetCmdQueryVoteTargets(),
 		GetCmdQueryTobinTaxes(),
+		GetCmdQueryAssetPrices(),
+		GetCmdQueryAssetTargets(),
 	)
 
 	return oracleQueryCmd
@@ -408,6 +410,70 @@ Or, can
 				return err
 			}
 
+			return clientCtx.PrintProto(res)
+		},
+	}
+
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+// GetCmdQueryAssetPrices implements the query asset prices command (spec §21.6 stage 2).
+func GetCmdQueryAssetPrices() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "asset-prices [asset]",
+		Args:  cobra.RangeArgs(0, 1),
+		Short: "Query the consensus USD price (and Depth2%) of an asset, or of every asset",
+		Long: strings.TrimSpace(`
+Query the consensus USD price and Depth2% of an asset of the asset whitelist,
+or the prices of every asset with consensus this vote period.
+
+$ terrad query oracle asset-prices ubtc
+$ terrad query oracle asset-prices
+`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			queryClient := types.NewQueryClient(clientCtx)
+
+			if len(args) == 0 {
+				res, err := queryClient.AssetPrices(context.Background(), &types.QueryAssetPricesRequest{})
+				if err != nil {
+					return err
+				}
+				return clientCtx.PrintProto(res)
+			}
+			res, err := queryClient.AssetPrice(context.Background(), &types.QueryAssetPriceRequest{Asset: args[0]})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+// GetCmdQueryAssetTargets implements the query asset targets command.
+func GetCmdQueryAssetTargets() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "asset-targets",
+		Args:  cobra.NoArgs,
+		Short: "Query the assets priced in USD by the oracle (asset whitelist)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			queryClient := types.NewQueryClient(clientCtx)
+
+			res, err := queryClient.AssetTargets(context.Background(), &types.QueryAssetTargetsRequest{})
+			if err != nil {
+				return err
+			}
 			return clientCtx.PrintProto(res)
 		},
 	}

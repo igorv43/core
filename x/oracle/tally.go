@@ -89,3 +89,51 @@ func PickReferenceTerra(ctx sdk.Context, k keeper.Keeper, voteTargets map[string
 
 	return referenceTerra
 }
+
+// TallyAssets tallies the asset ballots of spec §21.6 stage 2 in asset name
+// order: a ballot that reaches the vote threshold sets the consensus USD price
+// (weighted median, winners counted in the claim map like denoms), the
+// consensus Depth2% (weighted median of the reported depths) and a rate sample
+// for the dispersion/TWAP queries. It returns the number of assets with
+// consensus, which counts towards the miss rule.
+func TallyAssets(ctx sdk.Context, k keeper.Keeper, params types.Params, targets types.AssetList,
+	priceBallots, depthBallots map[string]types.ExchangeRateBallot, validatorClaimMap map[string]types.Claim,
+) int {
+	if len(targets) == 0 {
+		return 0
+	}
+	totalBondedTokens, err := k.StakingKeeper.TotalBondedTokens(ctx)
+	if err != nil {
+		return 0
+	}
+	powerReduction := k.StakingKeeper.PowerReduction(ctx)
+	thresholdVotes := params.VoteThreshold.MulInt(totalBondedTokens.Quo(powerReduction)).RoundInt()
+
+	passing := 0
+	for _, asset := range targets {
+		ballot, ok := priceBallots[asset.Name]
+		if !ok {
+			continue
+		}
+		if _, ok := ballotIsPassing(ballot, thresholdVotes); !ok {
+			continue
+		}
+		price := Tally(ballot, params.RewardBand, validatorClaimMap)
+		depth := math.ZeroInt()
+		if db := depthBallots[asset.Name]; db.Power() > 0 {
+			depth = db.WeightedMedian().TruncateInt()
+		}
+		k.SetAssetPriceWithEvent(ctx, asset.Name, price, depth)
+		k.SetRateSample(ctx, types.RateSample{
+			Denom:        asset.Name,
+			ExchangeRate: price,
+			Dispersion:   ballot.Dispersion(price),
+			VotePeriod:   uint64(ctx.BlockHeight()) / params.VotePeriod,
+			Height:       ctx.BlockHeight(),
+			Time:         ctx.BlockTime(),
+			Depth:        depth,
+		})
+		passing++
+	}
+	return passing
+}

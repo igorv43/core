@@ -113,8 +113,20 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) {
 		}
 
 		//---------------------------
+		// Assets priced in USD (spec §21.6 stage 2): tallied without cross
+		// rates; a failed ballot is not counted against the validators
+		assetTargets := k.GetAssetTargets(ctx)
+		k.IterateAssetPrices(ctx, func(asset string, _ math.LegacyDec) (stop bool) {
+			k.DeleteAssetPrice(ctx, asset)
+			k.DeleteRateSample(ctx, asset)
+			return false
+		})
+		priceBallots, depthBallots := k.OrganizeAssetBallots(ctx, validatorClaimMap, assetTargets)
+		passingAssets := TallyAssets(ctx, k, params, assetTargets, priceBallots, depthBallots, validatorClaimMap)
+
+		//---------------------------
 		// Do miss counting & slashing
-		voteTargetsLen := len(voteTargets)
+		voteTargetsLen := len(voteTargets) + passingAssets
 		for _, claim := range validatorClaimMap {
 			// Skip abstain & valid voters
 			if int(claim.WinCount) == voteTargetsLen {
@@ -139,6 +151,7 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) {
 
 		// Update vote targets and tobin tax
 		k.ApplyWhitelist(ctx, params.Whitelist, voteTargets)
+		k.ApplyAssetWhitelist(ctx, params.AssetWhitelist)
 	}
 
 	// Do slash who did miss voting over threshold and

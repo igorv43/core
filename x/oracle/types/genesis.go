@@ -22,6 +22,8 @@ func NewGenesisState(
 		AggregateExchangeRatePrevotes: aggregateExchangeRatePrevotes,
 		AggregateExchangeRateVotes:    aggregateExchangeRateVotes,
 		TobinTaxes:                    tobinTaxes,
+		AssetTargets:                  AssetList{},
+		AssetPrices:                   ExchangeRateTuples{},
 	}
 }
 

@@ -17,6 +17,11 @@ message GenesisState {
   repeated AggregateExchangeRatePrevote aggregate_exchange_rate_prevotes = 5 [(gogoproto.nullable) = false];
   repeated AggregateExchangeRateVote    aggregate_exchange_rate_votes    = 6 [(gogoproto.nullable) = false];
   repeated TobinTax                     tobin_taxes                      = 7 [(gogoproto.nullable) = false];
+  // asset_targets are the active asset vote targets (spec §21.6 stage 2).
+  repeated Asset asset_targets = 8 [(gogoproto.castrepeated) = "AssetList", (gogoproto.nullable) = false];
+  // asset_prices are the current USD prices (and depth) of the assets.
+  repeated ExchangeRateTuple asset_prices = 9
+      [(gogoproto.castrepeated) = "ExchangeRateTuples", (gogoproto.nullable) = false];
 }
 
 // FeederDelegation is the address for where oracle feeder authority are
