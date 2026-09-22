@@ -60,9 +60,11 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) {
 			return false
 		})
 
-		// Clear all exchange rates
+		// Clear all exchange rates (and the latest rate samples: a denom that
+		// fails this period must not keep a stale dispersion)
 		k.IterateLunaExchangeRates(ctx, func(denom string, _ math.LegacyDec) (stop bool) {
 			k.DeleteLunaExchangeRate(ctx, denom)
+			k.DeleteRateSample(ctx, denom)
 			return false
 		})
 
@@ -95,6 +97,18 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) {
 
 				// Set the exchange rate, emit ABCI event
 				k.SetLunaExchangeRateWithEvent(ctx, denom, exchangeRate)
+
+				// Liquidity Fabric spec §21.6 stage 1: persist the dispersion of the
+				// original (non cross-rate) ballot and a bounded rate history for TWAP.
+				original := voteMap[denom]
+				k.SetRateSample(ctx, types.RateSample{
+					Denom:        denom,
+					ExchangeRate: exchangeRate,
+					Dispersion:   original.Dispersion(original.WeightedMedian()),
+					VotePeriod:   uint64(ctx.BlockHeight()) / params.VotePeriod,
+					Height:       ctx.BlockHeight(),
+					Time:         ctx.BlockTime(),
+				})
 			}
 		}
 

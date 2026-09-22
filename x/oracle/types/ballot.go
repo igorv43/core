@@ -1,10 +1,7 @@
 package types
 
 import (
-	"fmt"
-	mathstd "math"
 	"sort"
-	"strconv"
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -133,11 +130,55 @@ func (pb ExchangeRateBallot) StandardDeviation(median math.LegacyDec) (standardD
 
 	variance := sum.QuoInt64(int64(len(pb)))
 
-	floatNum, _ := strconv.ParseFloat(variance.String(), 64)
-	floatNum = mathstd.Sqrt(floatNum)
-	standardDeviation, _ = math.LegacyNewDecFromStr(fmt.Sprintf("%f", floatNum))
+	// deterministic fixed-point square root (the previous float64 round-trip
+	// was a determinism hazard on the consensus path)
+	standardDeviation, err := variance.ApproxSqrt()
+	if err != nil {
+		return math.LegacyZeroDec()
+	}
 
 	return standardDeviation
+}
+
+// WeightedPercentile returns the exchange rate at the given percentile of the
+// voting power (p in [0, 1]), ignoring abstain votes (non-positive rates).
+// The ballot must be sorted by exchange rate.
+func (pb ExchangeRateBallot) WeightedPercentile(p math.LegacyDec) math.LegacyDec {
+	totalPower := int64(0)
+	for _, v := range pb {
+		if v.ExchangeRate.IsPositive() {
+			totalPower += v.Power
+		}
+	}
+	if totalPower == 0 {
+		return math.LegacyZeroDec()
+	}
+	target := p.MulInt64(totalPower)
+	cumulative := math.LegacyZeroDec()
+	for _, v := range pb {
+		if !v.ExchangeRate.IsPositive() {
+			continue
+		}
+		cumulative = cumulative.Add(math.LegacyNewDec(v.Power))
+		if cumulative.GTE(target) {
+			return v.ExchangeRate
+		}
+	}
+	return pb[len(pb)-1].ExchangeRate
+}
+
+// Dispersion returns (P75 - P25) / median, weighted by voting power (Liquidity
+// Fabric spec §21.1). It is zero for an empty ballot or a zero median.
+func (pb ExchangeRateBallot) Dispersion(median math.LegacyDec) math.LegacyDec {
+	if len(pb) == 0 || !median.IsPositive() {
+		return math.LegacyZeroDec()
+	}
+	sorted := make(ExchangeRateBallot, len(pb))
+	copy(sorted, pb)
+	sort.Sort(sorted)
+	p25 := sorted.WeightedPercentile(math.LegacyNewDecWithPrec(25, 2))
+	p75 := sorted.WeightedPercentile(math.LegacyNewDecWithPrec(75, 2))
+	return p75.Sub(p25).Quo(median)
 }
 
 // Len implements sort.Interface

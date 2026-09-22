@@ -297,7 +297,11 @@ func TestPBStandardDeviation(t *testing.T) {
 			pb = append(pb, vote)
 		}
 
-		require.Equal(t, tc.standardDeviation, pb.StandardDeviation(pb.WeightedMedian()))
+		// the fixed-point square root carries 18 decimals; the expectations were
+		// produced by the former float64 path (6 decimals), so compare within 1e-5
+		got := pb.StandardDeviation(pb.WeightedMedian())
+		require.True(t, tc.standardDeviation.Sub(got).Abs().LT(sdkmath.LegacyNewDecWithPrec(1, 5)),
+			"expected ~%s, got %s", tc.standardDeviation, got)
 	}
 }
 

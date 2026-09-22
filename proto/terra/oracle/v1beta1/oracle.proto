@@ -3,6 +3,7 @@ package terra.oracle.v1beta1;
 
 import "cosmos_proto/cosmos.proto";
 import "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/classic-terra/core/v4/x/oracle/types";
 
@@ -102,4 +103,29 @@ message ExchangeRateTuple {
     (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
     (gogoproto.nullable)   = false
   ];
+}
+
+// RateSample is the consensus exchange rate of a denom at the end of one vote
+// period together with the dispersion of the ballot that produced it
+// (Liquidity Fabric spec §21.1: dispersion = (P75 - P25) / median, weighted by
+// voting power). Samples feed the Dispersion and Twap queries (§21.6 stage 1).
+message RateSample {
+  option (gogoproto.equal)           = false;
+  option (gogoproto.goproto_getters) = false;
+
+  string denom         = 1 [(gogoproto.moretags) = "yaml:\"denom\""];
+  string exchange_rate = 2 [
+    (cosmos_proto.scalar)  = "cosmos.Dec",
+    (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
+    (gogoproto.nullable)   = false
+  ];
+  string dispersion = 3 [
+    (cosmos_proto.scalar)  = "cosmos.Dec",
+    (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
+    (gogoproto.nullable)   = false
+  ];
+  // vote_period is the vote period index (height / vote_period).
+  uint64 vote_period = 4;
+  int64  height      = 5;
+  google.protobuf.Timestamp time = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }

@@ -76,6 +76,22 @@ service Query {
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
     option (google.api.http).get = "/terra/oracle/v1beta1/params";
   }
+
+  // Dispersion queries the vote dispersion of the latest vote period of a denom.
+  rpc Dispersion(QueryDispersionRequest) returns (QueryDispersionResponse) {
+    option (google.api.http).get = "/terra/oracle/v1beta1/denoms/{denom}/dispersion";
+  }
+
+  // Twap queries the time-weighted average exchange rate of a denom over the
+  // last vote periods.
+  rpc Twap(QueryTwapRequest) returns (QueryTwapResponse) {
+    option (google.api.http).get = "/terra/oracle/v1beta1/denoms/{denom}/twap";
+  }
+
+  // RateHistory queries the stored rate samples of a denom, newest first.
+  rpc RateHistory(QueryRateHistoryRequest) returns (QueryRateHistoryResponse) {
+    option (google.api.http).get = "/terra/oracle/v1beta1/denoms/{denom}/rate_history";
+  }
 }
 
 // QueryExchangeRateRequest is the request type for the Query/ExchangeRate RPC method.
@@ -256,4 +272,53 @@ message QueryParamsRequest {}
 message QueryParamsResponse {
   // params defines the parameters of the module.
   Params params = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryDispersionRequest is the request type for the Query/Dispersion RPC method.
+message QueryDispersionRequest {
+  option (gogoproto.equal)           = false;
+  option (gogoproto.goproto_getters) = false;
+
+  string denom = 1;
+}
+
+// QueryDispersionResponse is the response type for the Query/Dispersion RPC method.
+message QueryDispersionResponse {
+  RateSample sample = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryTwapRequest is the request type for the Query/Twap RPC method.
+message QueryTwapRequest {
+  option (gogoproto.equal)           = false;
+  option (gogoproto.goproto_getters) = false;
+
+  string denom = 1;
+  // periods is the number of latest vote periods to average (bounded by the stored history).
+  uint64 periods = 2;
+}
+
+// QueryTwapResponse is the response type for the Query/Twap RPC method.
+message QueryTwapResponse {
+  string twap = 1 [
+    (cosmos_proto.scalar)  = "cosmos.Dec",
+    (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
+    (gogoproto.nullable)   = false
+  ];
+  uint64 samples     = 2;
+  int64  from_height = 3;
+  int64  to_height   = 4;
+}
+
+// QueryRateHistoryRequest is the request type for the Query/RateHistory RPC method.
+message QueryRateHistoryRequest {
+  option (gogoproto.equal)           = false;
+  option (gogoproto.goproto_getters) = false;
+
+  string denom   = 1;
+  uint64 periods = 2;
+}
+
+// QueryRateHistoryResponse is the response type for the Query/RateHistory RPC method.
+message QueryRateHistoryResponse {
+  repeated RateSample samples = 1 [(gogoproto.nullable) = false];
 }

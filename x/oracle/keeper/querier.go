@@ -222,3 +222,51 @@ func (q querier) AggregateVotes(c context.Context, _ *types.QueryAggregateVotesR
 		AggregateVotes: votes,
 	}, nil
 }
+
+// Dispersion queries the latest rate sample (rate + ballot dispersion) of a denom
+func (q querier) Dispersion(c context.Context, req *types.QueryDispersionRequest) (*types.QueryDispersionResponse, error) {
+	if req == nil || len(req.Denom) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "empty denom")
+	}
+	ctx := sdk.UnwrapSDKContext(c)
+	sample, err := q.GetRateSample(ctx, req.Denom)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	return &types.QueryDispersionResponse{Sample: sample}, nil
+}
+
+// Twap queries the time-weighted average rate over the last vote periods
+func (q querier) Twap(c context.Context, req *types.QueryTwapRequest) (*types.QueryTwapResponse, error) {
+	if req == nil || len(req.Denom) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "empty denom")
+	}
+	ctx := sdk.UnwrapSDKContext(c)
+	twap, samples, err := q.Keeper.Twap(ctx, req.Denom, req.Periods)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	return &types.QueryTwapResponse{
+		Twap:       twap,
+		Samples:    uint64(len(samples)),
+		FromHeight: samples[len(samples)-1].Height,
+		ToHeight:   samples[0].Height,
+	}, nil
+}
+
+// RateHistory queries the stored rate samples of a denom, newest first
+func (q querier) RateHistory(c context.Context, req *types.QueryRateHistoryRequest) (*types.QueryRateHistoryResponse, error) {
+	if req == nil || len(req.Denom) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "empty denom")
+	}
+	periods := req.Periods
+	if periods == 0 || periods > types.MaxRateHistory {
+		periods = types.MaxRateHistory
+	}
+	ctx := sdk.UnwrapSDKContext(c)
+	samples := q.Keeper.RateHistory(ctx, req.Denom, periods)
+	if samples == nil {
+		samples = []types.RateSample{}
+	}
+	return &types.QueryRateHistoryResponse{Samples: samples}, nil
+}
