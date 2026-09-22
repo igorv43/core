@@ -1,7 +1,6 @@
 package app
 
 import (
-	"cosmossdk.io/x/circuit"
 	circuittypes "cosmossdk.io/x/circuit/types"
 	"cosmossdk.io/x/evidence"
 	evidencetypes "cosmossdk.io/x/evidence/types"
@@ -21,6 +20,7 @@ import (
 	customauthsim "github.com/classic-terra/core/v4/custom/auth/simulation"
 	customauthz "github.com/classic-terra/core/v4/custom/authz"
 	custombank "github.com/classic-terra/core/v4/custom/bank"
+	customcircuit "github.com/classic-terra/core/v4/custom/circuit"
 	customdistr "github.com/classic-terra/core/v4/custom/distribution"
 	customevidence "github.com/classic-terra/core/v4/custom/evidence"
 	customfeegrant "github.com/classic-terra/core/v4/custom/feegrant"
@@ -126,7 +126,7 @@ var (
 		consensus.AppModuleBasic{},
 		taxmodule.AppModuleBasic{},
 		// Liquidity Fabric (phase 1)
-		circuit.AppModuleBasic{},
+		customcircuit.AppModuleBasic{},
 		hyperlanecore.AppModule{},
 		warp.AppModule{},
 		warpledger.AppModuleBasic{},
@@ -194,7 +194,7 @@ func appModules(
 		consensus.NewAppModule(appCodec, app.ConsensusParamsKeeper),
 		taxmodule.NewAppModule(appCodec, app.TaxKeeper),
 		// Liquidity Fabric (phase 1)
-		circuit.NewAppModule(appCodec, app.CircuitKeeper),
+		customcircuit.NewAppModule(appCodec, app.CircuitKeeper),
 		customhyperlane.NewAppModule(appCodec, app.HyperlaneKeeper, app.WarpLedgerKeeper),
 		customwarp.NewAppModule(appCodec, app.WarpKeeper, app.WarpLedgerKeeper),
 		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
