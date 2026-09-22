@@ -1,0 +1,84 @@
+syntax = "proto3";
+package terra.batch.v1;
+
+option go_package = "github.com/classic-terra/core/v4/x/batch/types";
+
+message EventIntentSubmitted {
+  uint64 intent_id = 1;
+  string market_id = 2;
+  string sender = 3;
+  string side = 4;
+  string amount_in = 5;
+  string limit_price = 6;
+  int64 expiry_height = 7;
+  uint64 batch_id = 8;
+}
+
+message EventIntentCancelled {
+  uint64 intent_id = 1;
+  string refunded = 2;
+}
+
+message EventIntentExpired {
+  uint64 intent_id = 1;
+  string refunded = 2;
+}
+
+message EventIntentFilled {
+  uint64 intent_id = 1;
+  uint64 batch_id = 2;
+  string market_id = 3;
+  string qty = 4;
+  string price = 5;
+  string paid = 6;
+  string received = 7;
+  string protocol_fee = 8;
+  string builder_fee = 9;
+  bool complete = 10;
+}
+
+message EventBatchSealed {
+  uint64 batch_id = 1;
+  int64 height = 2;
+}
+
+message EventBidCommitted {
+  uint64 batch_id = 1;
+  string solver = 2;
+  string market_id = 3;
+}
+
+message EventBidRevealed {
+  uint64 batch_id = 1;
+  string solver = 2;
+  string market_id = 3;
+  uint32 levels = 4;
+  uint32 discarded_levels = 5;
+}
+
+message EventBatchCleared {
+  uint64 batch_id = 1;
+  string market_id = 2;
+  string clearing_price = 3;
+  string reference_price = 4;
+  string volume = 5;
+  uint32 fills = 6;
+  uint32 passes = 7;
+}
+
+message EventBatchNotExecuted {
+  uint64 batch_id = 1;
+  string market_id = 2;
+  string reason = 3;
+}
+
+message EventSolverSlashed {
+  string solver = 1;
+  string amount = 2;
+  string reason = 3;
+}
+
+message EventSolverSuspended {
+  string solver = 1;
+  int64 until_height = 2;
+}

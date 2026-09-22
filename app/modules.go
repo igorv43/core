@@ -33,6 +33,8 @@ import (
 	customupgrade "github.com/classic-terra/core/v4/custom/upgrade"
 	customwarp "github.com/classic-terra/core/v4/custom/warp"
 	customwasm "github.com/classic-terra/core/v4/custom/wasm"
+	"github.com/classic-terra/core/v4/x/batch"
+	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	"github.com/classic-terra/core/v4/x/dyncomm"
 	dyncommtypes "github.com/classic-terra/core/v4/x/dyncomm/types"
 	"github.com/classic-terra/core/v4/x/liquidstake"
@@ -133,6 +135,7 @@ var (
 		warp.AppModule{},
 		warpledger.AppModuleBasic{},
 		liquidstake.AppModuleBasic{},
+		batch.AppModuleBasic{},
 	)
 	// module account permissions
 	maccPerms = map[string][]string{
@@ -156,6 +159,7 @@ var (
 		warptypes.ModuleName:      {authtypes.Minter, authtypes.Burner},
 		// phase 6: mints/burns only stluna (enforced in the keeper); delegates uluna
 		liquidstaketypes.ModuleName: {authtypes.Minter, authtypes.Burner},
+		batchtypes.ModuleName:       nil, // escrow only: no mint or burn authority
 	}
 	// module accounts that are allowed to receive tokens
 	allowedReceivingModAcc = map[string]bool{
@@ -207,6 +211,7 @@ func appModules(
 		customwarp.NewAppModule(appCodec, app.WarpKeeper, app.WarpLedgerKeeper),
 		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
 		liquidstake.NewAppModule(appCodec, app.LiquidStakeKeeper),
+		batch.NewAppModule(appCodec, app.BatchKeeper),
 	}
 }
 
@@ -274,6 +279,7 @@ func orderBeginBlockers() []string {
 		warptypes.ModuleName,
 		warpledgertypes.ModuleName,
 		liquidstaketypes.ModuleName,
+		batchtypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -314,6 +320,7 @@ func orderEndBlockers() []string {
 		warptypes.ModuleName,
 		warpledgertypes.ModuleName,
 		liquidstaketypes.ModuleName,
+		batchtypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -354,6 +361,7 @@ func orderInitGenesis() []string {
 		warptypes.ModuleName,
 		warpledgertypes.ModuleName,
 		liquidstaketypes.ModuleName,
+		batchtypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}

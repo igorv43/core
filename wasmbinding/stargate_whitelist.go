@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
+	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
 	treasurytypes "github.com/classic-terra/core/v4/x/treasury/types"
@@ -37,6 +38,14 @@ func init() {
 	setWhitelistedQuery("/terra.warpledger.v1.Query/Params", &warpledgertypes.QueryParamsResponse{})
 	setWhitelistedQuery("/terra.warpledger.v1.Query/WarpLedger", &warpledgertypes.QueryWarpLedgerResponse{})
 	setWhitelistedQuery("/terra.warpledger.v1.Query/DepositAddress", &warpledgertypes.QueryDepositAddressResponse{})
+
+	// batch (spec §23.2): read-only market, pipeline and clearing data for
+	// integrators; sealed commits stay sealed in the Batch response
+	setWhitelistedQuery("/terra.batch.v1.Query/Params", &batchtypes.QueryParamsResponse{})
+	setWhitelistedQuery("/terra.batch.v1.Query/Market", &batchtypes.QueryMarketResponse{})
+	setWhitelistedQuery("/terra.batch.v1.Query/Markets", &batchtypes.QueryMarketsResponse{})
+	setWhitelistedQuery("/terra.batch.v1.Query/Batch", &batchtypes.QueryBatchResponse{})
+	setWhitelistedQuery("/terra.batch.v1.Query/Pipeline", &batchtypes.QueryPipelineResponse{})
 }
 
 // GetWhitelistedQuery returns the whitelisted query at the provided path.

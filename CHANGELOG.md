@@ -35,6 +35,8 @@ Ref: https://keepachangelog.com/en/1.0.0/
 ## [Unreleased]
 
 ### State Machine Breaking
+* (app) Liquidity Fabric Part II — upgrade `v17`: sealed-bid uniform-price call auction module `x/batch` (escrowed limit intents, bonded solvers with commit/reveal and objective slashing, delivery-versus-payment settlement inside the oracle price band, integrator builder codes, community-pool fee sink until the perpetuals insurance fund exists). The upgrade creates no market; governance registers markets with `MsgCreateMarket`.
+* (oracle) Liquidity Fabric phase 7 stage 1: per-period ballot dispersion and standard deviation persisted with a bounded rate history; `Dispersion`, `Twap` and `RateHistory` queries (no store migration).
 * (app) Liquidity Fabric phase 6 — upgrade `v16`: native liquid staking `x/liquidstake` (non-rebasing `stluna` receipt, exchange rate from live staking/distribution state, objective validator whitelist with equal weights and caps, epoch-batched delegation and undelegation, redemption queue, 5% fee on rewards with a 20% burn share). `MsgUnstake`/`MsgClaim` can never be tripped by `x/circuit`.
 * (app) Liquidity Fabric phase 1 — upgrade `v15`: native Hyperlane (`x/core`, `x/warp` from `bcp-innovations/hyperlane-cosmos` v1.2.0-rc.0), `cosmossdk.io/x/circuit` v0.2.0 (reset restricted to the governance authority by the ante handler) and the new `x/warpledger` module (per-domain exposure ledger and caps, EndBlock solvency invariant that trips `MsgRemoteTransfer` in `x/circuit`, migration deposit addresses and permissionless `MsgSweepMigration`). No route, mailbox, ISM or token is created by the upgrade; `default_domain_cap` is 0.
 * (app) [#319](https://github.com/classic-terra/core/pull/319) Upgrade SDKs

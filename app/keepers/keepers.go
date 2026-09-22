@@ -24,6 +24,8 @@ import (
 	customstaking "github.com/classic-terra/core/v4/custom/staking"
 	customwasmkeeper "github.com/classic-terra/core/v4/custom/wasm/keeper"
 	terrawasm "github.com/classic-terra/core/v4/wasmbinding"
+	batchkeeper "github.com/classic-terra/core/v4/x/batch/keeper"
+	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	dyncommkeeper "github.com/classic-terra/core/v4/x/dyncomm/keeper"
 	dyncommtypes "github.com/classic-terra/core/v4/x/dyncomm/types"
 	liquidstakekeeper "github.com/classic-terra/core/v4/x/liquidstake/keeper"
@@ -122,6 +124,7 @@ type AppKeepers struct {
 	WarpKeeper        warpkeeper.Keeper
 	WarpLedgerKeeper  warpledgerkeeper.Keeper
 	LiquidStakeKeeper liquidstakekeeper.Keeper
+	BatchKeeper       batchkeeper.Keeper
 
 	Ics20WasmHooks  *ibchooks.WasmHooks
 	IBCHooksWrapper *ibchooks.ICS4Middleware
@@ -171,6 +174,7 @@ func NewAppKeepers(
 		warptypes.ModuleName:         storetypes.NewKVStoreKey(warptypes.ModuleName),
 		warpledgertypes.StoreKey:     storetypes.NewKVStoreKey(warpledgertypes.StoreKey),
 		liquidstaketypes.StoreKey:    storetypes.NewKVStoreKey(liquidstaketypes.StoreKey),
+		batchtypes.StoreKey:          storetypes.NewKVStoreKey(batchtypes.StoreKey),
 	}
 	tkeys := map[string]*storetypes.TransientStoreKey{
 		paramstypes.TStoreKey: storetypes.NewTransientStoreKey(paramstypes.TStoreKey),
@@ -558,6 +562,17 @@ func NewAppKeepers(
 		appKeepers.DistrKeeper,
 		appKeepers.SlashingKeeper,
 		treasurytypes.BurnModuleName,
+	)
+
+	// x/batch (Part II): sealed-bid uniform-price call auctions; fees and
+	// slashes go to the community pool until the x/perp insurance fund exists.
+	appKeepers.BatchKeeper = batchkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[batchtypes.StoreKey]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.BankKeeper,
+		appKeepers.OracleKeeper,
+		batchkeeper.NewCommunityPoolSink(appKeepers.DistrKeeper),
 	)
 
 	// Create static IBC router, add transfer route, then set and seal it

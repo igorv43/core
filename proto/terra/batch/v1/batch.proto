@@ -1,0 +1,166 @@
+syntax = "proto3";
+package terra.batch.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "amino/amino.proto";
+import "cosmos/base/v1beta1/coin.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/batch/types";
+
+// Side of an order.
+enum Side {
+  option (gogoproto.goproto_enum_prefix) = false;
+  SIDE_UNSPECIFIED = 0;
+  SIDE_BUY         = 1;
+  SIDE_SELL        = 2;
+}
+
+// MarketType selects what an order moves (spec D-14): full escrow (spot) or a
+// margin reservation (perpetual, provided by x/perp).
+enum MarketType {
+  option (gogoproto.goproto_enum_prefix) = false;
+  MARKET_TYPE_UNSPECIFIED = 0;
+  MARKET_TYPE_SPOT        = 1;
+  MARKET_TYPE_PERP        = 2;
+}
+
+// Params defines the x/batch parameters (spec §12.2, §14–§16, §23, Annex B).
+message Params {
+  option (amino.name)      = "terra/batch/Params";
+  option (gogoproto.equal) = true;
+
+  // commit_window is W: commits are accepted in the W blocks after the seal;
+  // reveals in the block after the window; resolution at that block's EndBlock.
+  int64 commit_window = 1;
+  // price_band is δ: only prices within P_ref·(1±δ) clear.
+  string price_band = 2 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // intent_ttl_blocks bounds expiry_height − submission height.
+  int64 intent_ttl_blocks = 3;
+  // intent_fee is the non-refundable anti-spam fee charged on submission.
+  cosmos.base.v1beta1.Coin intent_fee = 4 [(gogoproto.nullable) = false];
+  uint32 max_intents_per_batch = 5;
+  uint32 max_solvers_per_batch = 6;
+  uint32 max_levels_per_bid = 7;
+  uint32 max_active_markets = 8;
+  uint32 max_resolution_passes = 9;
+  // spot_fee_bps is the protocol fee on the amount received by each participant.
+  uint32 spot_fee_bps = 10;
+  // builder_fee_max_bps caps the fee an integrator may charge on top (§23.2).
+  uint32 builder_fee_max_bps = 11;
+  // solver_bond_min is the minimum bond to register a solver.
+  cosmos.base.v1beta1.Coin solver_bond_min = 12 [(gogoproto.nullable) = false];
+  // slash_no_reveal is the flat penalty for a committed and unrevealed bid.
+  cosmos.base.v1beta1.Coin slash_no_reveal = 13 [(gogoproto.nullable) = false];
+  // solver_unbond_blocks is the wait between MsgUnbondSolver and the refund.
+  int64 solver_unbond_blocks = 14;
+  // solver_suspension_blocks is the suspension for a reveal rate below 90% over 1,000 blocks.
+  int64 solver_suspension_blocks = 15;
+  // prune_delay_blocks is how long resolved batch aggregates are kept.
+  int64 prune_delay_blocks = 16;
+  // max_frontend_approvals bounds simultaneous integrator approvals per account.
+  uint32 max_frontend_approvals = 17;
+}
+
+// Market is a trading pair served by the auction engine.
+message Market {
+  // id is "base/quote", e.g. "uluna/uusdc".
+  string id = 1;
+  string base_denom = 2;
+  string quote_denom = 3;
+  MarketType type = 4;
+  // oracle_denom is the x/oracle denom whose LUNC rate gives P_ref (spot LUNC/settlement: "uusd").
+  string oracle_denom = 5;
+  bool enabled = 6;
+  // min_qty is the minimum base quantity of an intent or level.
+  string min_qty = 7 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // tick_size is the price granularity (quote per base).
+  string tick_size = 8 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+}
+
+// Intent is a limit order with expiry submitted to the sealed call auction (spec §13, §14).
+message Intent {
+  uint64 id = 1;
+  string market_id = 2;
+  string sender = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  Side side = 4;
+  // amount_in is what was escrowed on submission (quote for BUY, base for SELL).
+  cosmos.base.v1beta1.Coin amount_in = 5 [(gogoproto.nullable) = false];
+  // remaining is the unfilled part of amount_in still in escrow.
+  string remaining = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // limit_price is quote per base.
+  string limit_price = 7 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // min_out is the minimum total amount the sender accepts to receive for the whole intent.
+  string min_out = 8 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // received accumulates what the intent has received so far.
+  string received = 9 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  int64 expiry_height = 10;
+  int64 created_height = 11;
+  // frontend is the integrator attributed to the order (optional, §23.2).
+  string frontend = 12 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// Level is one price level of a solver bid.
+message Level {
+  Side side = 1;
+  string price = 2 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // qty is in base units.
+  string qty = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+
+// Bid is the sealed bid of a solver for one batch and market (spec §15.2).
+message Bid {
+  string market_id = 1;
+  repeated Level levels = 2 [(gogoproto.nullable) = false];
+}
+
+// Solver is a registered market maker (spec §16).
+message Solver {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  cosmos.base.v1beta1.Coin bond = 2 [(gogoproto.nullable) = false];
+  // unbond_height is set when the solver asked to leave; the bond is refunded after solver_unbond_blocks.
+  int64 unbond_height = 3;
+  int64 suspended_until = 4;
+  // commits and reveals count over the rolling window used for the reveal-rate rule.
+  uint64 commits = 5;
+  uint64 reveals = 6;
+  int64 window_start = 7;
+}
+
+// Commit is a sealed bid commitment (spec §15.1).
+message Commit {
+  uint64 batch_id = 1;
+  string solver = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string market_id = 3;
+  bytes commitment = 4;
+  // tx_index orders solver levels at the marginal price (§15.3).
+  uint64 tx_index = 5;
+  bool revealed = 6;
+  Bid bid = 7;
+}
+
+// BatchResult is the aggregate kept after resolution (spec §12.4).
+message BatchResult {
+  uint64 batch_id = 1;
+  string market_id = 2;
+  int64 height = 3;
+  string clearing_price = 4 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // volume is the base quantity cleared.
+  string volume = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  uint32 fills = 6;
+  string reference_price = 7 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  bool executed = 8;
+}
+
+// Frontend is a registered integrator (spec §23.2, D-21).
+message Frontend {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint32 fee_bps = 2;
+}
+
+// FrontendApproval is a user's consent to an integrator fee cap.
+message FrontendApproval {
+  string user = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string frontend = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint32 max_fee_bps = 3;
+}

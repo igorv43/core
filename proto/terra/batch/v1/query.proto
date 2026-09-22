@@ -1,0 +1,132 @@
+syntax = "proto3";
+package terra.batch.v1;
+
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/base/v1beta1/coin.proto";
+import "terra/batch/v1/batch.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/batch/types";
+
+// Query defines the x/batch gRPC query service (spec Annex E.2).
+service Query {
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/terra/batch/v1/params";
+  }
+  rpc Markets(QueryMarketsRequest) returns (QueryMarketsResponse) {
+    option (google.api.http).get = "/terra/batch/v1/markets";
+  }
+  // Market takes market_id as a query parameter because ids contain "/" (base/quote).
+  rpc Market(QueryMarketRequest) returns (QueryMarketResponse) {
+    option (google.api.http).get = "/terra/batch/v1/market";
+  }
+  rpc Intent(QueryIntentRequest) returns (QueryIntentResponse) {
+    option (google.api.http).get = "/terra/batch/v1/intents/{intent_id}";
+  }
+  rpc IntentsByAccount(QueryIntentsByAccountRequest) returns (QueryIntentsByAccountResponse) {
+    option (google.api.http).get = "/terra/batch/v1/accounts/{address}/intents";
+  }
+  rpc Batch(QueryBatchRequest) returns (QueryBatchResponse) {
+    option (google.api.http).get = "/terra/batch/v1/batches/{batch_id}";
+  }
+  rpc Solver(QuerySolverRequest) returns (QuerySolverResponse) {
+    option (google.api.http).get = "/terra/batch/v1/solvers/{address}";
+  }
+  rpc Solvers(QuerySolversRequest) returns (QuerySolversResponse) {
+    option (google.api.http).get = "/terra/batch/v1/solvers";
+  }
+  rpc Frontend(QueryFrontendRequest) returns (QueryFrontendResponse) {
+    option (google.api.http).get = "/terra/batch/v1/frontends/{address}";
+  }
+  rpc Approvals(QueryApprovalsRequest) returns (QueryApprovalsResponse) {
+    option (google.api.http).get = "/terra/batch/v1/accounts/{address}/approvals";
+  }
+  // Pipeline describes the batch schedule at the current height.
+  rpc Pipeline(QueryPipelineRequest) returns (QueryPipelineResponse) {
+    option (google.api.http).get = "/terra/batch/v1/pipeline";
+  }
+}
+
+message QueryParamsRequest {}
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryMarketsRequest {}
+message QueryMarketsResponse {
+  repeated Market markets = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryMarketRequest {
+  string market_id = 1;
+}
+message QueryMarketResponse {
+  Market market = 1 [(gogoproto.nullable) = false];
+  // reference_price is the current P_ref from x/oracle (0 when unavailable).
+  string reference_price = 2 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  uint64 active_intents = 3;
+  BatchResult last_result = 4 [(gogoproto.nullable) = false];
+}
+
+message QueryIntentRequest {
+  uint64 intent_id = 1;
+}
+message QueryIntentResponse {
+  Intent intent = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryIntentsByAccountRequest {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+message QueryIntentsByAccountResponse {
+  repeated Intent intents = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryBatchRequest {
+  uint64 batch_id = 1;
+}
+message QueryBatchResponse {
+  repeated BatchResult results = 1 [(gogoproto.nullable) = false];
+  repeated Commit commits = 2 [(gogoproto.nullable) = false];
+}
+
+message QuerySolverRequest {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+message QuerySolverResponse {
+  Solver solver = 1 [(gogoproto.nullable) = false];
+  repeated cosmos.base.v1beta1.Coin escrow = 2 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
+}
+
+message QuerySolversRequest {}
+message QuerySolversResponse {
+  repeated Solver solvers = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryFrontendRequest {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+message QueryFrontendResponse {
+  Frontend frontend = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryApprovalsRequest {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+message QueryApprovalsResponse {
+  repeated FrontendApproval approvals = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryPipelineRequest {}
+message QueryPipelineResponse {
+  int64 height = 1;
+  // collecting is the batch id intents submitted now belong to (= height).
+  uint64 collecting = 2;
+  // committing lists batch ids whose commit window is open.
+  repeated uint64 committing = 3;
+  // revealing is the batch id whose reveal block is now (0 if none).
+  uint64 revealing = 4;
+  // resolving is the batch id resolved at this block's EndBlock (0 if none).
+  uint64 resolving = 5;
+}
