@@ -35,6 +35,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 ## [Unreleased]
 
 ### State Machine Breaking
+* (app) Liquidity Fabric phase 1 — upgrade `v15`: native Hyperlane (`x/core`, `x/warp` from `bcp-innovations/hyperlane-cosmos` v1.2.0-rc.0), `cosmossdk.io/x/circuit` v0.2.0 (reset restricted to the governance authority by the ante handler) and the new `x/warpledger` module (per-domain exposure ledger and caps, EndBlock solvency invariant that trips `MsgRemoteTransfer` in `x/circuit`, migration deposit addresses and permissionless `MsgSweepMigration`). No route, mailbox, ISM or token is created by the upgrade; `default_domain_cap` is 0.
 * (app) [#319](https://github.com/classic-terra/core/pull/319) Upgrade SDKs
 * (treasury) [#272](https://github.com/classic-terra/core/pull/272) Split the burn tax to the distribution module
 
