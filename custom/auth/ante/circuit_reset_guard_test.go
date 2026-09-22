@@ -43,9 +43,19 @@ func TestCircuitResetGuardDecorator(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "trip by an emergency account is not restricted here",
-			msgs:    []sdk.Msg{&circuittypes.MsgTripCircuitBreaker{Authority: other}},
+			name:    "trip of a specific message by an emergency account is not restricted here",
+			msgs:    []sdk.Msg{&circuittypes.MsgTripCircuitBreaker{Authority: other, MsgTypeUrls: []string{"/hyperlane.warp.v1.MsgRemoteTransfer"}}},
 			wantErr: false,
+		},
+		{
+			name:    "trip of a protected user-exit message is rejected",
+			msgs:    []sdk.Msg{&circuittypes.MsgTripCircuitBreaker{Authority: other, MsgTypeUrls: []string{"/terra.liquidstake.v1.MsgUnstake"}}},
+			wantErr: true,
+		},
+		{
+			name:    "trip of all messages is rejected",
+			msgs:    []sdk.Msg{&circuittypes.MsgTripCircuitBreaker{Authority: other}},
+			wantErr: true,
 		},
 		{
 			name: "reset nested in authz MsgExec is rejected",

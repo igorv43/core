@@ -26,6 +26,8 @@ import (
 	terrawasm "github.com/classic-terra/core/v4/wasmbinding"
 	dyncommkeeper "github.com/classic-terra/core/v4/x/dyncomm/keeper"
 	dyncommtypes "github.com/classic-terra/core/v4/x/dyncomm/types"
+	liquidstakekeeper "github.com/classic-terra/core/v4/x/liquidstake/keeper"
+	liquidstaketypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	marketkeeper "github.com/classic-terra/core/v4/x/market/keeper"
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	oraclekeeper "github.com/classic-terra/core/v4/x/oracle/keeper"
@@ -115,10 +117,11 @@ type AppKeepers struct {
 	TaxKeeper             taxkeeper.Keeper
 
 	// Liquidity Fabric (phase 1): SDK circuit breaker and native Hyperlane
-	CircuitKeeper    circuitkeeper.Keeper
-	HyperlaneKeeper  *hyperlanekeeper.Keeper // pointer: warp and the app router hold a reference
-	WarpKeeper       warpkeeper.Keeper
-	WarpLedgerKeeper warpledgerkeeper.Keeper
+	CircuitKeeper     circuitkeeper.Keeper
+	HyperlaneKeeper   *hyperlanekeeper.Keeper // pointer: warp and the app router hold a reference
+	WarpKeeper        warpkeeper.Keeper
+	WarpLedgerKeeper  warpledgerkeeper.Keeper
+	LiquidStakeKeeper liquidstakekeeper.Keeper
 
 	Ics20WasmHooks  *ibchooks.WasmHooks
 	IBCHooksWrapper *ibchooks.ICS4Middleware
@@ -167,6 +170,7 @@ func NewAppKeepers(
 		hyperlanetypes.ModuleName:    storetypes.NewKVStoreKey(hyperlanetypes.ModuleName),
 		warptypes.ModuleName:         storetypes.NewKVStoreKey(warptypes.ModuleName),
 		warpledgertypes.StoreKey:     storetypes.NewKVStoreKey(warpledgertypes.StoreKey),
+		liquidstaketypes.StoreKey:    storetypes.NewKVStoreKey(liquidstaketypes.StoreKey),
 	}
 	tkeys := map[string]*storetypes.TransientStoreKey{
 		paramstypes.TStoreKey: storetypes.NewTransientStoreKey(paramstypes.TStoreKey),
@@ -540,6 +544,20 @@ func NewAppKeepers(
 		&appKeepers.WarpKeeper,
 		warpledgerkeeper.NewCircuitAdapter(&appKeepers.CircuitKeeper),
 		bApp.MsgServiceRouter(),
+	)
+
+	// x/liquidstake (phase 6): non-rebasing stLUNC, epoch-batched delegation
+	// through the module account, fee burn share via the treasury burn account.
+	appKeepers.LiquidStakeKeeper = liquidstakekeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[liquidstaketypes.StoreKey]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.AccountKeeper,
+		appKeepers.BankKeeper,
+		appKeepers.StakingKeeper,
+		appKeepers.DistrKeeper,
+		appKeepers.SlashingKeeper,
+		treasurytypes.BurnModuleName,
 	)
 
 	// Create static IBC router, add transfer route, then set and seal it

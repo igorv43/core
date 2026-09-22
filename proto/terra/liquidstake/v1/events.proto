@@ -1,0 +1,50 @@
+syntax = "proto3";
+package terra.liquidstake.v1;
+
+option go_package = "github.com/classic-terra/core/v4/x/liquidstake/types";
+
+message EventStaked {
+  string address = 1;
+  string amount = 2;
+  string minted = 3;
+  string exchange_rate = 4;
+}
+
+message EventUnstaked {
+  string address = 1;
+  string st_amount = 2;
+  string amount = 3;
+  string exchange_rate = 4;
+  bool instant = 5;
+  uint64 request_id = 6;
+}
+
+message EventClaimed {
+  string address = 1;
+  string amount = 2;
+  repeated uint64 request_ids = 3;
+}
+
+message EventEpochProcessed {
+  uint64 epoch = 1;
+  int64 height = 2;
+  string rewards = 3;
+  string fee = 4;
+  string burned = 5;
+  string delegated = 6;
+  string undelegated = 7;
+  string redelegated = 8;
+  uint32 eligible_validators = 9;
+  string exchange_rate = 10;
+}
+
+message EventValidatorRemoved {
+  string operator_address = 1;
+  string reason = 2;
+}
+
+message EventSlashAbsorbed {
+  uint64 epoch = 1;
+  string exchange_rate_before = 2;
+  string exchange_rate_after = 3;
+}

@@ -35,6 +35,8 @@ import (
 	customwasm "github.com/classic-terra/core/v4/custom/wasm"
 	"github.com/classic-terra/core/v4/x/dyncomm"
 	dyncommtypes "github.com/classic-terra/core/v4/x/dyncomm/types"
+	"github.com/classic-terra/core/v4/x/liquidstake"
+	liquidstaketypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	"github.com/classic-terra/core/v4/x/market"
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	"github.com/classic-terra/core/v4/x/oracle"
@@ -130,6 +132,7 @@ var (
 		hyperlanecore.AppModule{},
 		warp.AppModule{},
 		warpledger.AppModuleBasic{},
+		liquidstake.AppModuleBasic{},
 	)
 	// module account permissions
 	maccPerms = map[string][]string{
@@ -151,11 +154,16 @@ var (
 		// receive plain MsgSend (not in allowedReceivingModAcc).
 		hyperlanetypes.ModuleName: nil,
 		warptypes.ModuleName:      {authtypes.Minter, authtypes.Burner},
+		// phase 6: mints/burns only stluna (enforced in the keeper); delegates uluna
+		liquidstaketypes.ModuleName: {authtypes.Minter, authtypes.Burner},
 	}
 	// module accounts that are allowed to receive tokens
 	allowedReceivingModAcc = map[string]bool{
 		oracletypes.ModuleName:       true,
 		treasurytypes.BurnModuleName: true,
+		// x/liquidstake is the delegator: reward withdrawals and matured
+		// undelegations are paid to its account by x/distribution and x/staking
+		liquidstaketypes.ModuleName: true,
 	}
 )
 
@@ -198,6 +206,7 @@ func appModules(
 		customhyperlane.NewAppModule(appCodec, app.HyperlaneKeeper, app.WarpLedgerKeeper),
 		customwarp.NewAppModule(appCodec, app.WarpKeeper, app.WarpLedgerKeeper),
 		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
+		liquidstake.NewAppModule(appCodec, app.LiquidStakeKeeper),
 	}
 }
 
@@ -264,6 +273,7 @@ func orderBeginBlockers() []string {
 		hyperlanetypes.ModuleName,
 		warptypes.ModuleName,
 		warpledgertypes.ModuleName,
+		liquidstaketypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -303,6 +313,7 @@ func orderEndBlockers() []string {
 		hyperlanetypes.ModuleName,
 		warptypes.ModuleName,
 		warpledgertypes.ModuleName,
+		liquidstaketypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -342,6 +353,7 @@ func orderInitGenesis() []string {
 		hyperlanetypes.ModuleName,
 		warptypes.ModuleName,
 		warpledgertypes.ModuleName,
+		liquidstaketypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}

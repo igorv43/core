@@ -189,12 +189,13 @@ func SetupWithGenesisValSet(
 	require.NoError(t, err)
 
 	// InitChain writes all module genesis
-	terraApp.InitChain(&abci.RequestInitChain{
+	_, err = terraApp.InitChain(&abci.RequestInitChain{
 		ChainId:         chainID,
 		Validators:      []abci.ValidatorUpdate{},
 		ConsensusParams: DefaultConsensusParams,
 		AppStateBytes:   stateBytes,
 	})
+	require.NoError(t, err, "InitChain must succeed, otherwise the genesis state is silently empty")
 
 	// Commit genesis
 	_, terr := terraApp.Commit()

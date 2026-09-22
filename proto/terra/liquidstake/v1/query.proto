@@ -1,0 +1,83 @@
+syntax = "proto3";
+package terra.liquidstake.v1;
+
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/base/v1beta1/coin.proto";
+import "terra/liquidstake/v1/liquidstake.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/liquidstake/types";
+
+// Query defines the x/liquidstake gRPC query service (spec Annex E.4).
+service Query {
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/terra/liquidstake/v1/params";
+  }
+  // ExchangeRate returns the stLUNC exchange rate and its components.
+  rpc ExchangeRate(QueryExchangeRateRequest) returns (QueryExchangeRateResponse) {
+    option (google.api.http).get = "/terra/liquidstake/v1/exchange_rate";
+  }
+  // Delegations returns the module's delegations per validator and the eligibility set.
+  rpc Delegations(QueryDelegationsRequest) returns (QueryDelegationsResponse) {
+    option (google.api.http).get = "/terra/liquidstake/v1/delegations";
+  }
+  // UnstakeQueue returns queued and matured redemptions, optionally filtered by address.
+  rpc UnstakeQueue(QueryUnstakeQueueRequest) returns (QueryUnstakeQueueResponse) {
+    option (google.api.http).get = "/terra/liquidstake/v1/unstake_queue";
+  }
+  rpc Epoch(QueryEpochRequest) returns (QueryEpochResponse) {
+    option (google.api.http).get = "/terra/liquidstake/v1/epoch";
+  }
+}
+
+message QueryParamsRequest {}
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryExchangeRateRequest {}
+message QueryExchangeRateResponse {
+  string exchange_rate = 1 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string delegated = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string unbonding = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string buffer = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string pending_rewards = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // owed is the uluna reserved for matured/undelegated requests; it is not part of the rate.
+  string owed = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  cosmos.base.v1beta1.Coin st_supply = 7 [(gogoproto.nullable) = false];
+  // reward_buffer holds rewards received in denoms other than uluna (spec §24.8, D-23).
+  repeated cosmos.base.v1beta1.Coin reward_buffer = 8 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
+  int64 height = 9;
+}
+
+message QueryDelegationsRequest {}
+message DelegationEntry {
+  string operator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  string tokens = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string share = 3 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  bool eligible = 4;
+  string reason = 5;
+}
+message QueryDelegationsResponse {
+  repeated DelegationEntry delegations = 1 [(gogoproto.nullable) = false];
+  string total = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string validator_cap = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string module_cap = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+
+message QueryUnstakeQueueRequest {
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+message QueryUnstakeQueueResponse {
+  repeated UnstakeRequest requests = 1 [(gogoproto.nullable) = false];
+  string total_queued = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string total_owed = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+
+message QueryEpochRequest {}
+message QueryEpochResponse {
+  Epoch epoch = 1 [(gogoproto.nullable) = false];
+  int64 next_epoch_height = 2;
+  int64 current_height = 3;
+}

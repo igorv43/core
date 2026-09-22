@@ -1,0 +1,65 @@
+syntax = "proto3";
+package terra.liquidstake.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "amino/amino.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/liquidstake/types";
+
+// Params defines the x/liquidstake parameters (spec §24, Annex B).
+message Params {
+  option (amino.name)      = "terra/liquidstake/Params";
+  option (gogoproto.equal) = true;
+
+  // epoch_blocks is the length of an epoch in blocks. It MUST satisfy
+  // epoch_blocks * block_time >= UnbondingTime / MaxEntries (spec §24.4).
+  int64 epoch_blocks = 1;
+  // fee_rate is the share of each epoch's uluna rewards taken as protocol fee (initial 5%).
+  string fee_rate = 2 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // burn_share is the share of the fee burned directly in uluna (initial 20%, spec §23.1).
+  string burn_share = 3 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // validator_cap is the maximum share of the module's delegations on one validator (initial 10%).
+  string validator_cap = 4 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // max_share is the maximum share of the chain's bonded stake the module may hold (initial 20%).
+  string max_share = 5 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // buffer_ratio is the share of total assets kept undelegated for instant redemptions (initial 2%).
+  string buffer_ratio = 6 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // max_commission excludes validators whose commission rate is above it.
+  string max_commission = 7 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // min_uptime excludes validators whose signed ratio in the slashing window is below it.
+  string min_uptime = 8 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // max_validators bounds the number of validators the module delegates to per epoch.
+  uint32 max_validators = 9;
+}
+
+// Epoch is the current epoch of the module.
+message Epoch {
+  uint64 number = 1;
+  int64 start_height = 2;
+  google.protobuf.Timestamp start_time = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+// UnstakeRequest is a queued redemption (spec §24.4).
+message UnstakeRequest {
+  uint64 id = 1;
+  string address = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // st_amount is the amount of stLUNC burned when the request was accepted.
+  string st_amount = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // amount is the uluna owed, fixed at the exchange rate of the request.
+  string amount = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // epoch is the epoch in which the request was queued; it is undelegated at that epoch's end.
+  uint64 epoch = 5;
+  // completion_time is when the undelegation matures (zero until the batch is sent).
+  google.protobuf.Timestamp completion_time = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+  // undelegated is true once the epoch batch that covers the request was sent.
+  bool undelegated = 7;
+}
+
+// ValidatorState records why a validator is (not) in the active set of the epoch.
+message ValidatorState {
+  string operator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  bool eligible = 2;
+  string reason = 3;
+}
