@@ -43,6 +43,8 @@ import (
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	"github.com/classic-terra/core/v4/x/oracle"
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
+	"github.com/classic-terra/core/v4/x/perp"
+	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	taxmodule "github.com/classic-terra/core/v4/x/tax/module"
 	taxbank "github.com/classic-terra/core/v4/x/tax/modules/bank"
 	taxmarket "github.com/classic-terra/core/v4/x/tax/modules/market"
@@ -136,6 +138,7 @@ var (
 		warpledger.AppModuleBasic{},
 		liquidstake.AppModuleBasic{},
 		batch.AppModuleBasic{},
+		perp.AppModuleBasic{},
 	)
 	// module account permissions
 	maccPerms = map[string][]string{
@@ -160,6 +163,7 @@ var (
 		// phase 6: mints/burns only stluna (enforced in the keeper); delegates uluna
 		liquidstaketypes.ModuleName: {authtypes.Minter, authtypes.Burner},
 		batchtypes.ModuleName:       nil, // escrow only: no mint or burn authority
+		perptypes.ModuleName:        nil, // collateral, insurance fund and revenue: no mint or burn authority
 	}
 	// module accounts that are allowed to receive tokens
 	allowedReceivingModAcc = map[string]bool{
@@ -168,6 +172,9 @@ var (
 		// x/liquidstake is the delegator: reward withdrawals and matured
 		// undelegations are paid to its account by x/distribution and x/staking
 		liquidstaketypes.ModuleName: true,
+		// x/perp receives the uluna of its buyback from the x/batch settlement
+		// and the returned escrow of unfilled buyback orders
+		perptypes.ModuleName: true,
 	}
 )
 
@@ -212,6 +219,7 @@ func appModules(
 		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
 		liquidstake.NewAppModule(appCodec, app.LiquidStakeKeeper),
 		batch.NewAppModule(appCodec, app.BatchKeeper),
+		perp.NewAppModule(appCodec, app.PerpKeeper),
 	}
 }
 
@@ -280,6 +288,7 @@ func orderBeginBlockers() []string {
 		warpledgertypes.ModuleName,
 		liquidstaketypes.ModuleName,
 		batchtypes.ModuleName,
+		perptypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -321,6 +330,7 @@ func orderEndBlockers() []string {
 		warpledgertypes.ModuleName,
 		liquidstaketypes.ModuleName,
 		batchtypes.ModuleName,
+		perptypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -362,6 +372,7 @@ func orderInitGenesis() []string {
 		warpledgertypes.ModuleName,
 		liquidstaketypes.ModuleName,
 		batchtypes.ModuleName,
+		perptypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}

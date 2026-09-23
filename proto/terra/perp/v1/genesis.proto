@@ -1,0 +1,29 @@
+syntax = "proto3";
+package terra.perp.v1;
+
+import "gogoproto/gogo.proto";
+import "terra/perp/v1/perp.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/perp/types";
+
+// GenesisState defines the x/perp genesis state.
+message GenesisState {
+  Params params = 1 [(gogoproto.nullable) = false];
+  repeated Market markets = 2 [(gogoproto.nullable) = false];
+  repeated Position positions = 3 [(gogoproto.nullable) = false];
+  repeated CollateralEntry collateral = 4 [(gogoproto.nullable) = false];
+  repeated ReservationEntry reservations = 5 [(gogoproto.nullable) = false];
+  repeated TriggerOrder triggers = 6 [(gogoproto.nullable) = false];
+  uint64 next_trigger_id = 7;
+  repeated string auto_top_up_accounts = 8;
+  Ledger ledger = 9 [(gogoproto.nullable) = false];
+  repeated AllocationRecord allocations = 10 [(gogoproto.nullable) = false];
+  // unwind_intents maps market id to the open insurance-fund unwind intent.
+  repeated UnwindIntent unwind_intents = 11 [(gogoproto.nullable) = false];
+}
+
+// UnwindIntent is the open reduce-only intent of the insurance fund in a market.
+message UnwindIntent {
+  string market_id = 1;
+  uint64 intent_id = 2;
+}

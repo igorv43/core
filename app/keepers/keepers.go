@@ -34,6 +34,8 @@ import (
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	oraclekeeper "github.com/classic-terra/core/v4/x/oracle/keeper"
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
+	perpkeeper "github.com/classic-terra/core/v4/x/perp/keeper"
+	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	taxkeeper "github.com/classic-terra/core/v4/x/tax/keeper"
 	taxtypes "github.com/classic-terra/core/v4/x/tax/types"
 	taxexemptionkeeper "github.com/classic-terra/core/v4/x/taxexemption/keeper"
@@ -125,6 +127,7 @@ type AppKeepers struct {
 	WarpLedgerKeeper  warpledgerkeeper.Keeper
 	LiquidStakeKeeper liquidstakekeeper.Keeper
 	BatchKeeper       batchkeeper.Keeper
+	PerpKeeper        perpkeeper.Keeper
 
 	Ics20WasmHooks  *ibchooks.WasmHooks
 	IBCHooksWrapper *ibchooks.ICS4Middleware
@@ -175,6 +178,7 @@ func NewAppKeepers(
 		warpledgertypes.StoreKey:     storetypes.NewKVStoreKey(warpledgertypes.StoreKey),
 		liquidstaketypes.StoreKey:    storetypes.NewKVStoreKey(liquidstaketypes.StoreKey),
 		batchtypes.StoreKey:          storetypes.NewKVStoreKey(batchtypes.StoreKey),
+		perptypes.StoreKey:           storetypes.NewKVStoreKey(perptypes.StoreKey),
 	}
 	tkeys := map[string]*storetypes.TransientStoreKey{
 		paramstypes.TStoreKey: storetypes.NewTransientStoreKey(paramstypes.TStoreKey),
@@ -574,6 +578,23 @@ func NewAppKeepers(
 		appKeepers.OracleKeeper,
 		batchkeeper.NewCommunityPoolSink(appKeepers.DistrKeeper),
 	)
+
+	// x/perp (Part II): isolated-margin perpetuals novated with the protocol,
+	// insurance fund and ADL, oracle-state risk engine, resident triggers and
+	// the allocation cascade. It registers the margin hook and the fee sink
+	// of x/batch (fees flow to the insurance fund until its target).
+	appKeepers.PerpKeeper = perpkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[perptypes.StoreKey]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.BankKeeper,
+		appKeepers.OracleKeeper,
+		&appKeepers.BatchKeeper, // pointer: the hook and sink are registered on it below
+		appKeepers.DistrKeeper,
+		treasurytypes.BurnModuleName,
+	)
+	appKeepers.BatchKeeper.SetMarginHook(perpkeeper.NewMarginHook(appKeepers.PerpKeeper))
+	appKeepers.BatchKeeper.SetFeeSink(perpkeeper.NewFeeSink(appKeepers.PerpKeeper))
 
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := appKeepers.newIBCRouter()

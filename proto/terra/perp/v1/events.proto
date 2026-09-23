@@ -1,0 +1,97 @@
+syntax = "proto3";
+package terra.perp.v1;
+
+option go_package = "github.com/classic-terra/core/v4/x/perp/types";
+
+// Typed events of x/perp (spec Annex E.3).
+
+message EventCollateralDeposited {
+  string account = 1;
+  string amount  = 2;
+}
+message EventCollateralWithdrawn {
+  string account = 1;
+  string amount  = 2;
+}
+message EventPositionOpened {
+  string account     = 1;
+  string market_id   = 2;
+  string side        = 3;
+  string qty         = 4;
+  string entry_price = 5;
+  string collateral  = 6;
+}
+message EventPositionChanged {
+  string account      = 1;
+  string market_id    = 2;
+  string side         = 3;
+  string qty          = 4;
+  string entry_price  = 5;
+  string collateral   = 6;
+  string realized_pnl = 7;
+  string fee          = 8;
+  bool   closed       = 9;
+}
+message EventFundingApplied {
+  string market_id     = 1;
+  string rate          = 2;
+  string funding_index = 3;
+  string mark_price    = 4;
+}
+message EventPositionLiquidated {
+  string account   = 1;
+  string market_id = 2;
+  string side      = 3;
+  string qty       = 4;
+  string mark_price = 5;
+  string penalty   = 6;
+  // shortfall is what the insurance fund absorbed (0 when equity covered the penalty).
+  string shortfall = 7;
+  bool   to_adl    = 8;
+}
+message EventADLExecuted {
+  string market_id   = 1;
+  string defaulter   = 2;
+  string counterparty = 3;
+  string qty         = 4;
+  string price       = 5;
+}
+message EventMarketStateChanged {
+  string market_id = 1;
+  string from      = 2;
+  string to        = 3;
+  string effective_leverage = 4;
+  string effective_oi_cap   = 5;
+}
+message EventTriggerFired {
+  uint64 trigger_id = 1;
+  string account    = 2;
+  string market_id  = 3;
+  string mark_price = 4;
+  uint64 intent_id  = 5;
+}
+message EventAutoTopUp {
+  string account   = 1;
+  string market_id = 2;
+  string amount    = 3;
+}
+message EventInsuranceUnwind {
+  string market_id = 1;
+  string side      = 2;
+  string qty       = 3;
+  uint64 intent_id = 4;
+}
+message EventAllocationExecuted {
+  uint64 epoch             = 1;
+  string revenue           = 2;
+  string to_insurance      = 3;
+  string to_opex           = 4;
+  string to_oracle_pool    = 5;
+  string to_community_pool = 6;
+  string to_burn_budget    = 7;
+}
+message EventBuyback {
+  uint64 intent_id = 1;
+  string spent     = 2;
+  string burned    = 3;
+}

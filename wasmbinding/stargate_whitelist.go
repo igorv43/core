@@ -8,6 +8,7 @@ import (
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
+	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	treasurytypes "github.com/classic-terra/core/v4/x/treasury/types"
 	warpledgertypes "github.com/classic-terra/core/v4/x/warpledger/types"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -47,6 +48,14 @@ func init() {
 	setWhitelistedQuery("/terra.batch.v1.Query/Markets", &batchtypes.QueryMarketsResponse{})
 	setWhitelistedQuery("/terra.batch.v1.Query/Batch", &batchtypes.QueryBatchResponse{})
 	setWhitelistedQuery("/terra.batch.v1.Query/Pipeline", &batchtypes.QueryPipelineResponse{})
+
+	// perp (spec Annex E.3): read-only market, position and fund data
+	setWhitelistedQuery("/terra.perp.v1.Query/Params", &perptypes.QueryParamsResponse{})
+	setWhitelistedQuery("/terra.perp.v1.Query/Market", &perptypes.QueryMarketResponse{})
+	setWhitelistedQuery("/terra.perp.v1.Query/Markets", &perptypes.QueryMarketsResponse{})
+	setWhitelistedQuery("/terra.perp.v1.Query/Position", &perptypes.QueryPositionResponse{})
+	setWhitelistedQuery("/terra.perp.v1.Query/InsuranceFund", &perptypes.QueryInsuranceFundResponse{})
+	setWhitelistedQuery("/terra.perp.v1.Query/ADLRank", &perptypes.QueryADLRankResponse{})
 }
 
 // GetWhitelistedQuery returns the whitelisted query at the provided path.

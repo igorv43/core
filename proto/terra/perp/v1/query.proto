@@ -1,0 +1,176 @@
+syntax = "proto3";
+package terra.perp.v1;
+
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
+import "terra/batch/v1/batch.proto";
+import "terra/perp/v1/perp.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/perp/types";
+
+// Query defines the x/perp Query service (spec Annex E.3).
+service Query {
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/terra/perp/v1/params";
+  }
+  // Market takes market_id as a query parameter (ids contain "/").
+  rpc Market(QueryMarketRequest) returns (QueryMarketResponse) {
+    option (google.api.http).get = "/terra/perp/v1/market";
+  }
+  rpc Markets(QueryMarketsRequest) returns (QueryMarketsResponse) {
+    option (google.api.http).get = "/terra/perp/v1/markets";
+  }
+  // Position returns a position with its derived equity and liquidation price.
+  rpc Position(QueryPositionRequest) returns (QueryPositionResponse) {
+    option (google.api.http).get = "/terra/perp/v1/position";
+  }
+  rpc Positions(QueryPositionsRequest) returns (QueryPositionsResponse) {
+    option (google.api.http).get = "/terra/perp/v1/accounts/{account}/positions";
+  }
+  rpc Collateral(QueryCollateralRequest) returns (QueryCollateralResponse) {
+    option (google.api.http).get = "/terra/perp/v1/accounts/{account}/collateral";
+  }
+  rpc Triggers(QueryTriggersRequest) returns (QueryTriggersResponse) {
+    option (google.api.http).get = "/terra/perp/v1/accounts/{account}/triggers";
+  }
+  rpc InsuranceFund(QueryInsuranceFundRequest) returns (QueryInsuranceFundResponse) {
+    option (google.api.http).get = "/terra/perp/v1/insurance_fund";
+  }
+  // ADLRank lists the positions of a market by auto-deleveraging score (spec §18.2).
+  rpc ADLRank(QueryADLRankRequest) returns (QueryADLRankResponse) {
+    option (google.api.http).get = "/terra/perp/v1/adl_rank";
+  }
+  // ListingCheck evaluates the listing criteria of spec §21.3 for a market.
+  rpc ListingCheck(QueryListingCheckRequest) returns (QueryListingCheckResponse) {
+    option (google.api.http).get = "/terra/perp/v1/listing_check";
+  }
+  // Allocations returns the allocation cascade records (spec §23.1), newest first.
+  rpc Allocations(QueryAllocationsRequest) returns (QueryAllocationsResponse) {
+    option (google.api.http).get = "/terra/perp/v1/allocations";
+  }
+}
+
+message QueryParamsRequest {}
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryMarketRequest {
+  string market_id = 1;
+}
+// MarketView adds the derived data of a market.
+message MarketView {
+  Market market = 1 [(gogoproto.nullable) = false];
+  // insurance_inventory is the fund's net inventory (positive long, negative short) in base units.
+  string insurance_inventory = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string dispersion = 3 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // stale_periods is the number of vote periods since the last oracle update.
+  uint64 stale_periods = 4;
+  // initial_margin and maintenance_margin are the fractions in force for new positions.
+  string initial_margin = 5 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string maintenance_margin = 6 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+}
+message QueryMarketResponse {
+  MarketView market = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryMarketsRequest {}
+message QueryMarketsResponse {
+  repeated MarketView markets = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryPositionRequest {
+  string account   = 1;
+  string market_id = 2;
+}
+// PositionView is a position with its derived quantities at the current mark.
+message PositionView {
+  Position position = 1 [(gogoproto.nullable) = false];
+  string mark_price = 2 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string notional = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // unrealized_pnl and funding_owed are signed (settlement units).
+  string unrealized_pnl = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string funding_owed = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string equity = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string maintenance_margin = 7 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string liquidation_price = 8 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string adl_score = 9 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+}
+message QueryPositionResponse {
+  PositionView position = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryPositionsRequest {
+  string account = 1;
+}
+message QueryPositionsResponse {
+  repeated PositionView positions = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryCollateralRequest {
+  string account = 1;
+}
+message QueryCollateralResponse {
+  string free = 1 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string reserved = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string in_positions = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  bool auto_top_up = 4;
+}
+
+message QueryTriggersRequest {
+  string account = 1;
+}
+message QueryTriggersResponse {
+  repeated TriggerOrder triggers = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryInsuranceFundRequest {}
+message QueryInsuranceFundResponse {
+  string balance = 1 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string target = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // inventory lists the fund's positions.
+  repeated Position inventory = 3 [(gogoproto.nullable) = false];
+  Ledger ledger = 4 [(gogoproto.nullable) = false];
+}
+
+message QueryADLRankRequest {
+  string market_id = 1;
+  // side filters the ranking (unspecified = both).
+  terra.batch.v1.Side side = 2;
+}
+message ADLEntry {
+  string account = 1;
+  terra.batch.v1.Side side = 2;
+  string qty = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string score = 4 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+}
+message QueryADLRankResponse {
+  repeated ADLEntry entries = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryListingCheckRequest {
+  string market_id = 1;
+}
+message QueryListingCheckResponse {
+  // oi_cap_within_depth: OI_cap·mark <= alpha·Depth2% (criterion 1).
+  bool oi_cap_within_depth = 1;
+  string depth_2pct = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string depth_samples = 3;
+  // insurance_covers_target: IF >= IF_target including this market (criterion 2).
+  bool insurance_covers_target = 4;
+  string insurance_target = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // venues_attested is the governance attestation (criterion 3).
+  bool venues_attested = 6;
+  // healthy_long_enough: listing_min_blocks without REDUCE_ONLY/PAUSED (criterion 4).
+  bool healthy_long_enough = 7;
+  int64 healthy_blocks = 8;
+  bool listable = 9;
+}
+
+message QueryAllocationsRequest {
+  uint32 limit = 1;
+}
+message QueryAllocationsResponse {
+  repeated AllocationRecord allocations = 1 [(gogoproto.nullable) = false];
+}

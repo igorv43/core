@@ -1,0 +1,206 @@
+syntax = "proto3";
+package terra.perp.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "amino/amino.proto";
+import "terra/batch/v1/batch.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/perp/types";
+
+// OracleState is the state of a market's reference price (spec §21.2).
+enum OracleState {
+  option (gogoproto.goproto_enum_prefix) = false;
+  ORACLE_STATE_UNSPECIFIED = 0;
+  // NORMAL: dispersion <= d1 and the price is fresh.
+  ORACLE_STATE_NORMAL = 1;
+  // RESTRICTED: d1 < dispersion <= d2; leverage halved, new positions up to half the OI cap.
+  ORACLE_STATE_RESTRICTED = 2;
+  // REDUCE_ONLY: dispersion > d2 or one vote period without an update.
+  ORACLE_STATE_REDUCE_ONLY = 3;
+  // PAUSED: two or more periods without an update; liquidations and triggers suspended.
+  ORACLE_STATE_PAUSED = 4;
+}
+
+// Params defines the x/perp parameters (spec §18–§23, Annex B).
+message Params {
+  option (amino.name)      = "terra/perp/Params";
+  option (gogoproto.equal) = true;
+
+  // settlement_denom is the collateral, fee and insurance-fund denom (spec §11).
+  string settlement_denom = 1;
+  // liq_penalty is charged on the notional of a liquidated position, to the insurance fund.
+  string liq_penalty = 2 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // if_unwind_per_batch caps the fraction of the fund's inventory unwound per batch.
+  string if_unwind_per_batch = 3 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // if_max_inventory caps the fund's inventory in a market as a fraction of its OI cap; beyond it liquidations go to ADL.
+  string if_max_inventory = 4 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // if_fee_share is the share of trading fees sent to the fund until IF >= IF_target.
+  string if_fee_share = 5 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // beta scales the insurance-fund target (spec §18.4).
+  string beta = 6 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // premium_window is k, the number of batches in the premium TWAP (spec §20.1).
+  uint32 premium_window = 7;
+  // premium_clamp is c, the clamp of the premium in the mark price.
+  string premium_clamp = 8 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // funding_interval is the number of blocks between funding applications (spec §20.2).
+  int64 funding_interval = 9;
+  // funding_rate_max is r_max per interval.
+  string funding_rate_max = 10 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // dispersion_restricted (d1) and dispersion_reduce_only (d2) drive the oracle states (spec §21.2).
+  string dispersion_restricted = 11 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string dispersion_reduce_only = 12 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // perp_fee_bps is the protocol fee on the notional of every fill (spec §23).
+  uint32 perp_fee_bps = 13;
+  uint32 max_open_positions_per_account = 14;
+  uint32 max_triggers_per_account = 15;
+  // trigger_slippage_default is used when a trigger order sets no slippage.
+  string trigger_slippage_default = 16 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // risk_step bounds the change of effective leverage and OI cap per vote period (spec §21.4).
+  string risk_step = 17 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // alloc_epoch_blocks is the allocation cascade epoch (spec §23.1).
+  int64 alloc_epoch_blocks = 18;
+  // opex_cap is the per-epoch operational budget (settlement units); opex_account receives it (community pool when empty).
+  string opex_cap = 19 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string opex_account = 20;
+  // split_op, split_cp and split_burn divide the surplus (sum = 1).
+  string split_op = 21 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string split_cp = 22 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string split_burn = 23 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // burn_buy_cap caps the settlement spent per epoch by the buyback (spec §23.1).
+  string burn_buy_cap = 24 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // spot_market_id is the internal LUNC/settlement spot market used by the buyback.
+  string spot_market_id = 25;
+  // max_liquidations_per_block and max_triggers_per_block bound the EndBlock work (spec §12).
+  uint32 max_liquidations_per_block = 26;
+  uint32 max_triggers_per_block = 27;
+}
+
+// Market is a perpetual market (spec §19–§22). Governance sets the risk
+// inputs; the module keeps the derived state.
+message Market {
+  // id is the x/batch market id, e.g. "ubtc-perp/uusdc".
+  string id = 1;
+  // oracle_asset is the x/oracle name giving P_ref ("ubtc" asset or "uusd" denom).
+  string oracle_asset = 2;
+  // max_leverage is the governance leverage cap (absolute maximum 10 in code, §26.3).
+  string max_leverage = 3 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // oi_cap is the governance open-interest cap per side, in base units.
+  string oi_cap = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // alpha bounds OI_cap by alpha·Depth2% (spec §21.3, at most 0.5 in code).
+  string alpha = 5 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // stress is the worst 1-hour move of the underlying over 365 days divided by MM, floor 1 (spec §18.4).
+  string stress = 6 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // listing_min_blocks is D of spec §21.3 criterion 4, in blocks.
+  int64 listing_min_blocks = 7;
+  // venues_attested records the governance attestation of criterion 3 (>= 3 venues in the feeders).
+  bool venues_attested = 8;
+  bool enabled = 9;
+  OracleState state = 10;
+  string mark_price = 11 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string ref_price = 12 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // funding_index accumulates funding per unit of base (settlement per base unit).
+  string funding_index = 13 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  int64  last_funding_height = 14;
+  string funding_rate = 15 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string oi_long = 16 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string oi_short = 17 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // effective_leverage and effective_oi_cap are the risk-engine outputs applied to new positions (spec §22, §21.4 steps).
+  string effective_leverage = 18 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string effective_oi_cap = 19 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  int64 created_height = 20;
+  // healthy_since_height is the start of the current streak without REDUCE_ONLY/PAUSED (criterion 4).
+  int64 healthy_since_height = 21;
+  string min_qty = 22 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string tick_size = 23 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // premium_sum and premium_count accumulate the batch premiums since the last funding (spec §20.2).
+  string premium_sum = 24 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  uint32 premium_count = 25;
+  // last_risk_height is the last vote period boundary at which the risk steps were applied.
+  int64 last_risk_height = 26;
+}
+
+// Position is an isolated-margin position (spec §19.1). Unrealized PnL,
+// equity and the liquidation price are derived, never stored.
+message Position {
+  string account   = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string market_id = 2;
+  terra.batch.v1.Side side = 3;
+  // qty is the position size in base units.
+  string qty = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string entry_price = 5 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // collateral is the margin allocated to the position, in the settlement denom.
+  string collateral = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string funding_index_at_open = 7 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string realized_pnl = 8 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  int64 last_update_height = 9;
+  // maintenance_margin is the MM fraction fixed when the position was opened or
+  // last increased; risk changes never touch existing positions (spec §21.4).
+  string maintenance_margin = 10 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // liq_price_indexed is the liquidation price under which the position is
+  // indexed for the incremental sweep (spec §19.5).
+  string liq_price_indexed = 11 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+}
+
+// TriggerOrder is a resident stop-loss / take-profit (spec §14.5 layer 4):
+// reduce-only, evaluated every EndBlock against the mark price.
+message TriggerOrder {
+  uint64 id        = 1;
+  string account   = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string market_id = 3;
+  // side is the side of the injected reduce-only order (opposite to the position).
+  terra.batch.v1.Side side = 4;
+  string trigger_price = 5 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // fire_above fires when mark >= trigger_price; otherwise when mark <= trigger_price.
+  bool fire_above = 6;
+  // qty is the quantity to close; zero closes the whole position at firing time.
+  string qty = 7 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // slippage bounds the injected limit: trigger ± slippage.
+  string slippage = 8 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  int64 created_height = 9;
+}
+
+// AllocationRecord is one execution of the allocation cascade (spec §23.1).
+message AllocationRecord {
+  uint64 epoch  = 1;
+  int64  height = 2;
+  string revenue = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string to_insurance = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string to_opex = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string to_oracle_pool = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string to_community_pool = 7 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string to_burn_budget = 8 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // burned_uluna is the uluna bought back and sent to the burn account during the epoch.
+  string burned_uluna = 9 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+
+// CollateralEntry is an account's free collateral (genesis / queries).
+message CollateralEntry {
+  string account = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string amount = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+
+// ReservationEntry is the margin reserved by an account's open orders in a market.
+message ReservationEntry {
+  string account   = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string market_id = 2;
+  string amount = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+
+// Ledger holds the module-level balances kept inside the perp module account.
+message Ledger {
+  // insurance is the insurance fund balance (settlement).
+  string insurance = 1 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // revenue is the protocol revenue accumulated for the next allocation epoch (settlement).
+  string revenue = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // burn_budget is settlement earmarked for the buyback (settlement).
+  string burn_budget = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // burn_spent_epoch is what the buyback spent in the current epoch.
+  string burn_spent_epoch = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // burned_epoch is the uluna burned in the current epoch.
+  string burned_epoch = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  uint64 epoch = 6;
+  int64  epoch_start_height = 7;
+  // buyback_intent_id is the open buyback intent in the spot market (0 = none).
+  uint64 buyback_intent_id = 8;
+}
