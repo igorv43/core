@@ -83,6 +83,13 @@ message Gateway {
   string app_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
   uint32 domain = 2;
   string address = 3 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // exit_factory is the CREATE2 factory of the withdrawal exit contracts on
+  // the domain (spec §14.7.2, D-30): 32-byte hex, zero when native-currency
+  // withdrawals are not offered on the domain.
+  string exit_factory = 4 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // exit_init_code_hash is the keccak256 of the exit clone init code, constant
+  // per factory (32 bytes).
+  bytes exit_init_code_hash = 5;
 }
 
 // RemoteAccount is a derived account controlled by (domain, controller).
@@ -122,4 +129,74 @@ message RemotePayload {
   bytes on_behalf_of = 1;
   // msgs are messages of the whitelist in code, signed by the derived account.
   repeated google.protobuf.Any msgs = 2;
+  // conversion carries the data of a native-currency deposit converted at the
+  // edge by the enrolled gateway (spec §14.7); recorded as a ConversionReceipt.
+  ConversionData conversion = 3;
+  // update confirms the result of a native-currency withdrawal executed on
+  // the origin (spec §14.7.3 item 6); only from the enrolled gateway.
+  ConversionUpdate update = 4;
+}
+
+// ConversionData is measured by the gateway contract on the origin chain
+// (spec §14.7.3 item 2); amounts are 32-byte big-endian unsigned integers.
+message ConversionData {
+  // token_in is the input asset on the origin: 0x-prefixed address or "native".
+  string token_in = 1;
+  uint32 decimals_in = 2;
+  bytes amount_in = 3;
+  // usdc_amount is the settlement asset actually received, by balance difference.
+  bytes usdc_amount = 4;
+  bytes dex_fee = 5;
+  bytes route_fee = 6;
+  // min_accepted is the minimum the user set before signing.
+  bytes min_accepted = 7;
+  uint64 origin_block = 8;
+}
+
+// ConversionUpdate reports the outcome of a withdrawal exit on the origin.
+message ConversionUpdate {
+  // withdraw_message_id is the hyperlane message id of the warp transfer (32 bytes).
+  bytes withdraw_message_id = 1;
+  // amount_out is what the user received, in token_out units (32-byte big-endian).
+  bytes amount_out = 2;
+  // fallback_to_usdc is true when the swap failed and USDC was paid instead.
+  bool fallback_to_usdc = 3;
+  uint64 origin_block = 4;
+}
+
+// ConversionReceipt is the on-chain record of a conversion at the edge
+// (spec §14.7.4), one per deposit and one per withdrawal, keyed by
+// (account, message id). It is evidence, never a balance.
+message ConversionReceipt {
+  string account = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint32 origin_domain = 2;
+  uint64 origin_block = 3;
+  string message_id = 4 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  ConversionDirection direction = 5;
+  // token_in is the asset converted on deposit; on withdrawal it is the
+  // settlement asset released.
+  string token_in = 6;
+  string amount_in = 7;
+  string usdc_amount = 8;
+  // effective_rate is usdc per unit of token_in, both in display units.
+  string effective_rate = 9 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  string dex_fee = 10;
+  string route_fee = 11;
+  string min_accepted = 12;
+  bool fallback_to_usdc = 13;
+  int64 registered_height = 14;
+  // token_out is the asset requested on withdrawal (32-byte hex on the origin).
+  string token_out = 15;
+  // amount_out is what the user received on withdrawal, once confirmed.
+  string amount_out = 16;
+  // confirmed is true once the origin reported the outcome of a withdrawal.
+  bool confirmed = 17;
+  // exit_address is the deterministic exit contract the withdrawal was sent to.
+  string exit_address = 18 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+}
+
+enum ConversionDirection {
+  option (gogoproto.goproto_enum_prefix) = false;
+  CONVERSION_DEPOSIT = 0;
+  CONVERSION_WITHDRAW = 1;
 }

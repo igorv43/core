@@ -67,6 +67,30 @@ func (k *Keeper) Handle(goCtx context.Context, mailboxId util.HexAddress, messag
 		copy(controller[:], payload.OnBehalfOf)
 	}
 	derived := types.DeriveAddress(message.Origin, controller)
+	fromGateway := len(payload.OnBehalfOf) > 0
+	if (payload.Conversion != nil || payload.Update != nil) && !fromGateway {
+		return k.reject(ctx, message.Origin, controller, derived.String(), errorsmod.Wrap(types.ErrInvalidConversion, "conversion data allowed only from the enrolled gateway"))
+	}
+	// a conversion receipt is evidence of the deposit converted at the edge
+	// (spec §14.7); it is written before the messages so a rejected payload
+	// still leaves the receipt of the value that arrived through warp
+	if payload.Conversion != nil {
+		r, err := depositReceipt(ctx, derived.String(), message.Origin, message.Id(), payload.Conversion)
+		if err != nil {
+			return k.reject(ctx, message.Origin, controller, derived.String(), err)
+		}
+		if err := k.recordReceipt(ctx, r); err != nil {
+			return err
+		}
+	}
+	if payload.Update != nil {
+		if err := k.applyUpdate(ctx, derived.String(), payload.Update); err != nil {
+			return k.reject(ctx, message.Origin, controller, derived.String(), err)
+		}
+	}
+	if len(payload.Msgs) == 0 && (payload.Conversion != nil || payload.Update != nil) {
+		return nil
+	}
 	if err := k.execute(ctx, message.Origin, controller, derived, payload.Msgs); err != nil {
 		return k.reject(ctx, message.Origin, controller, derived.String(), err)
 	}

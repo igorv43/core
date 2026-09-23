@@ -165,7 +165,7 @@ func TestPayloadRejections(t *testing.T) {
 func TestGatewayActsOnBehalfOfController(t *testing.T) {
 	f := setup(t)
 	gateway := util.CreateMockHexAddress("gateway", 1)
-	require.NoError(t, f.k.SetGateway(f.ctx, f.appId, originDom, gateway))
+	require.NoError(t, f.k.SetGateway(f.ctx, f.appId, originDom, gateway, util.NewZeroAddress(), nil))
 	body := f.payload(t, f.controller.Bytes(), &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))})
 	f.deliver(t, gateway, body)
 	require.Empty(t, f.rejected(t))
@@ -226,7 +226,7 @@ func TestWithdrawLockedToController(t *testing.T) {
 	require.Empty(t, f.rejected(t))
 
 	before := f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount
-	id, err := f.k.Withdraw(f.ctx, f.derived.String(), f.token, math.NewInt(500_000_000))
+	id, err := f.k.Withdraw(f.ctx, f.derived.String(), f.token, math.NewInt(500_000_000), "", nil)
 	require.NoError(t, err)
 	require.False(t, id.IsZeroAddress())
 	after := f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount
@@ -242,7 +242,7 @@ func TestWithdrawLockedToController(t *testing.T) {
 	require.Equal(t, "500000000", ledger.Sent.String())
 
 	// no withdrawal for an unknown remote account
-	_, err = f.k.Withdraw(f.ctx, f.owner.String(), f.token, math.NewInt(1))
+	_, err = f.k.Withdraw(f.ctx, f.owner.String(), f.token, math.NewInt(1), "", nil)
 	require.ErrorIs(t, err, types.ErrAccountNotFound)
 
 	gs, err := f.k.ExportGenesis(f.ctx)

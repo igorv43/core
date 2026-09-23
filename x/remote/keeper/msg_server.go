@@ -39,7 +39,7 @@ func (ms msgServer) RevokeOwnSessionKey(goCtx context.Context, msg *types.MsgRev
 }
 
 func (ms msgServer) Withdraw(goCtx context.Context, msg *types.MsgWithdraw) (*types.MsgWithdrawResponse, error) {
-	id, err := ms.k.Withdraw(sdk.UnwrapSDKContext(goCtx), msg.Controller, msg.TokenId, msg.Amount)
+	id, err := ms.k.Withdraw(sdk.UnwrapSDKContext(goCtx), msg.Controller, msg.TokenId, msg.Amount, msg.TokenOut, msg.MinAccepted)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (ms msgServer) SetGateway(goCtx context.Context, msg *types.MsgSetGateway) 
 	if err := ms.authority(msg.Authority); err != nil {
 		return nil, err
 	}
-	if err := ms.k.SetGateway(sdk.UnwrapSDKContext(goCtx), msg.AppId, msg.Domain, msg.Address); err != nil {
+	if err := ms.k.SetGateway(sdk.UnwrapSDKContext(goCtx), msg.AppId, msg.Domain, msg.Address, msg.ExitFactory, msg.ExitInitCodeHash); err != nil {
 		return nil, err
 	}
 	return &types.MsgSetGatewayResponse{}, nil

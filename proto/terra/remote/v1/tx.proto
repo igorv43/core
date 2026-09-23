@@ -66,6 +66,14 @@ message MsgWithdraw {
   string controller = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
   string token_id = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
   string amount = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // token_out requests the conversion at the edge (spec §14.7.2): the asset
+  // on the origin as 32-byte hex (address left-padded, or the native sentinel
+  // 0x000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee).
+  // Empty withdraws the settlement asset to the controller as before.
+  string token_out = 4;
+  // min_accepted is the minimum of token_out the user accepts; below it the
+  // exit pays USDC instead.
+  string min_accepted = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = true];
 }
 message MsgWithdrawResponse {
   string message_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
@@ -98,6 +106,10 @@ message MsgSetGateway {
   uint32 domain    = 3;
   // address is the gateway contract; the zero address removes the gateway.
   string address = 4 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // exit_factory and exit_init_code_hash enable native-currency withdrawals on
+  // the domain (spec §14.7); zero/empty disables them.
+  string exit_factory = 5 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  bytes exit_init_code_hash = 6;
 }
 message MsgSetGatewayResponse {}
 

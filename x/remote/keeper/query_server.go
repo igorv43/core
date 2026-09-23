@@ -7,6 +7,7 @@ import (
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	"github.com/classic-terra/core/v4/x/remote/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/query"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -35,16 +36,8 @@ func (qs queryServer) RemoteApps(goCtx context.Context, _ *types.QueryRemoteApps
 	}); err != nil {
 		return nil, err
 	}
-	if err := qs.k.Gateways.Walk(ctx, nil, func(key collections.Pair[uint64, uint32], bz []byte) (bool, error) {
-		h, err := hexFromBytes(bz)
-		if err != nil {
-			return true, err
-		}
-		for _, a := range res.Apps {
-			if a.Id.GetInternalId() == key.K1() {
-				res.Gateways = append(res.Gateways, types.Gateway{AppId: a.Id, Domain: key.K2(), Address: h})
-			}
-		}
+	if err := qs.k.Gateways.Walk(ctx, nil, func(_ collections.Pair[uint64, uint32], g types.Gateway) (bool, error) {
+		res.Gateways = append(res.Gateways, g)
 		return false, nil
 	}); err != nil {
 		return nil, err
@@ -142,4 +135,32 @@ func (qs queryServer) BeaconBody(goCtx context.Context, req *types.QueryBeaconBo
 		return nil, err
 	}
 	return &types.QueryBeaconBodyResponse{Body: body}, nil
+}
+
+// ConversionReceipts lists the receipts of an account, newest first (spec §14.7.5).
+func (qs queryServer) ConversionReceipts(goCtx context.Context, req *types.QueryConversionReceiptsRequest) (*types.QueryConversionReceiptsResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	if _, err := sdk.AccAddressFromBech32(req.Address); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	page := req.Pagination
+	if page == nil {
+		page = &query.PageRequest{}
+	}
+	page.Reverse = true
+	receipts, pageRes, err := query.CollectionPaginate(ctx, qs.k.Receipts, page,
+		func(_ collections.Pair[string, uint64], r types.ConversionReceipt) (types.ConversionReceipt, error) {
+			return r, nil
+		},
+		query.WithCollectionPaginationPairPrefix[string, uint64](req.Address))
+	if err != nil {
+		return nil, err
+	}
+	if receipts == nil {
+		receipts = []types.ConversionReceipt{}
+	}
+	return &types.QueryConversionReceiptsResponse{Receipts: receipts, Pagination: pageRes}, nil
 }

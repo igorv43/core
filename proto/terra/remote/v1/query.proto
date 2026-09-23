@@ -3,6 +3,7 @@ package terra.remote.v1;
 
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
 import "cosmos/base/v1beta1/coin.proto";
 import "terra/remote/v1/remote.proto";
 
@@ -29,6 +30,10 @@ service Query {
   }
   rpc Withdrawals(QueryWithdrawalsRequest) returns (QueryWithdrawalsResponse) {
     option (google.api.http).get = "/terra/remote/v1/withdrawals/{address}";
+  }
+  // ConversionReceipts lists the conversion receipts of an account, newest first (spec §14.7.5).
+  rpc ConversionReceipts(QueryConversionReceiptsRequest) returns (QueryConversionReceiptsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/receipts/{address}";
   }
   rpc Paymaster(QueryPaymasterRequest) returns (QueryPaymasterResponse) {
     option (google.api.http).get = "/terra/remote/v1/paymaster";
@@ -84,6 +89,15 @@ message QueryWithdrawalsRequest {
 }
 message QueryWithdrawalsResponse {
   repeated Withdrawal withdrawals = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryConversionReceiptsRequest {
+  string address = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+message QueryConversionReceiptsResponse {
+  repeated ConversionReceipt receipts = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
 message QueryPaymasterRequest {}

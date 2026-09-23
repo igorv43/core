@@ -16,4 +16,5 @@ message GenesisState {
   repeated Withdrawal withdrawals = 6 [(gogoproto.nullable) = false];
   repeated Beacon beacons = 7 [(gogoproto.nullable) = false];
   uint64 next_beacon_id = 8;
+  repeated ConversionReceipt receipts = 9 [(gogoproto.nullable) = false];
 }

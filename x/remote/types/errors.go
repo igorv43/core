@@ -21,6 +21,7 @@ const (
 	CodeFeeUnpaid         // 12
 	CodeGatewayNotFound   // 13
 	CodeInvalidSession    // 14
+	CodeInvalidConversion // 15
 )
 
 // Uint32 returns the numeric code for the SDK error registry.
@@ -41,3 +42,6 @@ var (
 	ErrGatewayNotFound   = errorsmod.Register(ModuleName, CodeGatewayNotFound.Uint32(), "gateway not found")
 	ErrInvalidSession    = errorsmod.Register(ModuleName, CodeInvalidSession.Uint32(), "invalid session key")
 )
+
+// ErrInvalidConversion covers conversion data and receipts (spec §14.7).
+var ErrInvalidConversion = errorsmod.Register(ModuleName, CodeInvalidConversion.Uint32(), "invalid conversion data")

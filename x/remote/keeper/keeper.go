@@ -6,6 +6,7 @@ import (
 
 	"cosmossdk.io/collections"
 	storetypes "cosmossdk.io/core/store"
+	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	feegrantkeeper "cosmossdk.io/x/feegrant/keeper"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
@@ -36,16 +37,22 @@ type Keeper struct {
 	roots        types.RootRecorder
 	warpAddress  sdk.AccAddress
 
-	Schema      collections.Schema
-	Params      collections.Item[types.Params]
-	Apps        collections.Map[uint64, types.RemoteApp]
-	Gateways    collections.Map[collections.Pair[uint64, uint32], []byte]
-	Accounts    collections.Map[string, types.RemoteAccount]
-	Sessions    collections.Map[collections.Pair[string, string], types.Session]
-	Withdrawals collections.Map[collections.Pair[string, uint64], types.Withdrawal]
-	WithdrawSeq collections.Map[string, uint64]
-	Beacons     collections.Map[uint64, types.Beacon]
-	BeaconSeq   collections.Sequence
+	Schema   collections.Schema
+	Params   collections.Item[types.Params]
+	Apps     collections.Map[uint64, types.RemoteApp]
+	Gateways collections.Map[collections.Pair[uint64, uint32], types.Gateway]
+	// Receipts are the conversion receipts of spec §14.7 by (account, seq);
+	// ReceiptSeq is the per-account sequence; ReceiptByMsg maps
+	// (account, message id) to the seq for updates from the origin.
+	Receipts     collections.Map[collections.Pair[string, uint64], types.ConversionReceipt]
+	ReceiptSeq   collections.Map[string, uint64]
+	ReceiptByMsg collections.Map[collections.Pair[string, []byte], uint64]
+	Accounts     collections.Map[string, types.RemoteAccount]
+	Sessions     collections.Map[collections.Pair[string, string], types.Session]
+	Withdrawals  collections.Map[collections.Pair[string, uint64], types.Withdrawal]
+	WithdrawSeq  collections.Map[string, uint64]
+	Beacons      collections.Map[uint64, types.Beacon]
+	BeaconSeq    collections.Sequence
 }
 
 // NewKeeper creates the x/remote keeper and registers it as Hyperlane app 3.
@@ -70,7 +77,12 @@ func NewKeeper(
 		Params: collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
 		Apps:   collections.NewMap(sb, types.AppsKey, "apps", collections.Uint64Key, codec.CollValue[types.RemoteApp](cdc)),
 		Gateways: collections.NewMap(sb, types.GatewaysKey, "gateways",
-			collections.PairKeyCodec(collections.Uint64Key, collections.Uint32Key), collections.BytesValue),
+			collections.PairKeyCodec(collections.Uint64Key, collections.Uint32Key), codec.CollValue[types.Gateway](cdc)),
+		Receipts: collections.NewMap(sb, types.ReceiptsKey, "receipts",
+			collections.PairKeyCodec(collections.StringKey, collections.Uint64Key), codec.CollValue[types.ConversionReceipt](cdc)),
+		ReceiptSeq: collections.NewMap(sb, types.ReceiptSeqKey, "receipt_seq", collections.StringKey, collections.Uint64Value),
+		ReceiptByMsg: collections.NewMap(sb, types.ReceiptByMsgKey, "receipt_by_msg",
+			collections.PairKeyCodec(collections.StringKey, collections.BytesKey), collections.Uint64Value),
 		Accounts: collections.NewMap(sb, types.AccountsKey, "accounts", collections.StringKey, codec.CollValue[types.RemoteAccount](cdc)),
 		Sessions: collections.NewMap(sb, types.SessionsKey, "sessions",
 			collections.PairKeyCodec(collections.StringKey, collections.StringKey), codec.CollValue[types.Session](cdc)),
@@ -143,7 +155,7 @@ func (k Keeper) CreateApp(ctx sdk.Context, owner string, mailboxId util.HexAddre
 }
 
 // SetGateway enrols (or removes with the zero address) the trusted gateway of a domain.
-func (k Keeper) SetGateway(ctx sdk.Context, appId util.HexAddress, domain uint32, gateway util.HexAddress) error {
+func (k Keeper) SetGateway(ctx sdk.Context, appId util.HexAddress, domain uint32, gateway util.HexAddress, exitFactory util.HexAddress, exitInitCodeHash []byte) error {
 	if _, err := k.GetApp(ctx, appId); err != nil {
 		return err
 	}
@@ -151,23 +163,37 @@ func (k Keeper) SetGateway(ctx sdk.Context, appId util.HexAddress, domain uint32
 	if gateway.IsZeroAddress() {
 		return k.Gateways.Remove(ctx, key)
 	}
-	return k.Gateways.Set(ctx, key, gateway.Bytes())
+	if !exitFactory.IsZeroAddress() && len(exitInitCodeHash) != 32 {
+		return errorsmod.Wrap(types.ErrInvalidParams, "exit_init_code_hash must be 32 bytes")
+	}
+	return k.Gateways.Set(ctx, key, types.Gateway{AppId: appId, Domain: domain, Address: gateway, ExitFactory: exitFactory, ExitInitCodeHash: exitInitCodeHash})
 }
 
 // gateway returns the enrolled gateway of a domain, if any.
 func (k Keeper) gateway(ctx sdk.Context, appId util.HexAddress, domain uint32) (util.HexAddress, bool, error) {
-	bz, err := k.Gateways.Get(ctx, collections.Join(appId.GetInternalId(), domain))
+	g, err := k.Gateways.Get(ctx, collections.Join(appId.GetInternalId(), domain))
 	if err != nil {
 		if errors.Is(err, collections.ErrNotFound) {
 			return util.HexAddress{}, false, nil
 		}
 		return util.HexAddress{}, false, err
 	}
-	h, err := hexFromBytes(bz)
-	if err != nil {
-		return util.HexAddress{}, false, err
-	}
-	return h, true, nil
+	return g.Address, true, nil
+}
+
+// exitGateway returns the first enrolled gateway of a domain that offers
+// withdrawal exits (spec §14.7.2), whatever the app.
+func (k Keeper) exitGateway(ctx sdk.Context, domain uint32) (types.Gateway, bool, error) {
+	var found types.Gateway
+	ok := false
+	err := k.Gateways.Walk(ctx, nil, func(key collections.Pair[uint64, uint32], g types.Gateway) (bool, error) {
+		if key.K2() == domain && !g.ExitFactory.IsZeroAddress() && len(g.ExitInitCodeHash) == 32 {
+			found, ok = g, true
+			return true, nil
+		}
+		return false, nil
+	})
+	return found, ok, err
 }
 
 // GetAccount returns a remote account by derived address.
@@ -180,17 +206,6 @@ func (k Keeper) GetAccount(ctx sdk.Context, address string) (types.RemoteAccount
 		return types.RemoteAccount{}, err
 	}
 	return a, nil
-}
-
-// hexFromBytes rebuilds a HexAddress from its raw 32 bytes (HexAddress.Unmarshal
-// expects the hex string form used by protobuf).
-func hexFromBytes(bz []byte) (util.HexAddress, error) {
-	var h util.HexAddress
-	if len(bz) != len(h) {
-		return h, fmt.Errorf("invalid gateway address length %d", len(bz))
-	}
-	copy(h[:], bz)
-	return h, nil
 }
 
 // SetBeaconSources registers the state readers of the beacons and the root

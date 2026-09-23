@@ -20,7 +20,7 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 		}
 	}
 	for _, g := range gs.Gateways {
-		if err := k.Gateways.Set(ctx, collections.Join(g.AppId.GetInternalId(), g.Domain), g.Address.Bytes()); err != nil {
+		if err := k.Gateways.Set(ctx, collections.Join(g.AppId.GetInternalId(), g.Domain), g); err != nil {
 			return err
 		}
 	}
@@ -41,6 +41,11 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 	}
 	if err := k.BeaconSeq.Set(ctx, gs.NextBeaconId); err != nil {
 		return err
+	}
+	for _, r := range gs.Receipts {
+		if err := k.storeReceipt(ctx, r); err != nil {
+			return err
+		}
 	}
 	for _, w := range gs.Withdrawals {
 		if err := k.Withdrawals.Set(ctx, collections.Join(w.Account, w.Seq), w); err != nil {
@@ -82,6 +87,12 @@ func (k Keeper) ExportGenesis(ctx sdk.Context) (*types.GenesisState, error) {
 	}
 	if err := k.Sessions.Walk(ctx, nil, func(_ collections.Pair[string, string], s types.Session) (bool, error) {
 		gs.Sessions = append(gs.Sessions, s)
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	if err := k.Receipts.Walk(ctx, nil, func(_ collections.Pair[string, uint64], r types.ConversionReceipt) (bool, error) {
+		gs.Receipts = append(gs.Receipts, r)
 		return false, nil
 	}); err != nil {
 		return nil, err

@@ -40,3 +40,25 @@ message EventBeaconSent {
   string kind       = 4;
   string message_id = 5;
 }
+
+// EventConversionReceiptCreated is emitted when a conversion receipt is recorded (spec §14.7.5).
+message EventConversionReceiptCreated {
+  string account = 1;
+  string message_id = 2;
+  string direction = 3;
+  string token_in = 4;
+  string amount_in = 5;
+  string usdc_amount = 6;
+  string effective_rate = 7;
+  string token_out = 8;
+  string min_accepted = 9;
+  string exit_address = 10;
+}
+
+// EventConversionReceiptUpdated is emitted when the origin confirms a withdrawal exit.
+message EventConversionReceiptUpdated {
+  string account = 1;
+  string message_id = 2;
+  string amount_out = 3;
+  bool fallback_to_usdc = 4;
+}

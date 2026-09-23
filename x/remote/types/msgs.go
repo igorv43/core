@@ -2,6 +2,7 @@ package types
 
 import (
 	errorsmod "cosmossdk.io/errors"
+	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -53,6 +54,14 @@ func (m MsgWithdraw) ValidateBasic() error {
 	if m.Amount.IsNil() || !m.Amount.IsPositive() {
 		return errorsmod.Wrap(ErrInvalidWithdraw, "amount must be positive")
 	}
+	if m.TokenOut != "" {
+		if _, err := util.DecodeHexAddress(m.TokenOut); err != nil {
+			return errorsmod.Wrapf(ErrInvalidWithdraw, "token_out must be a 32-byte hex: %v", err)
+		}
+		if m.MinAccepted == nil || m.MinAccepted.IsNil() || m.MinAccepted.IsNegative() {
+			return errorsmod.Wrap(ErrInvalidWithdraw, "min_accepted must be set with token_out")
+		}
+	}
 	return nil
 }
 
@@ -71,7 +80,15 @@ func (m MsgFundPaymaster) ValidateBasic() error {
 func (m MsgCreateRemoteApp) ValidateBasic() error { return validAddr("authority", m.Authority) }
 
 // ValidateBasic implements sdk.HasValidateBasic.
-func (m MsgSetGateway) ValidateBasic() error { return validAddr("authority", m.Authority) }
+func (m MsgSetGateway) ValidateBasic() error {
+	if err := validAddr("authority", m.Authority); err != nil {
+		return err
+	}
+	if !m.ExitFactory.IsZeroAddress() && len(m.ExitInitCodeHash) != 32 {
+		return errorsmod.Wrap(ErrInvalidParams, "exit_init_code_hash must be 32 bytes when exit_factory is set")
+	}
+	return nil
+}
 
 // ValidateBasic implements sdk.HasValidateBasic.
 func (m MsgSetBeacon) ValidateBasic() error {

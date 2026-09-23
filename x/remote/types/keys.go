@@ -26,6 +26,9 @@ const (
 	MaxMsgsPerPayloadAbsolute = 10
 	// MaxWithdrawalsKept bounds the withdrawal records kept per account.
 	MaxWithdrawalsKept = 50
+	// NativeTokenSentinel is the 32-byte hex that names the chain's native
+	// coin as token_out of a withdrawal (spec §14.7.2).
+	NativeTokenSentinel = "0x000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 
 	// PaymasterName derives the paymaster account that pays the gas of session keys.
 	PaymasterName = "paymaster"
@@ -41,6 +44,11 @@ var (
 	WithdrawSeqKey = collections.NewPrefix(6)
 	BeaconsKey     = collections.NewPrefix(7)
 	BeaconSeqKey   = collections.NewPrefix(8)
+	// Conversion receipts (spec §14.7): by (account, seq), the per-account
+	// sequence, and the (account, message id) → seq index used by updates.
+	ReceiptsKey     = collections.NewPrefix(9)
+	ReceiptSeqKey   = collections.NewPrefix(10)
+	ReceiptByMsgKey = collections.NewPrefix(11)
 )
 
 // PaymasterAddress is the account that grants fee allowances to session keys.
