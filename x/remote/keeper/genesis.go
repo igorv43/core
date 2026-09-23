@@ -47,6 +47,16 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 			return err
 		}
 	}
+	for _, ex := range gs.Executors {
+		if err := k.Executors.Set(ctx, ex.Domain, ex); err != nil {
+			return err
+		}
+	}
+	for _, p := range gs.Ports {
+		if err := k.Ports.Set(ctx, p.PortDomain, p); err != nil {
+			return err
+		}
+	}
 	for _, w := range gs.Withdrawals {
 		if err := k.Withdrawals.Set(ctx, collections.Join(w.Account, w.Seq), w); err != nil {
 			return err
@@ -93,6 +103,18 @@ func (k Keeper) ExportGenesis(ctx sdk.Context) (*types.GenesisState, error) {
 	}
 	if err := k.Receipts.Walk(ctx, nil, func(_ collections.Pair[string, uint64], r types.ConversionReceipt) (bool, error) {
 		gs.Receipts = append(gs.Receipts, r)
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	if err := k.Executors.Walk(ctx, nil, func(_ uint32, ex types.Executor) (bool, error) {
+		gs.Executors = append(gs.Executors, ex)
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	if err := k.Ports.Walk(ctx, nil, func(_ uint32, p types.Port) (bool, error) {
+		gs.Ports = append(gs.Ports, p)
 		return false, nil
 	}); err != nil {
 		return nil, err

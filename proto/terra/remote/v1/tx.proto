@@ -28,6 +28,14 @@ service Msg {
   rpc SetGateway(MsgSetGateway) returns (MsgSetGatewayResponse);
   // SetBeacon creates or updates a beacon (interval_blocks = 0 removes it).
   rpc SetBeacon(MsgSetBeacon) returns (MsgSetBeaconResponse);
+  // SetExecutor registers, updates or removes the FabricExecutor of a vault
+  // chain and its leg limits (governance only, spec §11.5).
+  rpc SetExecutor(MsgSetExecutor) returns (MsgSetExecutorResponse);
+  // ExecutorControl dispatches a governance-only order (ENROLL_LEG,
+  // PAUSE_LEG, UNPAUSE_LEG) to a FabricExecutor (spec §11.5.2).
+  rpc ExecutorControl(MsgExecutorControl) returns (MsgExecutorControlResponse);
+  // SetPort registers or removes a port-of-entry chain (governance only, spec §11.6).
+  rpc SetPort(MsgSetPort) returns (MsgSetPortResponse);
   rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
 }
 
@@ -138,3 +146,50 @@ message MsgUpdateParams {
   Params params = 2 [(gogoproto.nullable) = false];
 }
 message MsgUpdateParamsResponse {}
+
+// MsgSetExecutor is the Msg/SetExecutor request type (spec §11.5).
+message MsgSetExecutor {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/remote/MsgSetExecutor";
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string app_id = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  uint32 domain = 3;
+  // address is the executor contract; the zero address removes the executor.
+  string address = 4 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string token_id = 5 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string min_collateral = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string target_collateral = 7 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // reset_net_rebalanced zeroes the expected-collateral adjustment after an
+  // off-chain reconciliation (watcher) found the vault balance.
+  bool reset_net_rebalanced = 8;
+}
+message MsgSetExecutorResponse {}
+
+// MsgExecutorControl is the Msg/ExecutorControl request type (spec §11.5.2).
+message MsgExecutorControl {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/remote/MsgExecutorControl";
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint32 domain = 2;
+  ControlAction action = 3;
+  // leg_domain, leg_router and leg_bridge are the ENROLL_LEG parameters.
+  uint32 leg_domain = 4;
+  string leg_router = 5 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string leg_bridge = 6 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+}
+message MsgExecutorControlResponse {
+  string message_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  uint64 nonce = 2;
+}
+
+// MsgSetPort is the Msg/SetPort request type (spec §11.6).
+message MsgSetPort {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/remote/MsgSetPort";
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint32 port_domain = 2;
+  // vault_domain zero removes the port.
+  uint32 vault_domain = 3;
+  uint32 cctp_domain = 4;
+}
+message MsgSetPortResponse {}

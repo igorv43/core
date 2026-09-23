@@ -3,6 +3,7 @@ package terra.remote.v1;
 
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
 import "cosmos/base/query/v1beta1/pagination.proto";
 import "cosmos/base/v1beta1/coin.proto";
 import "terra/remote/v1/remote.proto";
@@ -34,6 +35,14 @@ service Query {
   // ConversionReceipts lists the conversion receipts of an account, newest first (spec §14.7.5).
   rpc ConversionReceipts(QueryConversionReceiptsRequest) returns (QueryConversionReceiptsResponse) {
     option (google.api.http).get = "/terra/remote/v1/receipts/{address}";
+  }
+  // Executors lists the FabricExecutors and their expected collateral (spec §11.5).
+  rpc Executors(QueryExecutorsRequest) returns (QueryExecutorsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/executors";
+  }
+  // Ports lists the port-of-entry chains (spec §11.6).
+  rpc Ports(QueryPortsRequest) returns (QueryPortsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/ports";
   }
   rpc Paymaster(QueryPaymasterRequest) returns (QueryPaymasterResponse) {
     option (google.api.http).get = "/terra/remote/v1/paymaster";
@@ -98,6 +107,23 @@ message QueryConversionReceiptsRequest {
 message QueryConversionReceiptsResponse {
   repeated ConversionReceipt receipts = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryExecutorsRequest {}
+message ExecutorView {
+  Executor executor = 1 [(gogoproto.nullable) = false];
+  // ledger_collateral is max(0, received - sent) of the vault's origin in x/warpledger.
+  string ledger_collateral = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // expected_collateral = ledger_collateral + net_rebalanced.
+  string expected_collateral = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+message QueryExecutorsResponse {
+  repeated ExecutorView executors = 1 [(gogoproto.nullable) = false];
+  int64 next_epoch_height = 2;
+}
+message QueryPortsRequest {}
+message QueryPortsResponse {
+  repeated Port ports = 1 [(gogoproto.nullable) = false];
 }
 
 message QueryPaymasterRequest {}

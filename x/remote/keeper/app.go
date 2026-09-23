@@ -66,8 +66,18 @@ func (k *Keeper) Handle(goCtx context.Context, mailboxId util.HexAddress, messag
 		}
 		copy(controller[:], payload.OnBehalfOf)
 	}
-	derived := types.DeriveAddress(message.Origin, controller)
 	fromGateway := len(payload.OnBehalfOf) > 0
+	domain := message.Origin
+	if payload.PortDomain != 0 {
+		// a port-of-entry deposit (spec §11.6): the vault chain's gateway
+		// credits the account of the port chain's user
+		port, err := k.Ports.Get(ctx, payload.PortDomain)
+		if !fromGateway || err != nil || port.VaultDomain != message.Origin {
+			return k.reject(ctx, message.Origin, controller, "", errorsmod.Wrapf(types.ErrInvalidPayload, "port %d not served by domain %d", payload.PortDomain, message.Origin))
+		}
+		domain = payload.PortDomain
+	}
+	derived := types.DeriveAddress(domain, controller)
 	if (payload.Conversion != nil || payload.Update != nil) && !fromGateway {
 		return k.reject(ctx, message.Origin, controller, derived.String(), errorsmod.Wrap(types.ErrInvalidConversion, "conversion data allowed only from the enrolled gateway"))
 	}
@@ -75,7 +85,7 @@ func (k *Keeper) Handle(goCtx context.Context, mailboxId util.HexAddress, messag
 	// (spec §14.7); it is written before the messages so a rejected payload
 	// still leaves the receipt of the value that arrived through warp
 	if payload.Conversion != nil {
-		r, err := depositReceipt(ctx, derived.String(), message.Origin, message.Id(), payload.Conversion)
+		r, err := depositReceipt(ctx, derived.String(), domain, message.Id(), payload.Conversion)
 		if err != nil {
 			return k.reject(ctx, message.Origin, controller, derived.String(), err)
 		}
@@ -91,7 +101,7 @@ func (k *Keeper) Handle(goCtx context.Context, mailboxId util.HexAddress, messag
 	if len(payload.Msgs) == 0 && (payload.Conversion != nil || payload.Update != nil) {
 		return nil
 	}
-	if err := k.execute(ctx, message.Origin, controller, derived, payload.Msgs); err != nil {
+	if err := k.execute(ctx, domain, controller, derived, payload.Msgs); err != nil {
 		return k.reject(ctx, message.Origin, controller, derived.String(), err)
 	}
 	return nil

@@ -101,3 +101,34 @@ func (ms msgServer) UpdateParams(goCtx context.Context, msg *types.MsgUpdatePara
 	}
 	return &types.MsgUpdateParamsResponse{}, nil
 }
+
+func (ms msgServer) SetExecutor(goCtx context.Context, msg *types.MsgSetExecutor) (*types.MsgSetExecutorResponse, error) {
+	if err := ms.authority(msg.Authority); err != nil {
+		return nil, err
+	}
+	if err := ms.k.SetExecutor(sdk.UnwrapSDKContext(goCtx), msg); err != nil {
+		return nil, err
+	}
+	return &types.MsgSetExecutorResponse{}, nil
+}
+
+func (ms msgServer) ExecutorControl(goCtx context.Context, msg *types.MsgExecutorControl) (*types.MsgExecutorControlResponse, error) {
+	if err := ms.authority(msg.Authority); err != nil {
+		return nil, err
+	}
+	id, nonce, err := ms.k.ExecutorControl(sdk.UnwrapSDKContext(goCtx), msg)
+	if err != nil {
+		return nil, err
+	}
+	return &types.MsgExecutorControlResponse{MessageId: id, Nonce: nonce}, nil
+}
+
+func (ms msgServer) SetPort(goCtx context.Context, msg *types.MsgSetPort) (*types.MsgSetPortResponse, error) {
+	if err := ms.authority(msg.Authority); err != nil {
+		return nil, err
+	}
+	if err := ms.k.SetPort(sdk.UnwrapSDKContext(goCtx), msg); err != nil {
+		return nil, err
+	}
+	return &types.MsgSetPortResponse{}, nil
+}

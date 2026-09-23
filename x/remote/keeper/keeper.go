@@ -47,12 +47,16 @@ type Keeper struct {
 	Receipts     collections.Map[collections.Pair[string, uint64], types.ConversionReceipt]
 	ReceiptSeq   collections.Map[string, uint64]
 	ReceiptByMsg collections.Map[collections.Pair[string, []byte], uint64]
-	Accounts     collections.Map[string, types.RemoteAccount]
-	Sessions     collections.Map[collections.Pair[string, string], types.Session]
-	Withdrawals  collections.Map[collections.Pair[string, uint64], types.Withdrawal]
-	WithdrawSeq  collections.Map[string, uint64]
-	Beacons      collections.Map[uint64, types.Beacon]
-	BeaconSeq    collections.Sequence
+	// Executors are the FabricExecutors by vault domain (spec §11.5); Ports
+	// are the port-of-entry chains by their domain (spec §11.6).
+	Executors   collections.Map[uint32, types.Executor]
+	Ports       collections.Map[uint32, types.Port]
+	Accounts    collections.Map[string, types.RemoteAccount]
+	Sessions    collections.Map[collections.Pair[string, string], types.Session]
+	Withdrawals collections.Map[collections.Pair[string, uint64], types.Withdrawal]
+	WithdrawSeq collections.Map[string, uint64]
+	Beacons     collections.Map[uint64, types.Beacon]
+	BeaconSeq   collections.Sequence
 }
 
 // NewKeeper creates the x/remote keeper and registers it as Hyperlane app 3.
@@ -83,7 +87,9 @@ func NewKeeper(
 		ReceiptSeq: collections.NewMap(sb, types.ReceiptSeqKey, "receipt_seq", collections.StringKey, collections.Uint64Value),
 		ReceiptByMsg: collections.NewMap(sb, types.ReceiptByMsgKey, "receipt_by_msg",
 			collections.PairKeyCodec(collections.StringKey, collections.BytesKey), collections.Uint64Value),
-		Accounts: collections.NewMap(sb, types.AccountsKey, "accounts", collections.StringKey, codec.CollValue[types.RemoteAccount](cdc)),
+		Executors: collections.NewMap(sb, types.ExecutorsKey, "executors", collections.Uint32Key, codec.CollValue[types.Executor](cdc)),
+		Ports:     collections.NewMap(sb, types.PortsKey, "ports", collections.Uint32Key, codec.CollValue[types.Port](cdc)),
+		Accounts:  collections.NewMap(sb, types.AccountsKey, "accounts", collections.StringKey, codec.CollValue[types.RemoteAccount](cdc)),
 		Sessions: collections.NewMap(sb, types.SessionsKey, "sessions",
 			collections.PairKeyCodec(collections.StringKey, collections.StringKey), codec.CollValue[types.Session](cdc)),
 		Withdrawals: collections.NewMap(sb, types.WithdrawalsKey, "withdrawals",

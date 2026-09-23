@@ -164,3 +164,37 @@ func (qs queryServer) ConversionReceipts(goCtx context.Context, req *types.Query
 	}
 	return &types.QueryConversionReceiptsResponse{Receipts: receipts, Pagination: pageRes}, nil
 }
+
+// Executors lists the FabricExecutors with their expected collateral (spec §11.5).
+func (qs queryServer) Executors(goCtx context.Context, _ *types.QueryExecutorsRequest) (*types.QueryExecutorsResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	params, err := qs.k.GetParams(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res := &types.QueryExecutorsResponse{Executors: []types.ExecutorView{}}
+	if err := qs.k.Executors.Walk(ctx, nil, func(_ uint32, ex types.Executor) (bool, error) {
+		ledger, expected, err := qs.k.ExpectedCollateral(ctx, ex)
+		if err != nil {
+			return true, err
+		}
+		res.Executors = append(res.Executors, types.ExecutorView{Executor: ex, LedgerCollateral: ledger, ExpectedCollateral: expected})
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	h := ctx.BlockHeight()
+	res.NextEpochHeight = h + params.RebalanceEpochBlocks - h%params.RebalanceEpochBlocks
+	return res, nil
+}
+
+// Ports lists the port-of-entry chains (spec §11.6).
+func (qs queryServer) Ports(goCtx context.Context, _ *types.QueryPortsRequest) (*types.QueryPortsResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	res := &types.QueryPortsResponse{Ports: []types.Port{}}
+	err := qs.k.Ports.Walk(ctx, nil, func(_ uint32, p types.Port) (bool, error) {
+		res.Ports = append(res.Ports, p)
+		return false, nil
+	})
+	return res, err
+}

@@ -12,6 +12,12 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 			Service: "terra.remote.v1.Query",
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{RpcMethod: "Params", Use: "params", Short: "Query the x/remote parameters"},
+				{RpcMethod: "Executors", Use: "executors", Short: "List the FabricExecutors and their expected vault collateral (spec §11.5)"},
+				{RpcMethod: "Ports", Use: "ports", Short: "List the port-of-entry chains (spec §11.6)"},
+				{
+					RpcMethod: "ConversionReceipts", Use: "receipts [address]", Short: "List the conversion receipts of an account (spec §14.7)",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}},
+				},
 				{RpcMethod: "RemoteApps", Use: "apps", Short: "List the remote apps and their gateways"},
 				{
 					RpcMethod: "DeriveAddress", Use: "derive [domain] [controller-hex]", Short: "Derive the account of (domain, controller)",
@@ -48,6 +54,9 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{RpcMethod: "CreateRemoteApp", Skip: true},
 				{RpcMethod: "SetGateway", Skip: true},
 				{RpcMethod: "SetBeacon", Skip: true},
+				{RpcMethod: "SetExecutor", Skip: true},
+				{RpcMethod: "ExecutorControl", Skip: true},
+				{RpcMethod: "SetPort", Skip: true},
 				{RpcMethod: "UpdateParams", Skip: true},
 			},
 		},

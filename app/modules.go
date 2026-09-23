@@ -168,9 +168,10 @@ var (
 		warptypes.ModuleName:      {authtypes.Minter, authtypes.Burner},
 		// phase 6: mints/burns only stluna (enforced in the keeper); delegates uluna
 		liquidstaketypes.ModuleName: {authtypes.Minter, authtypes.Burner},
-		batchtypes.ModuleName:       nil, // escrow only: no mint or burn authority
-		perptypes.ModuleName:        nil, // collateral, insurance fund and revenue: no mint or burn authority
-		ismbondtypes.ModuleName:     nil, // operator bonds
+		batchtypes.ModuleName:       nil,                // escrow only: no mint or burn authority
+		perptypes.ModuleName:        nil,                // collateral, insurance fund and revenue: no mint or burn authority
+		remotetypes.ModuleName:      {authtypes.Burner}, // burns the dynamic withdrawal fee of the settlement asset (spec §11.5.4); never uluna
+		ismbondtypes.ModuleName:     nil,                // operator bonds
 	}
 	// module accounts that are allowed to receive tokens
 	allowedReceivingModAcc = map[string]bool{
@@ -181,7 +182,8 @@ var (
 		liquidstaketypes.ModuleName: true,
 		// x/perp receives the uluna of its buyback from the x/batch settlement
 		// and the returned escrow of unfilled buyback orders
-		perptypes.ModuleName: true,
+		perptypes.ModuleName:   true,
+		remotetypes.ModuleName: true,
 	}
 )
 

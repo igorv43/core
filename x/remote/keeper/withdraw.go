@@ -36,6 +36,39 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 		return util.HexAddress{}, err
 	}
 	seq++
+	// dynamic withdrawal fee of the vault (spec §11.5.4): burned, so the
+	// vault keeps the collateral as an unallocated reserve
+	destination := account.Domain
+	if port, err := k.Ports.Get(ctx, account.Domain); err == nil {
+		destination = port.VaultDomain
+		if tokenOut == "" {
+			// a port user withdraws by CCTP from the vault to their own address
+			tokenOut = types.PortSentinel(account.Domain).String()
+			m := amount
+			minAccepted = &m
+		}
+	}
+	if ex, err := k.Executors.Get(ctx, destination); err == nil && ex.WithdrawFeeBps > 0 {
+		fee := amount.MulRaw(int64(ex.WithdrawFeeBps)).QuoRaw(10_000)
+		if fee.IsPositive() {
+			denom, err := k.warpToken(ctx, tokenId)
+			if err != nil {
+				return util.HexAddress{}, err
+			}
+			coins := sdk.NewCoins(sdk.NewCoin(denom, fee))
+			if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, types.ModuleName, coins); err != nil {
+				return util.HexAddress{}, err
+			}
+			if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, coins); err != nil {
+				return util.HexAddress{}, err
+			}
+			amount = amount.Sub(fee)
+			if minAccepted != nil && minAccepted.GT(amount) {
+				m := amount
+				minAccepted = &m
+			}
+		}
+	}
 	recipient := account.Controller
 	var exit util.HexAddress
 	var tokenOutHex util.HexAddress
@@ -47,12 +80,12 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 		if err != nil {
 			return util.HexAddress{}, errorsmod.Wrap(types.ErrInvalidWithdraw, err.Error())
 		}
-		gw, ok, err := k.exitGateway(ctx, account.Domain)
+		gw, ok, err := k.exitGateway(ctx, destination)
 		if err != nil {
 			return util.HexAddress{}, err
 		}
 		if !ok {
-			return util.HexAddress{}, errorsmod.Wrapf(types.ErrGatewayNotFound, "domain %d offers no withdrawal exits", account.Domain)
+			return util.HexAddress{}, errorsmod.Wrapf(types.ErrGatewayNotFound, "domain %d offers no withdrawal exits", destination)
 		}
 		exit = types.ExitAddress(gw.ExitFactory, gw.ExitInitCodeHash, account.Controller, tokenOutHex, *minAccepted, seq)
 		recipient = exit
@@ -67,7 +100,7 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 		}
 	}
 	msg := &warptypes.MsgRemoteTransfer{
-		Sender: controller, TokenId: tokenId, DestinationDomain: account.Domain, Recipient: recipient, Amount: amount,
+		Sender: controller, TokenId: tokenId, DestinationDomain: destination, Recipient: recipient, Amount: amount,
 		GasLimit: math.ZeroInt(), MaxFee: params.WithdrawFeeCap,
 	}
 	handler := k.router.Handler(msg)
@@ -99,7 +132,7 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 			return util.HexAddress{}, err
 		}
 		if err := k.recordReceipt(ctx, types.ConversionReceipt{
-			Account: controller, OriginDomain: account.Domain, MessageId: out.MessageId, Direction: types.CONVERSION_WITHDRAW,
+			Account: controller, OriginDomain: destination, MessageId: out.MessageId, Direction: types.CONVERSION_WITHDRAW,
 			TokenIn: token, AmountIn: amount.String(), UsdcAmount: amount.String(), EffectiveRate: math.LegacyZeroDec(),
 			DexFee: "0", RouteFee: "0", MinAccepted: minAccepted.String(), TokenOut: tokenOutHex.String(), ExitAddress: exit,
 			RegisteredHeight: ctx.BlockHeight(),
@@ -108,7 +141,7 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 		}
 	}
 	return out.MessageId, ctx.EventManager().EmitTypedEvent(&types.EventRemoteWithdraw{
-		Account: controller, TokenId: tokenId.String(), Amount: amount.String(), Domain: account.Domain,
+		Account: controller, TokenId: tokenId.String(), Amount: amount.String(), Domain: destination,
 		Recipient: recipient.String(), MessageId: out.MessageId.String(),
 	})
 }

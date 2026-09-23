@@ -62,3 +62,13 @@ message EventConversionReceiptUpdated {
   string amount_out = 3;
   bool fallback_to_usdc = 4;
 }
+
+// EventControlSent is emitted when a control order is dispatched to a FabricExecutor (spec §11.5).
+message EventControlSent {
+  uint32 domain = 1;
+  string action = 2;
+  uint64 nonce = 3;
+  string message_id = 4;
+  // params renders the order: destination domain and amount, fees, limits or leg.
+  string params = 5;
+}

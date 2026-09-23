@@ -17,4 +17,6 @@ message GenesisState {
   repeated Beacon beacons = 7 [(gogoproto.nullable) = false];
   uint64 next_beacon_id = 8;
   repeated ConversionReceipt receipts = 9 [(gogoproto.nullable) = false];
+  repeated Executor executors = 10 [(gogoproto.nullable) = false];
+  repeated Port ports = 11 [(gogoproto.nullable) = false];
 }

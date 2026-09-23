@@ -49,6 +49,10 @@ var (
 	ReceiptsKey     = collections.NewPrefix(9)
 	ReceiptSeqKey   = collections.NewPrefix(10)
 	ReceiptByMsgKey = collections.NewPrefix(11)
+	// ExecutorsKey and PortsKey hold the FabricExecutors (spec §11.5) and the
+	// port-of-entry chains (spec §11.6), both by hyperlane domain.
+	ExecutorsKey = collections.NewPrefix(12)
+	PortsKey     = collections.NewPrefix(13)
 )
 
 // PaymasterAddress is the account that grants fee allowances to session keys.

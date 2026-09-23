@@ -61,6 +61,16 @@ func NewDecodeStore(cdc codec.Codec) func(kvA, kvB kv.Pair) string {
 			cdc.MustUnmarshal(kvA.Value, &a)
 			cdc.MustUnmarshal(kvB.Value, &b)
 			return fmt.Sprintf("%v\n%v", a, b)
+		case hasPrefix(kvA.Key, types.ExecutorsKey):
+			var a, b types.Executor
+			cdc.MustUnmarshal(kvA.Value, &a)
+			cdc.MustUnmarshal(kvB.Value, &b)
+			return fmt.Sprintf("%v\n%v", a, b)
+		case hasPrefix(kvA.Key, types.PortsKey):
+			var a, b types.Port
+			cdc.MustUnmarshal(kvA.Value, &a)
+			cdc.MustUnmarshal(kvB.Value, &b)
+			return fmt.Sprintf("%v\n%v", a, b)
 		case hasPrefix(kvA.Key, types.ReceiptSeqKey), hasPrefix(kvA.Key, types.ReceiptByMsgKey):
 			return fmt.Sprintf("%d\n%d", decodeUint64(kvA.Value), decodeUint64(kvB.Value))
 		default:

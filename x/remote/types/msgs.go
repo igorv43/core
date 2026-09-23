@@ -119,3 +119,38 @@ func (m MsgUpdateParams) ValidateBasic() error {
 	}
 	return m.Params.Validate()
 }
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgSetExecutor) ValidateBasic() error {
+	if err := validAddr("authority", m.Authority); err != nil {
+		return err
+	}
+	if m.Domain == 0 {
+		return errorsmod.Wrap(ErrInvalidParams, "domain must be set")
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgExecutorControl) ValidateBasic() error {
+	if err := validAddr("authority", m.Authority); err != nil {
+		return err
+	}
+	switch m.Action {
+	case CONTROL_ENROLL_LEG, CONTROL_PAUSE_LEG, CONTROL_UNPAUSE_LEG:
+		return nil
+	default:
+		return errorsmod.Wrap(ErrInvalidParams, "action must be ENROLL_LEG, PAUSE_LEG or UNPAUSE_LEG")
+	}
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgSetPort) ValidateBasic() error {
+	if err := validAddr("authority", m.Authority); err != nil {
+		return err
+	}
+	if m.PortDomain == 0 {
+		return errorsmod.Wrap(ErrInvalidParams, "port_domain must be set")
+	}
+	return nil
+}

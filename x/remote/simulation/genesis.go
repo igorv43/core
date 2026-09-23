@@ -32,6 +32,10 @@ func RandomizedParams(r *rand.Rand) types.Params {
 	p.WithdrawFeeCap = sdk.NewCoin("uluna", math.NewInt(int64(r.Intn(1_000_000_000))))
 	p.BeaconFeeCap = sdk.NewCoin("uluna", math.NewInt(int64(r.Intn(1_000_000_000))))
 	p.MaxBeaconsPerBlock = uint32(1 + r.Intn(50))
+	p.RebalanceEpochBlocks = int64(1 + r.Intn(10_000))
+	p.DynamicFeeBandBps = uint32(r.Intn(1_001))
+	p.ControlFeeCap = sdk.NewCoin("uluna", math.NewInt(int64(r.Intn(1_000_000_000))))
+	p.MaxControlMsgsPerBlock = uint32(1 + r.Intn(50))
 	if err := p.Validate(); err != nil {
 		panic(err)
 	}

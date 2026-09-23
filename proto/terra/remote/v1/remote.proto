@@ -36,6 +36,17 @@ message Params {
   cosmos.base.v1beta1.Coin beacon_fee_cap = 9 [(gogoproto.nullable) = false];
   // max_beacons_per_block bounds the beacon dispatches of one EndBlock.
   uint32 max_beacons_per_block = 10;
+  // rebalance_epoch_blocks is the period of the consensus rebalancing epoch
+  // (spec §11.5.2, D-31): every epoch EndBlock compares each vault's expected
+  // collateral with its limits and dispatches REBALANCE / SET_FEE orders.
+  int64 rebalance_epoch_blocks = 11;
+  // dynamic_fee_band_bps is the upper bound of the dynamic deposit and
+  // withdrawal fees set by consensus (param_dynamic_fee_band).
+  uint32 dynamic_fee_band_bps = 12;
+  // control_fee_cap is the interchain gas the paymaster pays per control message.
+  cosmos.base.v1beta1.Coin control_fee_cap = 13 [(gogoproto.nullable) = false];
+  // max_control_msgs_per_block bounds the control messages dispatched per block.
+  uint32 max_control_msgs_per_block = 14;
 }
 
 // BeaconKind is the fact a beacon transmits (spec §14.6 item 3): only chain
@@ -135,6 +146,57 @@ message RemotePayload {
   // update confirms the result of a native-currency withdrawal executed on
   // the origin (spec §14.7.3 item 6); only from the enrolled gateway.
   ConversionUpdate update = 4;
+  // port_domain credits the account of a port-of-entry chain (spec §11.6,
+  // D-33): the derived account is (port_domain, on_behalf_of) although the
+  // message comes from the vault chain's gateway. Only from that gateway, and
+  // only for a registered port whose vault is the message origin.
+  uint32 port_domain = 5;
+}
+
+// Executor is the FabricExecutor of a vault chain (spec §11.5, D-31): owner
+// and rebalancer of the route contracts there, obeying only this module.
+message Executor {
+  string app_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  uint32 domain = 2;
+  // address is the executor contract (32-byte hex), recipient of the control messages.
+  string address = 3 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // token_id is the basket token whose vault the executor controls.
+  string token_id = 4 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // min_collateral and target_collateral are the leg limits (settlement units).
+  string min_collateral = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string target_collateral = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // deposit_fee_bps and withdraw_fee_bps are the dynamic fees last set by consensus.
+  uint32 deposit_fee_bps = 7;
+  uint32 withdraw_fee_bps = 8;
+  // nonce is the last control nonce dispatched (the executor rejects repeats).
+  uint64 nonce = 9;
+  bool paused = 10;
+  // net_rebalanced is the collateral moved into (positive) or out of
+  // (negative) the vault by consensus orders; expected collateral =
+  // ledger collateral + net_rebalanced.
+  string net_rebalanced = 11 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  int64 last_epoch_height = 12;
+}
+
+// Port is a port-of-entry chain (spec §11.6, D-33): its users are credited
+// on Terra Classic through the vault chain's gateway and withdraw back by CCTP.
+message Port {
+  uint32 port_domain = 1;
+  uint32 vault_domain = 2;
+  // cctp_domain is the issuer's domain id of the port chain (informational).
+  uint32 cctp_domain = 3;
+}
+
+// ControlAction is the closed list of orders a FabricExecutor obeys.
+enum ControlAction {
+  option (gogoproto.goproto_enum_prefix) = false;
+  CONTROL_UNSPECIFIED = 0;
+  CONTROL_REBALANCE = 1;
+  CONTROL_SET_FEE = 2;
+  CONTROL_SET_LEG_LIMITS = 3;
+  CONTROL_ENROLL_LEG = 4;
+  CONTROL_PAUSE_LEG = 5;
+  CONTROL_UNPAUSE_LEG = 6;
 }
 
 // ConversionData is measured by the gateway contract on the origin chain

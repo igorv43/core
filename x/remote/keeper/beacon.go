@@ -167,6 +167,10 @@ func (k Keeper) EndBlocker(ctx sdk.Context) error {
 			continue
 		}
 	}
+	// consensus rebalancing epoch (spec §11.5.2)
+	if params.RebalanceEpochBlocks > 0 && ctx.BlockHeight()%params.RebalanceEpochBlocks == 0 {
+		return k.rebalanceEpoch(ctx, params)
+	}
 	return nil
 }
 
