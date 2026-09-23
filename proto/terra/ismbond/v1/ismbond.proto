@@ -1,0 +1,66 @@
+syntax = "proto3";
+package terra.ismbond.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "amino/amino.proto";
+import "cosmos/base/v1beta1/coin.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/ismbond/types";
+
+// Params defines the x/ismbond parameters (spec §6.6, Annex B).
+message Params {
+  option (amino.name)      = "terra/ismbond/Params";
+  option (gogoproto.equal) = true;
+
+  // bond_min is the minimum bond of an operator (uluna).
+  cosmos.base.v1beta1.Coin bond_min = 1 [(gogoproto.nullable) = false];
+  // unbond_delay_blocks is the wait between MsgUnbondOperator and MsgClaimBond (>= dispute window).
+  int64 unbond_delay_blocks = 2;
+  // dispute_window_blocks is how long outbound roots are kept for evidence.
+  int64 dispute_window_blocks = 3;
+  // evidence_reward is the share of a slashed bond paid to the submitter.
+  string evidence_reward = 4 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+}
+
+// Operator is a bonded ISM validator.
+message Operator {
+  // address is the Terra Classic account that bonded.
+  string address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // validator is the 20-byte ethereum-style address that signs checkpoints (lowercase hex, 0x-prefixed).
+  string validator = 2;
+  cosmos.base.v1beta1.Coin bond = 3 [(gogoproto.nullable) = false];
+  int64 bonded_height = 4;
+  // unbond_height is the height at which the bond can be claimed (0 while active).
+  int64 unbond_height = 5;
+}
+
+// RootRecord is the root of the local merkle tree hook after an outbound
+// message (spec §6.6: the chain knows its own state).
+message RootRecord {
+  string mailbox_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  uint32 index  = 2;
+  bytes  root   = 3;
+  int64  height = 4;
+}
+
+// Checkpoint is a signed Hyperlane checkpoint.
+message Checkpoint {
+  uint32 origin = 1;
+  string merkle_tree_hook = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  bytes  root       = 3;
+  uint32 index      = 4;
+  bytes  message_id = 5;
+  // signature is the 65-byte ethereum signature of the checkpoint digest.
+  bytes signature = 6;
+}
+
+// EvidenceKind is the slashing condition of spec §6.6 item 2.
+enum EvidenceKind {
+  option (gogoproto.goproto_enum_prefix) = false;
+  EVIDENCE_KIND_UNSPECIFIED = 0;
+  // EQUIVOCATION: two checkpoints of the same (hook, index) with different roots signed by the same validator.
+  EVIDENCE_KIND_EQUIVOCATION = 1;
+  // INVALID_OUTBOUND: a signed checkpoint whose root differs from the recorded local root at that index.
+  EVIDENCE_KIND_INVALID_OUTBOUND = 2;
+}

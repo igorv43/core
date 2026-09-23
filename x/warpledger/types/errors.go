@@ -19,6 +19,7 @@ const (
 	CodeTransfersPaused    // 7
 	CodeTooManyDomains     // 8
 	CodeInvalidFeeQuote    // 9
+	CodeIsmNotBonded       // 10
 )
 
 // Uint32 returns the numeric code for the SDK error registry.
@@ -34,3 +35,5 @@ var (
 	ErrTooManyDomains     = errorsmod.Register(ModuleName, CodeTooManyDomains.Uint32(), "maximum number of domains per token reached")
 	ErrInvalidFeeQuote    = errorsmod.Register(ModuleName, CodeInvalidFeeQuote.Uint32(), "unsupported interchain gas fee quote")
 )
+
+var ErrIsmNotBonded = errorsmod.Register(ModuleName, CodeIsmNotBonded.Uint32(), "the token ISM must be bonded in x/ismbond for a cap above bonded_cap_threshold")

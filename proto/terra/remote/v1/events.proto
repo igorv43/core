@@ -1,0 +1,35 @@
+syntax = "proto3";
+package terra.remote.v1;
+
+option go_package = "github.com/classic-terra/core/v4/x/remote/types";
+
+message EventRemoteExecuted {
+  string account    = 1;
+  uint32 domain     = 2;
+  string controller = 3;
+  uint32 msgs       = 4;
+}
+message EventRemoteRejected {
+  string account    = 1;
+  uint32 domain     = 2;
+  string controller = 3;
+  string reason     = 4;
+}
+message EventSessionGranted {
+  string account       = 1;
+  string session_key   = 2;
+  string expiry        = 3;
+  bool   paymaster     = 4;
+}
+message EventSessionRevoked {
+  string account     = 1;
+  string session_key = 2;
+}
+message EventRemoteWithdraw {
+  string account    = 1;
+  string token_id   = 2;
+  string amount     = 3;
+  uint32 domain     = 4;
+  string recipient  = 5;
+  string message_id = 6;
+}

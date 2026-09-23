@@ -1,0 +1,86 @@
+syntax = "proto3";
+package terra.remote.v1;
+
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos/base/v1beta1/coin.proto";
+import "terra/remote/v1/remote.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/remote/types";
+
+// Query defines the x/remote Query service (spec Annex E.5).
+service Query {
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/params";
+  }
+  rpc RemoteApps(QueryRemoteAppsRequest) returns (QueryRemoteAppsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/apps";
+  }
+  // DeriveAddress returns the derived account of (domain, controller).
+  rpc DeriveAddress(QueryDeriveAddressRequest) returns (QueryDeriveAddressResponse) {
+    option (google.api.http).get = "/terra/remote/v1/derive/{domain}/{controller}";
+  }
+  // RemoteAccount returns the account, its bank balances and active session keys.
+  rpc RemoteAccount(QueryRemoteAccountRequest) returns (QueryRemoteAccountResponse) {
+    option (google.api.http).get = "/terra/remote/v1/accounts/{domain}/{controller}";
+  }
+  rpc Sessions(QuerySessionsRequest) returns (QuerySessionsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/sessions/{address}";
+  }
+  rpc Withdrawals(QueryWithdrawalsRequest) returns (QueryWithdrawalsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/withdrawals/{address}";
+  }
+  rpc Paymaster(QueryPaymasterRequest) returns (QueryPaymasterResponse) {
+    option (google.api.http).get = "/terra/remote/v1/paymaster";
+  }
+}
+
+message QueryParamsRequest {}
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryRemoteAppsRequest {}
+message QueryRemoteAppsResponse {
+  repeated RemoteApp apps = 1 [(gogoproto.nullable) = false];
+  repeated Gateway gateways = 2 [(gogoproto.nullable) = false];
+}
+
+message QueryDeriveAddressRequest {
+  uint32 domain = 1;
+  // controller is the origin address as a 32-byte hex string.
+  string controller = 2;
+}
+message QueryDeriveAddressResponse {
+  string address = 1;
+}
+
+message QueryRemoteAccountRequest {
+  uint32 domain = 1;
+  string controller = 2;
+}
+message QueryRemoteAccountResponse {
+  RemoteAccount account = 1 [(gogoproto.nullable) = false];
+  repeated cosmos.base.v1beta1.Coin balances = 2 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
+  repeated Session sessions = 3 [(gogoproto.nullable) = false];
+}
+
+message QuerySessionsRequest {
+  string address = 1;
+}
+message QuerySessionsResponse {
+  repeated Session sessions = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryWithdrawalsRequest {
+  string address = 1;
+}
+message QueryWithdrawalsResponse {
+  repeated Withdrawal withdrawals = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryPaymasterRequest {}
+message QueryPaymasterResponse {
+  string address = 1;
+  repeated cosmos.base.v1beta1.Coin balance = 2 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
+}

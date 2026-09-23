@@ -10,7 +10,8 @@ import (
 // every (token, domain) pair is blocked until governance sets a cap.
 func DefaultParams() Params {
 	return Params{
-		DefaultDomainCap: math.ZeroInt(),
+		DefaultDomainCap:   math.ZeroInt(),
+		BondedCapThreshold: math.ZeroInt(),
 	}
 }
 
@@ -21,6 +22,9 @@ func (p Params) Validate() error {
 	}
 	if p.DefaultDomainCap.IsNegative() {
 		return fmt.Errorf("default_domain_cap must not be negative: %s", p.DefaultDomainCap)
+	}
+	if !p.BondedCapThreshold.IsNil() && p.BondedCapThreshold.IsNegative() {
+		return fmt.Errorf("bonded_cap_threshold must not be negative: %s", p.BondedCapThreshold)
 	}
 	return nil
 }

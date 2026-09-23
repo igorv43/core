@@ -23,21 +23,31 @@ type AppModule struct {
 
 	keeper warpkeeper.Keeper
 	ledger warpledgerkeeper.Keeper
+	roots  RootRecorder
 }
 
-// NewAppModule creates a new wrapped warp AppModule.
-func NewAppModule(cdc codec.Codec, keeper warpkeeper.Keeper, ledger warpledgerkeeper.Keeper) AppModule {
-	return AppModule{
+// NewAppModule creates a new wrapped warp AppModule; the optional recorder
+// is x/ismbond (root history of outbound messages).
+func NewAppModule(cdc codec.Codec, keeper warpkeeper.Keeper, ledger warpledgerkeeper.Keeper, recorders ...RootRecorder) AppModule {
+	am := AppModule{
 		AppModule: warp.NewAppModule(cdc, keeper),
 		keeper:    keeper,
 		ledger:    ledger,
 	}
+	if len(recorders) > 0 {
+		am.roots = recorders[0]
+	}
+	return am
 }
 
 // RegisterServices registers the wrapped message server and the upstream query
 // server.
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	upstream := warpkeeper.NewMsgServerImpl(am.keeper)
-	warptypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServer(upstream, am.ledger))
+	if am.roots != nil {
+		warptypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServer(upstream, am.ledger, am.roots))
+	} else {
+		warptypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServer(upstream, am.ledger))
+	}
 	warptypes.RegisterQueryServer(cfg.QueryServer(), warpkeeper.NewQueryServerImpl(am.keeper))
 }

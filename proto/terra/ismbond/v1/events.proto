@@ -1,0 +1,35 @@
+syntax = "proto3";
+package terra.ismbond.v1;
+
+option go_package = "github.com/classic-terra/core/v4/x/ismbond/types";
+
+message EventOperatorBonded {
+  string operator  = 1;
+  string validator = 2;
+  string bond      = 3;
+}
+message EventOperatorUnbonding {
+  string operator     = 1;
+  int64  claim_height = 2;
+}
+message EventBondClaimed {
+  string operator = 1;
+  string amount   = 2;
+}
+message EventOperatorSlashed {
+  string operator  = 1;
+  string validator = 2;
+  string amount    = 3;
+  string reward    = 4;
+  string submitter = 5;
+  string kind      = 6;
+}
+message EventRootRecorded {
+  string mailbox_id = 1;
+  uint32 index      = 2;
+  string root       = 3;
+}
+message EventRewardsDistributed {
+  string amount    = 1;
+  uint32 operators = 2;
+}

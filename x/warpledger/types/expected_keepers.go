@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 
+	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -18,4 +19,10 @@ type CircuitKeeper interface {
 	// DisableMsg trips the breaker for a message type URL. Reset is only
 	// possible through governance (custom ante handler guard).
 	DisableMsg(ctx context.Context, typeURL string) error
+}
+
+// IsmBondKeeper reports whether a token's ISM (or the mailbox default when
+// nil) is bonded at its threshold in x/ismbond; optional.
+type IsmBondKeeper interface {
+	IsmBondedForToken(ctx sdk.Context, ismId *util.HexAddress, mailboxId util.HexAddress) (bool, error)
 }

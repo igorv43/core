@@ -29,6 +29,8 @@ type Keeper struct {
 	// router dispatches the MsgRemoteTransfer built by SweepMigration through
 	// the registered (wrapped) warp message server, so caps and accounting apply.
 	router baseapp.MessageRouter
+	// ismBond is optional: when set, caps above bonded_cap_threshold require a bonded ISM (spec §7.2).
+	ismBond types.IsmBondKeeper
 
 	Schema  collections.Schema
 	Params  collections.Item[types.Params]
@@ -104,3 +106,6 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) error {
 	}
 	return k.Params.Set(ctx, params)
 }
+
+// SetIsmBondKeeper registers x/ismbond for the bonded-cap rule of spec §7.2.
+func (k *Keeper) SetIsmBondKeeper(b types.IsmBondKeeper) { k.ismBond = b }

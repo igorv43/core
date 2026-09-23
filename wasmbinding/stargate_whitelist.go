@@ -6,9 +6,11 @@ import (
 
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
+	ismbondtypes "github.com/classic-terra/core/v4/x/ismbond/types"
 	markettypes "github.com/classic-terra/core/v4/x/market/types"
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
+	remotetypes "github.com/classic-terra/core/v4/x/remote/types"
 	treasurytypes "github.com/classic-terra/core/v4/x/treasury/types"
 	warpledgertypes "github.com/classic-terra/core/v4/x/warpledger/types"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -56,6 +58,12 @@ func init() {
 	setWhitelistedQuery("/terra.perp.v1.Query/Position", &perptypes.QueryPositionResponse{})
 	setWhitelistedQuery("/terra.perp.v1.Query/InsuranceFund", &perptypes.QueryInsuranceFundResponse{})
 	setWhitelistedQuery("/terra.perp.v1.Query/ADLRank", &perptypes.QueryADLRankResponse{})
+
+	// remote and ismbond (spec §14.4, §6.6): derived addresses, accounts and the bonded status of an ISM
+	setWhitelistedQuery("/terra.remote.v1.Query/DeriveAddress", &remotetypes.QueryDeriveAddressResponse{})
+	setWhitelistedQuery("/terra.remote.v1.Query/RemoteAccount", &remotetypes.QueryRemoteAccountResponse{})
+	setWhitelistedQuery("/terra.ismbond.v1.Query/IsmBonded", &ismbondtypes.QueryIsmBondedResponse{})
+	setWhitelistedQuery("/terra.ismbond.v1.Query/Operator", &ismbondtypes.QueryOperatorResponse{})
 }
 
 // GetWhitelistedQuery returns the whitelisted query at the provided path.

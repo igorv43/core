@@ -1,0 +1,81 @@
+syntax = "proto3";
+package terra.ismbond.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos/msg/v1/msg.proto";
+import "amino/amino.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/base/v1beta1/coin.proto";
+import "terra/ismbond/v1/ismbond.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/ismbond/types";
+
+// Msg defines the x/ismbond Msg service (spec §6.6).
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  rpc BondOperator(MsgBondOperator) returns (MsgBondOperatorResponse);
+  rpc UnbondOperator(MsgUnbondOperator) returns (MsgUnbondOperatorResponse);
+  rpc ClaimBond(MsgClaimBond) returns (MsgClaimBondResponse);
+  // SubmitEvidence is permissionless: the module verifies the signatures and compares with local state.
+  rpc SubmitEvidence(MsgSubmitEvidence) returns (MsgSubmitEvidenceResponse);
+  // DistributeRewards splits an amount among the active operators pro rata to their bonds.
+  rpc DistributeRewards(MsgDistributeRewards) returns (MsgDistributeRewardsResponse);
+  rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
+}
+
+message MsgBondOperator {
+  option (cosmos.msg.v1.signer) = "operator";
+  option (amino.name)           = "terra/ismbond/MsgBondOperator";
+  string operator  = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string validator = 2;
+  cosmos.base.v1beta1.Coin bond = 3 [(gogoproto.nullable) = false];
+}
+message MsgBondOperatorResponse {}
+
+message MsgUnbondOperator {
+  option (cosmos.msg.v1.signer) = "operator";
+  option (amino.name)           = "terra/ismbond/MsgUnbondOperator";
+  string operator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+message MsgUnbondOperatorResponse {
+  int64 claim_height = 1;
+}
+
+message MsgClaimBond {
+  option (cosmos.msg.v1.signer) = "operator";
+  option (amino.name)           = "terra/ismbond/MsgClaimBond";
+  string operator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+message MsgClaimBondResponse {}
+
+message MsgSubmitEvidence {
+  option (cosmos.msg.v1.signer) = "submitter";
+  option (amino.name)           = "terra/ismbond/MsgSubmitEvidence";
+  string submitter = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  EvidenceKind kind = 2;
+  Checkpoint checkpoint_a = 3 [(gogoproto.nullable) = false];
+  // checkpoint_b is the conflicting checkpoint (equivocation only).
+  Checkpoint checkpoint_b = 4 [(gogoproto.nullable) = false];
+}
+message MsgSubmitEvidenceResponse {
+  string validator = 1;
+  string slashed   = 2;
+  string reward    = 3;
+}
+
+message MsgDistributeRewards {
+  option (cosmos.msg.v1.signer) = "sender";
+  option (amino.name)           = "terra/ismbond/MsgDistributeRewards";
+  string sender = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  cosmos.base.v1beta1.Coin amount = 2 [(gogoproto.nullable) = false];
+}
+message MsgDistributeRewardsResponse {}
+
+message MsgUpdateParams {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/ismbond/MsgUpdateParams";
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  Params params = 2 [(gogoproto.nullable) = false];
+}
+message MsgUpdateParamsResponse {}

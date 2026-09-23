@@ -28,6 +28,8 @@ import (
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	dyncommkeeper "github.com/classic-terra/core/v4/x/dyncomm/keeper"
 	dyncommtypes "github.com/classic-terra/core/v4/x/dyncomm/types"
+	ismbondkeeper "github.com/classic-terra/core/v4/x/ismbond/keeper"
+	ismbondtypes "github.com/classic-terra/core/v4/x/ismbond/types"
 	liquidstakekeeper "github.com/classic-terra/core/v4/x/liquidstake/keeper"
 	liquidstaketypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	marketkeeper "github.com/classic-terra/core/v4/x/market/keeper"
@@ -36,6 +38,8 @@ import (
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
 	perpkeeper "github.com/classic-terra/core/v4/x/perp/keeper"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
+	remotekeeper "github.com/classic-terra/core/v4/x/remote/keeper"
+	remotetypes "github.com/classic-terra/core/v4/x/remote/types"
 	taxkeeper "github.com/classic-terra/core/v4/x/tax/keeper"
 	taxtypes "github.com/classic-terra/core/v4/x/tax/types"
 	taxexemptionkeeper "github.com/classic-terra/core/v4/x/taxexemption/keeper"
@@ -128,6 +132,8 @@ type AppKeepers struct {
 	LiquidStakeKeeper liquidstakekeeper.Keeper
 	BatchKeeper       batchkeeper.Keeper
 	PerpKeeper        perpkeeper.Keeper
+	RemoteKeeper      remotekeeper.Keeper
+	IsmBondKeeper     ismbondkeeper.Keeper
 
 	Ics20WasmHooks  *ibchooks.WasmHooks
 	IBCHooksWrapper *ibchooks.ICS4Middleware
@@ -179,6 +185,8 @@ func NewAppKeepers(
 		liquidstaketypes.StoreKey:    storetypes.NewKVStoreKey(liquidstaketypes.StoreKey),
 		batchtypes.StoreKey:          storetypes.NewKVStoreKey(batchtypes.StoreKey),
 		perptypes.StoreKey:           storetypes.NewKVStoreKey(perptypes.StoreKey),
+		remotetypes.StoreKey:         storetypes.NewKVStoreKey(remotetypes.StoreKey),
+		ismbondtypes.StoreKey:        storetypes.NewKVStoreKey(ismbondtypes.StoreKey),
 	}
 	tkeys := map[string]*storetypes.TransientStoreKey{
 		paramstypes.TStoreKey: storetypes.NewTransientStoreKey(paramstypes.TStoreKey),
@@ -246,7 +254,7 @@ func NewAppKeepers(
 		appCodec,
 		runtime.NewKVStoreService(appKeepers.keys[feegrant.StoreKey]),
 		appKeepers.AccountKeeper,
-	)
+	).SetBankKeeper(appKeepers.BankKeeper) // required: GrantAllowance to a new account checks BlockedAddr
 	appKeepers.StakingKeeper = stakingkeeper.NewKeeper(
 		appCodec,
 		runtime.NewKVStoreService(appKeepers.keys[stakingtypes.StoreKey]),
@@ -595,6 +603,33 @@ func NewAppKeepers(
 	)
 	appKeepers.BatchKeeper.SetMarginHook(perpkeeper.NewMarginHook(appKeepers.PerpKeeper))
 	appKeepers.BatchKeeper.SetFeeSink(perpkeeper.NewFeeSink(appKeepers.PerpKeeper))
+
+	// x/remote (Part II, D-19/D-27): Hyperlane app 3; accounts derived from
+	// (origin domain, sender), session keys via x/authz, paymaster via
+	// x/feegrant, withdrawals locked to the controller through warp.
+	appKeepers.RemoteKeeper = remotekeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[remotetypes.StoreKey]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.BankKeeper,
+		appKeepers.HyperlaneKeeper,
+		appKeepers.AuthzKeeper,
+		appKeepers.FeeGrantKeeper,
+		&appKeepers.PerpKeeper,
+		bApp.MsgServiceRouter(),
+	)
+
+	// x/ismbond (D-17): operator bonds for the ISM validators, evidence judged
+	// against the local merkle tree hook; feeds the bonded-cap rule of x/warpledger.
+	appKeepers.IsmBondKeeper = ismbondkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[ismbondtypes.StoreKey]),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		appKeepers.BankKeeper,
+		ismbondkeeper.NewCoreAdapter(appKeepers.HyperlaneKeeper),
+		appKeepers.DistrKeeper,
+	)
+	appKeepers.WarpLedgerKeeper.SetIsmBondKeeper(appKeepers.IsmBondKeeper)
 
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := appKeepers.newIBCRouter()

@@ -1,0 +1,82 @@
+package types
+
+import (
+	errorsmod "cosmossdk.io/errors"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+)
+
+func validAddr(field, addr string) error {
+	if _, err := sdk.AccAddressFromBech32(addr); err != nil {
+		return errorsmod.Wrapf(ErrUnauthorized, "invalid %s address: %v", field, err)
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgGrantSessionKey) ValidateBasic() error {
+	if err := validAddr("controller", m.Controller); err != nil {
+		return err
+	}
+	if err := validAddr("session_key", m.SessionKey); err != nil {
+		return err
+	}
+	if m.SessionKey == m.Controller {
+		return errorsmod.Wrap(ErrInvalidSession, "the session key must differ from the account")
+	}
+	if m.TtlSeconds < 0 {
+		return errorsmod.Wrap(ErrInvalidSession, "ttl_seconds must be non-negative")
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgRevokeSessionKey) ValidateBasic() error {
+	if err := validAddr("controller", m.Controller); err != nil {
+		return err
+	}
+	return validAddr("session_key", m.SessionKey)
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgRevokeOwnSessionKey) ValidateBasic() error {
+	if err := validAddr("session_key", m.SessionKey); err != nil {
+		return err
+	}
+	return validAddr("controller", m.Controller)
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgWithdraw) ValidateBasic() error {
+	if err := validAddr("controller", m.Controller); err != nil {
+		return err
+	}
+	if m.Amount.IsNil() || !m.Amount.IsPositive() {
+		return errorsmod.Wrap(ErrInvalidWithdraw, "amount must be positive")
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgFundPaymaster) ValidateBasic() error {
+	if err := validAddr("sender", m.Sender); err != nil {
+		return err
+	}
+	if !m.Amount.IsValid() || !m.Amount.IsPositive() {
+		return errorsmod.Wrap(ErrInvalidParams, "amount must be a positive coin")
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgCreateRemoteApp) ValidateBasic() error { return validAddr("authority", m.Authority) }
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgSetGateway) ValidateBasic() error { return validAddr("authority", m.Authority) }
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgUpdateParams) ValidateBasic() error {
+	if err := validAddr("authority", m.Authority); err != nil {
+		return err
+	}
+	return m.Params.Validate()
+}

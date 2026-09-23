@@ -37,6 +37,8 @@ import (
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	"github.com/classic-terra/core/v4/x/dyncomm"
 	dyncommtypes "github.com/classic-terra/core/v4/x/dyncomm/types"
+	"github.com/classic-terra/core/v4/x/ismbond"
+	ismbondtypes "github.com/classic-terra/core/v4/x/ismbond/types"
 	"github.com/classic-terra/core/v4/x/liquidstake"
 	liquidstaketypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	"github.com/classic-terra/core/v4/x/market"
@@ -45,6 +47,8 @@ import (
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
 	"github.com/classic-terra/core/v4/x/perp"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
+	"github.com/classic-terra/core/v4/x/remote"
+	remotetypes "github.com/classic-terra/core/v4/x/remote/types"
 	taxmodule "github.com/classic-terra/core/v4/x/tax/module"
 	taxbank "github.com/classic-terra/core/v4/x/tax/modules/bank"
 	taxmarket "github.com/classic-terra/core/v4/x/tax/modules/market"
@@ -139,6 +143,8 @@ var (
 		liquidstake.AppModuleBasic{},
 		batch.AppModuleBasic{},
 		perp.AppModuleBasic{},
+		remote.AppModuleBasic{},
+		ismbond.AppModuleBasic{},
 	)
 	// module account permissions
 	maccPerms = map[string][]string{
@@ -164,6 +170,7 @@ var (
 		liquidstaketypes.ModuleName: {authtypes.Minter, authtypes.Burner},
 		batchtypes.ModuleName:       nil, // escrow only: no mint or burn authority
 		perptypes.ModuleName:        nil, // collateral, insurance fund and revenue: no mint or burn authority
+		ismbondtypes.ModuleName:     nil, // operator bonds
 	}
 	// module accounts that are allowed to receive tokens
 	allowedReceivingModAcc = map[string]bool{
@@ -215,11 +222,13 @@ func appModules(
 		// Liquidity Fabric (phase 1)
 		customcircuit.NewAppModule(appCodec, app.CircuitKeeper),
 		customhyperlane.NewAppModule(appCodec, app.HyperlaneKeeper, app.WarpLedgerKeeper),
-		customwarp.NewAppModule(appCodec, app.WarpKeeper, app.WarpLedgerKeeper),
+		customwarp.NewAppModule(appCodec, app.WarpKeeper, app.WarpLedgerKeeper, app.IsmBondKeeper),
 		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
 		liquidstake.NewAppModule(appCodec, app.LiquidStakeKeeper),
 		batch.NewAppModule(appCodec, app.BatchKeeper),
 		perp.NewAppModule(appCodec, app.PerpKeeper),
+		remote.NewAppModule(appCodec, app.RemoteKeeper),
+		ismbond.NewAppModule(appCodec, app.IsmBondKeeper),
 	}
 }
 
@@ -289,6 +298,8 @@ func orderBeginBlockers() []string {
 		liquidstaketypes.ModuleName,
 		batchtypes.ModuleName,
 		perptypes.ModuleName,
+		remotetypes.ModuleName,
+		ismbondtypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -331,6 +342,8 @@ func orderEndBlockers() []string {
 		liquidstaketypes.ModuleName,
 		batchtypes.ModuleName,
 		perptypes.ModuleName,
+		remotetypes.ModuleName,
+		ismbondtypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}
@@ -373,6 +386,8 @@ func orderInitGenesis() []string {
 		liquidstaketypes.ModuleName,
 		batchtypes.ModuleName,
 		perptypes.ModuleName,
+		remotetypes.ModuleName,
+		ismbondtypes.ModuleName,
 		// consensus module
 		consensusparamtypes.ModuleName,
 	}

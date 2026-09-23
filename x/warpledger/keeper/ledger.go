@@ -185,7 +185,11 @@ func (k Keeper) RecordInboundMessage(ctx sdk.Context, message util.HyperlaneMess
 
 // SetDomainCap sets the explicit cap of a pair. The token must exist in x/warp.
 func (k Keeper) SetDomainCap(ctx sdk.Context, tokenId util.HexAddress, domain uint32, cap math.Int) error {
-	if _, err := k.GetToken(ctx, tokenId); err != nil {
+	token, err := k.GetToken(ctx, tokenId)
+	if err != nil {
+		return err
+	}
+	if err := k.assertBondedForCap(ctx, token, cap); err != nil {
 		return err
 	}
 	ledger, exists, err := k.GetLedger(ctx, tokenId, domain)
@@ -213,4 +217,28 @@ func (k Keeper) LedgersOfToken(ctx sdk.Context, tokenId util.HexAddress) ([]type
 			return false, nil
 		})
 	return ledgers, err
+}
+
+// assertBondedForCap enforces spec §7.2: a per-domain cap above
+// params.bonded_cap_threshold needs the token's ISM (or the mailbox default)
+// bonded at its threshold in x/ismbond. Zero threshold disables the rule.
+func (k Keeper) assertBondedForCap(ctx sdk.Context, token warptypes.HypToken, cap math.Int) error {
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return err
+	}
+	if params.BondedCapThreshold.IsNil() || !params.BondedCapThreshold.IsPositive() || cap.LTE(params.BondedCapThreshold) {
+		return nil
+	}
+	if k.ismBond == nil {
+		return errorsmod.Wrap(types.ErrIsmNotBonded, "x/ismbond not available")
+	}
+	bonded, err := k.ismBond.IsmBondedForToken(ctx, token.IsmId, token.OriginMailbox)
+	if err != nil {
+		return err
+	}
+	if !bonded {
+		return errorsmod.Wrapf(types.ErrIsmNotBonded, "cap %s above threshold %s", cap, params.BondedCapThreshold)
+	}
+	return nil
 }

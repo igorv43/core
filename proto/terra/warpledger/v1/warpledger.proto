@@ -21,6 +21,13 @@ message Params {
     (gogoproto.nullable)   = false,
     (amino.dont_omitempty) = true
   ];
+  // bonded_cap_threshold is the per-domain cap above which the token's ISM
+  // must be bonded in x/ismbond (spec §7.2, §6.6). Zero disables the check.
+  string bonded_cap_threshold = 2 [
+    (cosmos_proto.scalar)  = "cosmos.Int",
+    (gogoproto.customtype) = "cosmossdk.io/math.Int",
+    (gogoproto.nullable)   = false
+  ];
 }
 
 // DomainLedger is the per (warp token, remote domain) accounting record kept

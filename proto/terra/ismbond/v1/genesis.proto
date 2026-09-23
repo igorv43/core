@@ -1,0 +1,14 @@
+syntax = "proto3";
+package terra.ismbond.v1;
+
+import "gogoproto/gogo.proto";
+import "terra/ismbond/v1/ismbond.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/ismbond/types";
+
+// GenesisState defines the x/ismbond genesis state.
+message GenesisState {
+  Params params = 1 [(gogoproto.nullable) = false];
+  repeated Operator operators = 2 [(gogoproto.nullable) = false];
+  repeated RootRecord roots = 3 [(gogoproto.nullable) = false];
+}

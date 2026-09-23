@@ -1,0 +1,92 @@
+syntax = "proto3";
+package terra.remote.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "amino/amino.proto";
+import "cosmos/base/v1beta1/coin.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/remote/types";
+
+// Params defines the x/remote parameters (spec §14.4, Annex B).
+message Params {
+  option (amino.name)      = "terra/remote/Params";
+  option (gogoproto.equal) = true;
+
+  // session_ttl_seconds is the default lifetime of a session key (param_remote_session_ttl, 30 days).
+  int64 session_ttl_seconds = 1;
+  // max_sessions bounds the simultaneous session keys of a remote account (param_remote_max_sessions).
+  uint32 max_sessions = 2;
+  // msg_fee is the anti-spam fee per message of a remote payload, charged to the remote account.
+  cosmos.base.v1beta1.Coin msg_fee = 3 [(gogoproto.nullable) = false];
+  // max_msgs_per_payload bounds the messages of one payload (absolute maximum 10 in code, spec §12).
+  uint32 max_msgs_per_payload = 4;
+  // paymaster_daily_cap is the fee allowance granted to each session key per period.
+  cosmos.base.v1beta1.Coin paymaster_daily_cap = 5 [(gogoproto.nullable) = false];
+  // paymaster_min_collateral is the free collateral (settlement units) a remote account needs for its
+  // session keys to receive an allowance.
+  string paymaster_min_collateral = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // paymaster_period_seconds is the allowance period.
+  int64 paymaster_period_seconds = 7;
+  // withdraw_fee_cap is the interchain gas the paymaster covers for one withdrawal.
+  cosmos.base.v1beta1.Coin withdraw_fee_cap = 8 [(gogoproto.nullable) = false];
+}
+
+// RemoteApp is the Hyperlane application instance (router id 3) that
+// receives control messages for a mailbox.
+message RemoteApp {
+  string id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string mailbox_id = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // ism_id overrides the mailbox default ISM when set.
+  string ism_id = 3 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = true];
+  string owner = 4 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// Gateway is a trusted periphery contract of an origin domain (spec §14.4
+// item 5, §14.6): only its messages may name an on_behalf_of controller.
+message Gateway {
+  string app_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  uint32 domain = 2;
+  string address = 3 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+}
+
+// RemoteAccount is a derived account controlled by (domain, controller).
+message RemoteAccount {
+  uint32 domain = 1;
+  string controller = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string address = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  int64 created_height = 4;
+  uint64 payloads = 5;
+}
+
+// Session is a session key of a remote account (authz grants scoped to the
+// trading messages, spec §14.4 item 3).
+message Session {
+  string account = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string session_key = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  google.protobuf.Timestamp expiry = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+  int64 granted_height = 4;
+  // paymaster reports whether a fee allowance was granted to the key.
+  bool paymaster = 5;
+}
+
+// Withdrawal records a warp transfer sent back to the controller.
+message Withdrawal {
+  string account = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint64 seq = 2;
+  string message_id = 3 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string token_id = 4 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string amount = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  int64 height = 6;
+}
+
+// RemotePayload is the body of a control message (spec Annex E.5). The
+// origin domain and sender come from the mailbox, never from the payload.
+message RemotePayload {
+  // on_behalf_of is the controller a trusted gateway acts for (32 bytes); empty for direct senders.
+  bytes on_behalf_of = 1;
+  // msgs are messages of the whitelist in code, signed by the derived account.
+  repeated google.protobuf.Any msgs = 2;
+}

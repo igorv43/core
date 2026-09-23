@@ -1,0 +1,17 @@
+syntax = "proto3";
+package terra.remote.v1;
+
+import "gogoproto/gogo.proto";
+import "terra/remote/v1/remote.proto";
+
+option go_package = "github.com/classic-terra/core/v4/x/remote/types";
+
+// GenesisState defines the x/remote genesis state.
+message GenesisState {
+  Params params = 1 [(gogoproto.nullable) = false];
+  repeated RemoteApp apps = 2 [(gogoproto.nullable) = false];
+  repeated Gateway gateways = 3 [(gogoproto.nullable) = false];
+  repeated RemoteAccount accounts = 4 [(gogoproto.nullable) = false];
+  repeated Session sessions = 5 [(gogoproto.nullable) = false];
+  repeated Withdrawal withdrawals = 6 [(gogoproto.nullable) = false];
+}
