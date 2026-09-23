@@ -57,7 +57,7 @@ func (k Keeper) sweepLiquidations(ctx sdk.Context, params types.Params, m *types
 	if err != nil {
 		return err
 	}
-	val := k.stValuation(ctx, params)
+	val := k.stValuationEndBlock(ctx, params)
 	fund := types.InsuranceFundAddress()
 	for _, p := range candidates {
 		if p.Account == fund {
@@ -278,7 +278,7 @@ func (k Keeper) adlRank(ctx sdk.Context, m types.Market, side batchtypes.Side) (
 	if err != nil {
 		return nil, nil, err
 	}
-	val := k.stValuation(ctx, params)
+	val := k.stValuationEndBlock(ctx, params)
 	positions, err := k.positionsOfMarket(ctx, m.Id)
 	if err != nil {
 		return nil, nil, err

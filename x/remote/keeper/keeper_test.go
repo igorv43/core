@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"cosmossdk.io/math"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
@@ -306,4 +307,34 @@ func TestBeaconsDispatchStateFacts(t *testing.T) {
 	gs, err := f.k.ExportGenesis(f.ctx)
 	require.NoError(t, err)
 	require.Len(t, gs.Beacons, 2)
+}
+
+// Spec §25.2: session key expired with an open position in a falling market.
+// The key's grants lapse by time, yet the resident trigger and the auto
+// top-up act in EndBlock without any key (§14.5 layer 4).
+func TestScenarioExpiredSessionKeyStillProtected(t *testing.T) {
+	f := setup(t)
+	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(100_000_000))))
+	session := sdk.AccAddress([]byte("remote-session-exp---"))
+	// deposit, grant a 1-second session and opt into the auto top-up, all by payload
+	f.deliver(t, f.controller, f.payload(t, nil,
+		&perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(40_000_000))},
+		&types.MsgGrantSessionKey{Controller: f.derived.String(), SessionKey: session.String(), TtlSeconds: 1},
+		&perptypes.MsgSetAutoTopUp{Sender: f.derived.String(), Enabled: true},
+	))
+	require.Empty(t, f.rejected(t))
+	auths, _ := f.app.AuthzKeeper.GetAuthorizations(f.ctx, session, f.derived)
+	require.NotEmpty(t, auths)
+	// time passes: the grants expire
+	f.ctx = f.ctx.WithBlockTime(f.ctx.BlockTime().Add(2 * time.Second))
+	for _, url := range types.SessionMsgTypeURLs() {
+		a, _ := f.app.AuthzKeeper.GetAuthorization(f.ctx, session, f.derived, url)
+		require.Nil(t, a, "expired session key can no longer act: %s", url)
+	}
+	// the protections do not depend on the key: the auto top-up flag is on
+	col, err := f.app.PerpKeeper.FreeCollateral(f.ctx, f.derived.String())
+	require.NoError(t, err)
+	require.Equal(t, "40000000", col.String())
+	on, _ := f.app.PerpKeeper.AutoTopUp.Has(f.ctx, f.derived.String())
+	require.True(t, on)
 }

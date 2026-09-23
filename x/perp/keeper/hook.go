@@ -97,7 +97,7 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 	}
 	account := f.Account.String()
 	isFund := account == types.InsuranceFundAddress()
-	val := k.stValuation(ctx, params)
+	val := k.stValuationEndBlock(ctx, params)
 
 	// premium sample of the batch (spec §20.1): p* against P_ref, once per batch
 	if err := k.recordPremium(ctx, params, &market, f.Batch, f.Price); err != nil {

@@ -29,6 +29,11 @@ type Keeper struct {
 	lsKeeper     types.LiquidStakeKeeper
 	burnAccount  string
 
+	// valMemo caches the stLUNC valuation of the current block for the
+	// EndBlock paths (fills, sweeps, re-indexing), where the state it reads is
+	// final; transaction paths always compute it fresh.
+	valMemo *stMemo
+
 	Schema            collections.Schema
 	Params            collections.Item[types.Params]
 	Markets           collections.Map[string, types.Market]
@@ -74,7 +79,7 @@ func NewKeeper(
 	sb := collections.NewSchemaBuilder(storeService)
 	k := Keeper{
 		cdc: cdc, authority: authority, bankKeeper: bankKeeper, oracleKeeper: oracleKeeper, batchKeeper: batchKeeper,
-		distrKeeper: distrKeeper, lsKeeper: lsKeeper, burnAccount: burnAccount,
+		distrKeeper: distrKeeper, lsKeeper: lsKeeper, burnAccount: burnAccount, valMemo: &stMemo{},
 		Params:  collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
 		Markets: collections.NewMap(sb, types.MarketsKey, "markets", collections.StringKey, codec.CollValue[types.Market](cdc)),
 		Positions: collections.NewMap(sb, types.PositionsKey, "positions",

@@ -26,6 +26,49 @@ type StValuation struct {
 	QueueRatio math.LegacyDec // owed / assets of x/liquidstake
 }
 
+// stMemo is the per-block valuation cache (see Keeper.valMemo).
+type stMemo struct {
+	height    int64
+	val       StValuation
+	set       bool
+	target    math.Int
+	targetSet bool
+}
+
+// insuranceTargetEndBlock memoizes IF_target for the block (fills route
+// their fees against it; markets do not change inside EndBlock).
+func (k Keeper) insuranceTargetEndBlock(ctx sdk.Context) (math.Int, error) {
+	if k.valMemo != nil && k.valMemo.targetSet && k.valMemo.height == ctx.BlockHeight() {
+		return k.valMemo.target, nil
+	}
+	target, err := k.InsuranceTarget(ctx)
+	if err != nil {
+		return math.Int{}, err
+	}
+	if k.valMemo != nil {
+		if k.valMemo.height != ctx.BlockHeight() {
+			k.valMemo.set = false
+		}
+		k.valMemo.height, k.valMemo.target, k.valMemo.targetSet = ctx.BlockHeight(), target, true
+	}
+	return target, nil
+}
+
+// stValuationEndBlock returns the valuation of the current block, computed
+// once: used by fills, sweeps and re-indexing, which run in EndBlock after
+// every transaction of the block has been applied (the inputs are final).
+func (k Keeper) stValuationEndBlock(ctx sdk.Context, params types.Params) StValuation {
+	if k.valMemo == nil {
+		return k.stValuation(ctx, params)
+	}
+	if k.valMemo.set && k.valMemo.height == ctx.BlockHeight() {
+		return k.valMemo.val
+	}
+	val := k.stValuation(ctx, params)
+	k.valMemo.height, k.valMemo.val, k.valMemo.set = ctx.BlockHeight(), val, true
+	return val
+}
+
 // stValuation reads the exchange rate, the LUNC price and the redemption
 // queue. When any input is missing the valuation is unavailable and stLUNC
 // is worth zero (never a stale or optimistic value).

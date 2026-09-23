@@ -841,3 +841,30 @@ func TestAssetWhitelistApplyAndGenesis(t *testing.T) {
 	params.AssetWhitelist = types.AssetList{{Name: core.MicroLunaDenom}}
 	require.Error(t, params.Validate())
 }
+
+// Spec §25.2: one third of the votes manipulated. With three equal
+// validators, one voting 10× the price, the weighted median is the honest
+// price, the manipulator is outside the reward band (a miss) and the
+// dispersion of the ballot is visible to the consumers of the rate.
+func TestScenarioOneThirdOfVotesManipulated(t *testing.T) {
+	input, h := setup(t)
+	params := input.OracleKeeper.GetParams(input.Ctx)
+	params.Whitelist = types.DenomList{{Name: core.MicroSDRDenom, TobinTax: types.DefaultTobinTax}}
+	input.OracleKeeper.SetParams(input.Ctx, params)
+	input.OracleKeeper.ClearTobinTaxes(input.Ctx)
+	input.OracleKeeper.SetTobinTax(input.Ctx, core.MicroSDRDenom, types.DefaultTobinTax)
+	honest := sdkmath.LegacyNewDec(1700)
+	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: honest}}, 0)
+	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: honest}}, 1)
+	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: honest.MulInt64(10)}}, 2)
+	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
+
+	rate, err := input.OracleKeeper.GetLunaExchangeRate(input.Ctx, core.MicroSDRDenom)
+	require.NoError(t, err)
+	require.True(t, rate.Equal(honest), rate.String())
+	require.Equal(t, uint64(0), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[0]))
+	require.Equal(t, uint64(1), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[2]), "the manipulator misses")
+	sample, err := input.OracleKeeper.GetRateSample(input.Ctx, core.MicroSDRDenom)
+	require.NoError(t, err)
+	require.True(t, sample.Dispersion.IsPositive(), "dispersion exposes the manipulated ballot")
+}
