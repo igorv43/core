@@ -43,9 +43,11 @@ type Keeper struct {
 	TriggersByAccount collections.KeySet[collections.Pair[string, uint64]]
 	TriggersByMarket  collections.KeySet[collections.Pair[string, uint64]]
 	AutoTopUp         collections.KeySet[string]
-	Ledger            collections.Item[types.Ledger]
-	Allocations       collections.Map[uint64, types.AllocationRecord]
-	UnwindIntents     collections.Map[string, uint64]
+	// FeeInLuna holds the accounts that pay protocol fees in LUNC at a discount (spec §23.3).
+	FeeInLuna     collections.KeySet[string]
+	Ledger        collections.Item[types.Ledger]
+	Allocations   collections.Map[uint64, types.AllocationRecord]
+	UnwindIntents collections.Map[string, uint64]
 	// LiqIndex orders positions by liquidation price per market and side:
 	// (market/side, price_key ‖ account) → unit (spec §19.5).
 	LiqIndex collections.KeySet[collections.Pair[string, []byte]]
@@ -90,6 +92,7 @@ func NewKeeper(
 		TriggersByMarket: collections.NewKeySet(sb, types.TriggersByMarketKey, "triggers_by_market",
 			collections.PairKeyCodec(collections.StringKey, collections.Uint64Key)),
 		AutoTopUp:     collections.NewKeySet(sb, types.AutoTopUpKey, "auto_top_up", collections.StringKey),
+		FeeInLuna:     collections.NewKeySet(sb, types.FeeInLunaKey, "fee_in_luna", collections.StringKey),
 		Ledger:        collections.NewItem(sb, types.LedgerKey, "ledger", codec.CollValue[types.Ledger](cdc)),
 		Allocations:   collections.NewMap(sb, types.AllocationsKey, "allocations", collections.Uint64Key, codec.CollValue[types.AllocationRecord](cdc)),
 		UnwindIntents: collections.NewMap(sb, types.UnwindIntentsKey, "unwind_intents", collections.StringKey, collections.Uint64Value),

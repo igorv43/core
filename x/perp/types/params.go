@@ -52,6 +52,7 @@ func DefaultParams() Params {
 		StGlobalCapIfRatio:         math.LegacyNewDec(2),             // stLUNC value at most 2× the fund core
 		StHaircutQueueSlope:        math.LegacyNewDecWithPrec(50, 2), // +50% of haircut per 100% of assets queued
 		StUnwindCapPerEpoch:        math.NewInt(100_000_000_000),     // 100,000 LUNC sold per epoch
+		LunaFeeDiscount:            math.LegacyZeroDec(),             // §23.3 option, disabled
 	}
 }
 
@@ -141,6 +142,12 @@ func (p Params) Validate() error {
 	}
 	if p.StGlobalCapIfRatio.IsNil() || p.StGlobalCapIfRatio.IsNegative() || p.StHaircutQueueSlope.IsNil() || p.StHaircutQueueSlope.IsNegative() {
 		return fmt.Errorf("st_global_cap_if_ratio and st_haircut_queue_slope must be non-negative")
+	}
+	if err := fraction("luna_fee_discount", p.LunaFeeDiscount); err != nil {
+		return err
+	}
+	if p.LunaFeeDiscount.Equal(math.LegacyOneDec()) {
+		return fmt.Errorf("luna_fee_discount must be below 1")
 	}
 	return nil
 }

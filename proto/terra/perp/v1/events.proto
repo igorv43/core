@@ -95,3 +95,8 @@ message EventBuyback {
   string spent     = 2;
   string burned    = 3;
 }
+message EventFeePaidInLuna {
+  string account        = 1;
+  string settlement_fee = 2;
+  string luna_burned    = 3;
+}

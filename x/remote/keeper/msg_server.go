@@ -81,6 +81,17 @@ func (ms msgServer) SetGateway(goCtx context.Context, msg *types.MsgSetGateway) 
 	return &types.MsgSetGatewayResponse{}, nil
 }
 
+func (ms msgServer) SetBeacon(goCtx context.Context, msg *types.MsgSetBeacon) (*types.MsgSetBeaconResponse, error) {
+	if err := ms.authority(msg.Authority); err != nil {
+		return nil, err
+	}
+	id, err := ms.k.SetBeacon(sdk.UnwrapSDKContext(goCtx), msg)
+	if err != nil {
+		return nil, err
+	}
+	return &types.MsgSetBeaconResponse{Id: id}, nil
+}
+
 func (ms msgServer) UpdateParams(goCtx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
 	if err := ms.authority(msg.Authority); err != nil {
 		return nil, err

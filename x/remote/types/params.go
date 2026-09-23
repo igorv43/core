@@ -18,6 +18,8 @@ func DefaultParams() Params {
 		PaymasterMinCollateral: math.NewInt(10_000_000),                        // 10 USD
 		PaymasterPeriodSeconds: 24 * 3600,
 		WithdrawFeeCap:         sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one withdrawal
+		BeaconFeeCap:           sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one beacon
+		MaxBeaconsPerBlock:     4,
 	}
 }
 
@@ -46,6 +48,12 @@ func (p Params) Validate() error {
 	}
 	if err := p.WithdrawFeeCap.Validate(); err != nil {
 		return fmt.Errorf("withdraw_fee_cap: %w", err)
+	}
+	if err := p.BeaconFeeCap.Validate(); err != nil {
+		return fmt.Errorf("beacon_fee_cap: %w", err)
+	}
+	if p.MaxBeaconsPerBlock == 0 || p.MaxBeaconsPerBlock > 50 {
+		return fmt.Errorf("max_beacons_per_block must be within [1, 50]")
 	}
 	return nil
 }

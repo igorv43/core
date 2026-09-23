@@ -14,4 +14,6 @@ message GenesisState {
   repeated RemoteAccount accounts = 4 [(gogoproto.nullable) = false];
   repeated Session sessions = 5 [(gogoproto.nullable) = false];
   repeated Withdrawal withdrawals = 6 [(gogoproto.nullable) = false];
+  repeated Beacon beacons = 7 [(gogoproto.nullable) = false];
+  uint64 next_beacon_id = 8;
 }

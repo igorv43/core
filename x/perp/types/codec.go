@@ -16,6 +16,7 @@ func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgCancelTriggerOrder{}, "terra/perp/MsgCancelTriggerOrder", nil)
 	cdc.RegisterConcrete(&MsgSetAutoTopUp{}, "terra/perp/MsgSetAutoTopUp", nil)
 	cdc.RegisterConcrete(&MsgFundInsurance{}, "terra/perp/MsgFundInsurance", nil)
+	cdc.RegisterConcrete(&MsgSetFeeInLuna{}, "terra/perp/MsgSetFeeInLuna", nil)
 	cdc.RegisterConcrete(&MsgCreateMarket{}, "terra/perp/MsgCreateMarket", nil)
 	cdc.RegisterConcrete(&MsgUpdateMarket{}, "terra/perp/MsgUpdateMarket", nil)
 	cdc.RegisterConcrete(&MsgEnableMarket{}, "terra/perp/MsgEnableMarket", nil)
@@ -33,6 +34,7 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		&MsgCancelTriggerOrder{},
 		&MsgSetAutoTopUp{},
 		&MsgFundInsurance{},
+		&MsgSetFeeInLuna{},
 		&MsgCreateMarket{},
 		&MsgUpdateMarket{},
 		&MsgEnableMarket{},

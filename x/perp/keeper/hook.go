@@ -154,11 +154,17 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 	fee := math.ZeroInt()
 	if !isFund {
 		fee = math.LegacyNewDecFromInt(f.Qty).Mul(f.Price).MulInt64(int64(params.PerpFeeBps)).QuoInt64(10_000).Ceil().TruncateInt()
-		if _, _, err := k.chargeSettlement(ctx, val, account, fee); err != nil {
-			return errorsmod.Wrapf(types.ErrInsufficientFree, "protocol fee %s: %v", fee, err)
-		}
-		if err := k.routeFee(ctx, fee, false); err != nil {
+		paidInLuna, err := k.tryFeeInLuna(ctx, params, val, f.Account, fee)
+		if err != nil {
 			return err
+		}
+		if !paidInLuna {
+			if _, _, err := k.chargeSettlement(ctx, val, account, fee); err != nil {
+				return errorsmod.Wrapf(types.ErrInsufficientFree, "protocol fee %s: %v", fee, err)
+			}
+			if err := k.routeFee(ctx, fee, false); err != nil {
+				return err
+			}
 		}
 		if f.Frontend != "" && !f.BuilderFee.IsNil() && f.BuilderFee.IsPositive() {
 			if _, _, err := k.chargeSettlement(ctx, val, account, f.BuilderFee); err != nil {
@@ -183,4 +189,45 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 		ev.Qty, ev.EntryPrice, ev.Collateral, ev.RealizedPnl = pos.Qty.String(), pos.EntryPrice.String(), pos.Collateral.String(), pos.RealizedPnl.String()
 	}
 	return ctx.EventManager().EmitTypedEvent(ev)
+}
+
+// tryFeeInLuna pays the protocol fee in LUNC at the governance discount when
+// the account opted in (spec §23.3, N1 option): only while the insurance
+// fund is at its target (the cascade's first step never loses its share),
+// from the account's bank balance, and the LUNC is sent to the burn account.
+// Returns false when the option does not apply (the settlement path runs).
+func (k Keeper) tryFeeInLuna(ctx sdk.Context, params types.Params, val StValuation, account sdk.AccAddress, fee math.Int) (bool, error) {
+	if !params.LunaFeeDiscount.IsPositive() || !fee.IsPositive() {
+		return false, nil
+	}
+	if has, err := k.FeeInLuna.Has(ctx, account.String()); err != nil || !has {
+		return false, err
+	}
+	if !val.Price.IsPositive() {
+		return false, nil
+	}
+	balance, err := k.insuranceBalance(ctx)
+	if err != nil {
+		return false, err
+	}
+	target, err := k.InsuranceTarget(ctx)
+	if err != nil {
+		return false, err
+	}
+	if balance.LT(target) {
+		return false, nil
+	}
+	discounted := math.LegacyOneDec().Sub(params.LunaFeeDiscount).MulInt(fee)
+	luna := discounted.Quo(val.Price).Ceil().TruncateInt()
+	coins := sdk.NewCoins(sdk.NewCoin("uluna", luna))
+	if !k.bankKeeper.GetBalance(ctx, account, "uluna").Amount.GTE(luna) {
+		return false, nil
+	}
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, account, types.ModuleName, coins); err != nil {
+		return false, err
+	}
+	if err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, k.burnAccount, coins); err != nil {
+		return false, err
+	}
+	return true, ctx.EventManager().EmitTypedEvent(&types.EventFeePaidInLuna{Account: account.String(), SettlementFee: fee.String(), LunaBurned: luna.String()})
 }

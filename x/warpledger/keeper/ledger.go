@@ -242,3 +242,20 @@ func (k Keeper) assertBondedForCap(ctx sdk.Context, token warptypes.HypToken, ca
 	}
 	return nil
 }
+
+// TotalExposure returns Σ max(0, sent − received) over the domains of a token:
+// the collateral the route must hold (the EndBlock invariant compares it with
+// the warp module balance).
+func (k Keeper) TotalExposure(ctx sdk.Context, tokenId util.HexAddress) (math.Int, error) {
+	ledgers, err := k.LedgersOfToken(ctx, tokenId)
+	if err != nil {
+		return math.Int{}, err
+	}
+	total := math.ZeroInt()
+	for _, l := range ledgers {
+		if net := l.Sent.Sub(l.Received); net.IsPositive() {
+			total = total.Add(net)
+		}
+	}
+	return total, nil
+}

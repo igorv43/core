@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"math/big"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -16,6 +17,7 @@ import (
 	terraapp "github.com/classic-terra/core/v4/app"
 	apptesting "github.com/classic-terra/core/v4/app/testing"
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
+	lstypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	"github.com/classic-terra/core/v4/x/remote/keeper"
 	"github.com/classic-terra/core/v4/x/remote/types"
@@ -242,4 +244,66 @@ func TestWithdrawLockedToController(t *testing.T) {
 	require.Len(t, gs.Apps, 1)
 	require.Len(t, gs.Accounts, 1)
 	require.NoError(t, gs.Validate())
+}
+
+func TestBeaconsDispatchStateFacts(t *testing.T) {
+	f := setup(t)
+	require.NoError(t, f.app.LiquidStakeKeeper.InitGenesis(f.ctx, lstypes.DefaultGenesisState()))
+	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(10_000_000_000))))
+	gov := f.k.GetAuthority()
+	target := util.CreateMockHexAddress("vault", 1)
+
+	erID, err := f.k.SetBeacon(f.ctx, &types.MsgSetBeacon{Authority: gov, AppId: f.appId, Domain: originDom, Recipient: target, Kind: types.BEACON_KIND_EXCHANGE_RATE, IntervalBlocks: 5})
+	require.NoError(t, err)
+	solvID, err := f.k.SetBeacon(f.ctx, &types.MsgSetBeacon{Authority: gov, AppId: f.appId, Domain: originDom, Recipient: target, Kind: types.BEACON_KIND_ROUTE_SOLVENCY, IntervalBlocks: 5, TokenId: f.token})
+	require.NoError(t, err)
+	_, err = f.k.SetBeacon(f.ctx, &types.MsgSetBeacon{Authority: gov, AppId: f.appId, Domain: originDom, Recipient: target, Kind: types.BEACON_KIND_POSITION_DIGEST, IntervalBlocks: 5, Account: f.derived.String()})
+	require.NoError(t, err)
+	// an unknown app or an unpriced beacon is refused
+	_, err = f.k.SetBeacon(f.ctx, &types.MsgSetBeacon{Authority: gov, AppId: util.CreateMockHexAddress("x", 9), Domain: originDom, Recipient: target, Kind: types.BEACON_KIND_EXCHANGE_RATE, IntervalBlocks: 5})
+	require.Error(t, err)
+
+	// the exchange-rate body: kind, height, time, rate·1e18 (= 1 at genesis), supply, assets
+	b, err := f.k.Beacons.Get(f.ctx, erID)
+	require.NoError(t, err)
+	body, err := f.k.BeaconBody(f.ctx, b)
+	require.NoError(t, err)
+	require.Len(t, body, 32*6)
+	require.Equal(t, uint8(types.BEACON_KIND_EXCHANGE_RATE), body[31])
+	require.Equal(t, math.LegacyOneDec().BigInt().String(), new(big.Int).SetBytes(body[96:128]).String())
+	// the solvency body carries the token id and reports the route solvent
+	b, _ = f.k.Beacons.Get(f.ctx, solvID)
+	body, err = f.k.BeaconBody(f.ctx, b)
+	require.NoError(t, err)
+	require.Len(t, body, 32*10)
+	require.Equal(t, f.token.Bytes(), body[96:128])
+	require.Equal(t, uint8(1), body[319])
+
+	// EndBlock dispatches all three through the mailbox and records the roots
+	mb, err := f.app.HyperlaneKeeper.GetMailbox(f.ctx, f.mailbox)
+	require.NoError(t, err)
+	sentBefore := mb.MessageSent
+	f.ctx = f.ctx.WithBlockHeight(f.ctx.BlockHeight() + 5)
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	mb, _ = f.app.HyperlaneKeeper.GetMailbox(f.ctx, f.mailbox)
+	require.Equal(t, sentBefore+3, mb.MessageSent)
+	sent := 0
+	for _, ev := range f.ctx.EventManager().Events() {
+		if ev.Type == "terra.remote.v1.EventBeaconSent" {
+			sent++
+		}
+	}
+	require.Equal(t, 3, sent)
+	// not due again until the interval elapsed
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	mb, _ = f.app.HyperlaneKeeper.GetMailbox(f.ctx, f.mailbox)
+	require.Equal(t, sentBefore+3, mb.MessageSent)
+	// removal
+	_, err = f.k.SetBeacon(f.ctx, &types.MsgSetBeacon{Authority: gov, Id: erID, IntervalBlocks: 0})
+	require.NoError(t, err)
+	all, _ := f.k.AllBeacons(f.ctx)
+	require.Len(t, all, 2)
+	gs, err := f.k.ExportGenesis(f.ctx)
+	require.NoError(t, err)
+	require.Len(t, gs.Beacons, 2)
 }

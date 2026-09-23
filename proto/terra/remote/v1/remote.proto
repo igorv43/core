@@ -32,6 +32,39 @@ message Params {
   int64 paymaster_period_seconds = 7;
   // withdraw_fee_cap is the interchain gas the paymaster covers for one withdrawal.
   cosmos.base.v1beta1.Coin withdraw_fee_cap = 8 [(gogoproto.nullable) = false];
+  // beacon_fee_cap is the interchain gas the paymaster covers for one beacon message (spec §14.6 item 3).
+  cosmos.base.v1beta1.Coin beacon_fee_cap = 9 [(gogoproto.nullable) = false];
+  // max_beacons_per_block bounds the beacon dispatches of one EndBlock.
+  uint32 max_beacons_per_block = 10;
+}
+
+// BeaconKind is the fact a beacon transmits (spec §14.6 item 3): only chain
+// state, signed by the normal message path, never an opinion.
+enum BeaconKind {
+  option (gogoproto.goproto_enum_prefix) = false;
+  BEACON_KIND_UNSPECIFIED = 0;
+  // EXCHANGE_RATE: the stLUNC exchange rate of x/liquidstake.
+  BEACON_KIND_EXCHANGE_RATE = 1;
+  // ROUTE_SOLVENCY: the ledger of a warp token on a domain (sent, received, cap, collateral).
+  BEACON_KIND_ROUTE_SOLVENCY = 2;
+  // POSITION_DIGEST: a digest of an account's perp positions and collateral.
+  BEACON_KIND_POSITION_DIGEST = 3;
+}
+
+// Beacon is a periodic state message to a remote contract (spec §14.6 item 3).
+message Beacon {
+  uint64 id = 1;
+  string app_id = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  uint32 domain = 3;
+  string recipient = 4 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  BeaconKind kind = 5;
+  // interval_blocks is the dispatch period.
+  int64 interval_blocks = 6;
+  int64 last_height = 7;
+  // token_id selects the warp token of a ROUTE_SOLVENCY beacon.
+  string token_id = 8 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // account selects the account of a POSITION_DIGEST beacon.
+  string account = 9;
 }
 
 // RemoteApp is the Hyperlane application instance (router id 3) that

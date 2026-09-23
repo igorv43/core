@@ -16,6 +16,7 @@ func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgFundPaymaster{}, "terra/remote/MsgFundPaymaster", nil)
 	cdc.RegisterConcrete(&MsgCreateRemoteApp{}, "terra/remote/MsgCreateRemoteApp", nil)
 	cdc.RegisterConcrete(&MsgSetGateway{}, "terra/remote/MsgSetGateway", nil)
+	cdc.RegisterConcrete(&MsgSetBeacon{}, "terra/remote/MsgSetBeacon", nil)
 	cdc.RegisterConcrete(&MsgUpdateParams{}, "terra/remote/MsgUpdateParams", nil)
 }
 
@@ -30,6 +31,7 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		&MsgFundPaymaster{},
 		&MsgCreateRemoteApp{},
 		&MsgSetGateway{},
+		&MsgSetBeacon{},
 		&MsgUpdateParams{},
 	)
 	msgservice.RegisterMsgServiceDesc(registry, &_Msg_serviceDesc)

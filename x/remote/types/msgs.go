@@ -74,6 +74,28 @@ func (m MsgCreateRemoteApp) ValidateBasic() error { return validAddr("authority"
 func (m MsgSetGateway) ValidateBasic() error { return validAddr("authority", m.Authority) }
 
 // ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgSetBeacon) ValidateBasic() error {
+	if err := validAddr("authority", m.Authority); err != nil {
+		return err
+	}
+	if m.IntervalBlocks < 0 {
+		return errorsmod.Wrap(ErrInvalidParams, "interval_blocks must be non-negative")
+	}
+	if m.IntervalBlocks > 0 {
+		switch m.Kind {
+		case BEACON_KIND_EXCHANGE_RATE, BEACON_KIND_ROUTE_SOLVENCY:
+		case BEACON_KIND_POSITION_DIGEST:
+			if err := validAddr("account", m.Account); err != nil {
+				return err
+			}
+		default:
+			return errorsmod.Wrap(ErrInvalidParams, "unknown beacon kind")
+		}
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
 func (m MsgUpdateParams) ValidateBasic() error {
 	if err := validAddr("authority", m.Authority); err != nil {
 		return err

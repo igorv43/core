@@ -36,7 +36,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{RpcMethod: "DepositCollateral", Skip: true}, {RpcMethod: "WithdrawCollateral", Skip: true},
 				{RpcMethod: "SubmitPerpIntent", Skip: true}, {RpcMethod: "SubmitTriggerOrder", Skip: true},
-				{RpcMethod: "CancelTriggerOrder", Skip: true}, {RpcMethod: "SetAutoTopUp", Skip: true}, {RpcMethod: "FundInsurance", Skip: true},
+				{RpcMethod: "CancelTriggerOrder", Skip: true}, {RpcMethod: "SetAutoTopUp", Skip: true}, {RpcMethod: "FundInsurance", Skip: true}, {RpcMethod: "SetFeeInLuna", Skip: true},
 				{RpcMethod: "CreateMarket", Skip: true}, {RpcMethod: "UpdateMarket", Skip: true},
 				{RpcMethod: "EnableMarket", Skip: true}, {RpcMethod: "UpdateParams", Skip: true},
 			},

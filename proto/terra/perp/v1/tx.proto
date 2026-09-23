@@ -26,6 +26,8 @@ service Msg {
   rpc SetAutoTopUp(MsgSetAutoTopUp) returns (MsgSetAutoTopUpResponse);
   // FundInsurance donates settlement to the insurance fund (permissionless; it can never be withdrawn, §26.3).
   rpc FundInsurance(MsgFundInsurance) returns (MsgFundInsuranceResponse);
+  // SetFeeInLuna opts in or out of paying protocol fees in LUNC at a discount (spec §23.3).
+  rpc SetFeeInLuna(MsgSetFeeInLuna) returns (MsgSetFeeInLunaResponse);
   // governance
   rpc CreateMarket(MsgCreateMarket) returns (MsgCreateMarketResponse);
   rpc UpdateMarket(MsgUpdateMarket) returns (MsgUpdateMarketResponse);
@@ -106,6 +108,14 @@ message MsgFundInsurance {
   cosmos.base.v1beta1.Coin amount = 2 [(gogoproto.nullable) = false];
 }
 message MsgFundInsuranceResponse {}
+
+message MsgSetFeeInLuna {
+  option (cosmos.msg.v1.signer) = "sender";
+  option (amino.name)           = "terra/perp/MsgSetFeeInLuna";
+  string sender  = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  bool   enabled = 2;
+}
+message MsgSetFeeInLunaResponse {}
 
 message MsgCreateMarket {
   option (cosmos.msg.v1.signer) = "authority";

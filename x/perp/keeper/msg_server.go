@@ -86,6 +86,20 @@ func (ms msgServer) FundInsurance(goCtx context.Context, msg *types.MsgFundInsur
 	return &types.MsgFundInsuranceResponse{}, nil
 }
 
+func (ms msgServer) SetFeeInLuna(goCtx context.Context, msg *types.MsgSetFeeInLuna) (*types.MsgSetFeeInLunaResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	var err error
+	if msg.Enabled {
+		err = ms.k.FeeInLuna.Set(ctx, msg.Sender)
+	} else {
+		err = ms.k.FeeInLuna.Remove(ctx, msg.Sender)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &types.MsgSetFeeInLunaResponse{}, nil
+}
+
 func (ms msgServer) authority(msg string) error {
 	if msg != ms.k.authority {
 		return errorsmod.Wrapf(govtypes.ErrInvalidSigner, "expected %s, got %s", ms.k.authority, msg)

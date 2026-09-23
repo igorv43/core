@@ -22,6 +22,9 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{RpcMethod: "Withdrawals", Use: "withdrawals [address]", Short: "List the withdrawals of a remote account",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}}},
 				{RpcMethod: "Paymaster", Use: "paymaster", Short: "Query the paymaster account and balance"},
+				{RpcMethod: "Beacons", Use: "beacons", Short: "List the state beacons"},
+				{RpcMethod: "BeaconBody", Use: "beacon-body [id]", Short: "Show the words a beacon would send now",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "id"}}},
 			},
 		},
 		Tx: &autocliv1.ServiceCommandDescriptor{
@@ -30,7 +33,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{RpcMethod: "GrantSessionKey", Skip: true}, {RpcMethod: "RevokeSessionKey", Skip: true},
 				{RpcMethod: "RevokeOwnSessionKey", Skip: true}, {RpcMethod: "Withdraw", Skip: true},
 				{RpcMethod: "FundPaymaster", Skip: true}, {RpcMethod: "CreateRemoteApp", Skip: true},
-				{RpcMethod: "SetGateway", Skip: true}, {RpcMethod: "UpdateParams", Skip: true},
+				{RpcMethod: "SetGateway", Skip: true}, {RpcMethod: "SetBeacon", Skip: true}, {RpcMethod: "UpdateParams", Skip: true},
 			},
 		},
 	}

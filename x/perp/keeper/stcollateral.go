@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"crypto/sha256"
 	"errors"
 
 	"cosmossdk.io/collections"
@@ -247,4 +248,44 @@ func (k Keeper) Valuation(ctx sdk.Context) StValuation {
 		return StValuation{}
 	}
 	return k.stValuation(ctx, params)
+}
+
+// PositionDigest returns a sha256 over the account's positions (market, side,
+// qty, entry, collateral, collateral_st, funding index) in market order plus
+// the free collateral, the number of positions and the sum of equities at
+// the current marks (POSITION_DIGEST beacon, spec §14.6 item 3).
+func (k Keeper) PositionDigest(ctx sdk.Context, account string) ([32]byte, math.Int, int, math.Int, error) {
+	var digest [32]byte
+	positions, err := k.PositionsOfAccount(ctx, account)
+	if err != nil {
+		return digest, math.Int{}, 0, math.Int{}, err
+	}
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return digest, math.Int{}, 0, math.Int{}, err
+	}
+	val := k.stValuation(ctx, params)
+	h := sha256.New()
+	equity := math.ZeroInt()
+	for _, p := range positions {
+		m, err := k.GetMarket(ctx, p.MarketId)
+		if err != nil {
+			return digest, math.Int{}, 0, math.Int{}, err
+		}
+		st := p.CollateralSt
+		if st.IsNil() {
+			st = math.ZeroInt()
+		}
+		h.Write([]byte(p.MarketId))
+		h.Write([]byte{byte(p.Side)})
+		h.Write([]byte(p.Qty.String() + "|" + p.EntryPrice.String() + "|" + p.Collateral.String() + "|" + st.String() + "|" + p.FundingIndexAtOpen.String() + "\n"))
+		equity = equity.Add(valued(p, val).Equity(m.MarkPrice, m.FundingIndex))
+	}
+	free, err := k.FreeCollateral(ctx, account)
+	if err != nil {
+		return digest, math.Int{}, 0, math.Int{}, err
+	}
+	h.Write([]byte("free|" + free.String()))
+	copy(digest[:], h.Sum(nil))
+	return digest, free, len(positions), equity, nil
 }

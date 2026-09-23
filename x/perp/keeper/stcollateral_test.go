@@ -218,3 +218,44 @@ func TestStAutoTopUpUsesStLunc(t *testing.T) {
 		t.Fatal(msg)
 	}
 }
+
+func TestFeeInLunaAtDiscountBurns(t *testing.T) {
+	f := setup(t)
+	f.stSetup(t) // LUNC priced, fund seeded
+	p := f.params
+	p.LunaFeeDiscount = math.LegacyNewDecWithPrec(20, 2) // 20% off
+	require.NoError(t, f.k.SetParams(f.ctx, p))
+	f.params = p
+	require.NoError(t, f.k.FeeInLuna.Set(f.ctx, f.long.String()))
+	// the fund must be at its target for the option to apply
+	target, _ := f.k.InsuranceTarget(f.ctx)
+	l, _ := f.k.GetLedger(f.ctx)
+	if gap := target.Sub(l.Insurance); gap.IsPositive() {
+		coins := sdk.NewCoins(sdk.NewCoin("uusd", gap))
+		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
+		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToModule(f.ctx, "mint", types.ModuleName, coins))
+		l.Insurance = target
+		require.NoError(t, f.k.Ledger.Set(f.ctx, l))
+	}
+	// the long needs LUNC in its bank balance to pay the fee with
+	lunas := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000)))
+	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", lunas))
+	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", f.long, lunas))
+	burnBefore := f.app.BankKeeper.GetBalance(f.ctx, f.app.AccountKeeper.GetModuleAddress("burn"), "uluna").Amount
+	lunaBefore := f.app.BankKeeper.GetBalance(f.ctx, f.long, "uluna").Amount
+	freeBefore, _ := f.k.FreeCollateral(f.ctx, f.long.String())
+
+	f.trade(t, 1_000, math.LegacyNewDec(60_000))
+
+	// fee 30,000 uusd → 24,000 uusd worth of LUNC at 0.0001 = 240,000,000 uluna burned; no settlement fee charged
+	burnAfter := f.app.BankKeeper.GetBalance(f.ctx, f.app.AccountKeeper.GetModuleAddress("burn"), "uluna").Amount
+	require.Equal(t, "240000000", burnAfter.Sub(burnBefore).String())
+	lunaAfter := f.app.BankKeeper.GetBalance(f.ctx, f.long, "uluna").Amount
+	// the intent fee (2 LUNC) and the discounted protocol fee left the bank balance
+	require.Equal(t, lunaBefore.Sub(f.bp.IntentFee.Amount).SubRaw(240_000_000).String(), lunaAfter.String())
+	freeAfter, _ := f.k.FreeCollateral(f.ctx, f.long.String())
+	require.Equal(t, freeBefore.SubRaw(20_000_000).String(), freeAfter.String(), "only the initial margin left the collateral")
+	// the short (not opted in) paid in settlement as before
+	freeShort, _ := f.k.FreeCollateral(f.ctx, f.short.String())
+	require.Equal(t, "79970000", freeShort.String())
+}

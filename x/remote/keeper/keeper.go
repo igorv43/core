@@ -30,6 +30,11 @@ type Keeper struct {
 	feegrantKeeper feegrantkeeper.Keeper
 	perpKeeper     types.PerpKeeper
 	router         baseapp.MessageRouter
+	// optional collaborators of the beacons (spec §14.6 item 3)
+	lsKeeper     types.LiquidStakeKeeper
+	ledgerKeeper types.WarpLedgerKeeper
+	roots        types.RootRecorder
+	warpAddress  sdk.AccAddress
 
 	Schema      collections.Schema
 	Params      collections.Item[types.Params]
@@ -39,6 +44,8 @@ type Keeper struct {
 	Sessions    collections.Map[collections.Pair[string, string], types.Session]
 	Withdrawals collections.Map[collections.Pair[string, uint64], types.Withdrawal]
 	WithdrawSeq collections.Map[string, uint64]
+	Beacons     collections.Map[uint64, types.Beacon]
+	BeaconSeq   collections.Sequence
 }
 
 // NewKeeper creates the x/remote keeper and registers it as Hyperlane app 3.
@@ -70,6 +77,8 @@ func NewKeeper(
 		Withdrawals: collections.NewMap(sb, types.WithdrawalsKey, "withdrawals",
 			collections.PairKeyCodec(collections.StringKey, collections.Uint64Key), codec.CollValue[types.Withdrawal](cdc)),
 		WithdrawSeq: collections.NewMap(sb, types.WithdrawSeqKey, "withdraw_seq", collections.StringKey, collections.Uint64Value),
+		Beacons:     collections.NewMap(sb, types.BeaconsKey, "beacons", collections.Uint64Key, codec.CollValue[types.Beacon](cdc)),
+		BeaconSeq:   collections.NewSequence(sb, types.BeaconSeqKey, "beacon_seq"),
 	}
 	schema, err := sb.Build()
 	if err != nil {
@@ -182,4 +191,10 @@ func hexFromBytes(bz []byte) (util.HexAddress, error) {
 	}
 	copy(h[:], bz)
 	return h, nil
+}
+
+// SetBeaconSources registers the state readers of the beacons and the root
+// recorder; warpAddress is the warp module account that custodies collateral.
+func (k *Keeper) SetBeaconSources(ls types.LiquidStakeKeeper, ledger types.WarpLedgerKeeper, roots types.RootRecorder, warpAddress sdk.AccAddress) {
+	k.lsKeeper, k.ledgerKeeper, k.roots, k.warpAddress = ls, ledger, roots, warpAddress
 }

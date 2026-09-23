@@ -119,3 +119,27 @@ func (qs queryServer) Paymaster(goCtx context.Context, _ *types.QueryPaymasterRe
 	pm := types.PaymasterAddress()
 	return &types.QueryPaymasterResponse{Address: pm.String(), Balance: qs.k.bankKeeper.GetAllBalances(ctx, pm)}, nil
 }
+
+func (qs queryServer) Beacons(goCtx context.Context, _ *types.QueryBeaconsRequest) (*types.QueryBeaconsResponse, error) {
+	b, err := qs.k.AllBeacons(sdk.UnwrapSDKContext(goCtx))
+	if err != nil {
+		return nil, err
+	}
+	return &types.QueryBeaconsResponse{Beacons: b}, nil
+}
+
+func (qs queryServer) BeaconBody(goCtx context.Context, req *types.QueryBeaconBodyRequest) (*types.QueryBeaconBodyResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	b, err := qs.k.Beacons.Get(ctx, req.Id)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "beacon not found")
+	}
+	body, err := qs.k.BeaconBody(ctx, b)
+	if err != nil {
+		return nil, err
+	}
+	return &types.QueryBeaconBodyResponse{Body: body}, nil
+}

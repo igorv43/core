@@ -39,6 +39,8 @@ var (
 	SessionsKey    = collections.NewPrefix(4)
 	WithdrawalsKey = collections.NewPrefix(5)
 	WithdrawSeqKey = collections.NewPrefix(6)
+	BeaconsKey     = collections.NewPrefix(7)
+	BeaconSeqKey   = collections.NewPrefix(8)
 )
 
 // PaymasterAddress is the account that grants fee allowances to session keys.

@@ -33,6 +33,13 @@ service Query {
   rpc Paymaster(QueryPaymasterRequest) returns (QueryPaymasterResponse) {
     option (google.api.http).get = "/terra/remote/v1/paymaster";
   }
+  rpc Beacons(QueryBeaconsRequest) returns (QueryBeaconsResponse) {
+    option (google.api.http).get = "/terra/remote/v1/beacons";
+  }
+  // BeaconBody returns the bytes a beacon would send now (for integrators to decode).
+  rpc BeaconBody(QueryBeaconBodyRequest) returns (QueryBeaconBodyResponse) {
+    option (google.api.http).get = "/terra/remote/v1/beacons/{id}/body";
+  }
 }
 
 message QueryParamsRequest {}
@@ -83,4 +90,16 @@ message QueryPaymasterRequest {}
 message QueryPaymasterResponse {
   string address = 1;
   repeated cosmos.base.v1beta1.Coin balance = 2 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
+}
+
+message QueryBeaconsRequest {}
+message QueryBeaconsResponse {
+  repeated Beacon beacons = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryBeaconBodyRequest {
+  uint64 id = 1;
+}
+message QueryBeaconBodyResponse {
+  bytes body = 1;
 }

@@ -90,6 +90,10 @@ message Params {
   string st_haircut_queue_slope = 34 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
   // st_unwind_cap_per_epoch caps the uluna the tranche sells per allocation epoch (rule 7).
   string st_unwind_cap_per_epoch = 35 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // luna_fee_discount is the discount of the protocol fee when an opted-in
+  // account pays it in LUNC (spec §23.3, N1 option; zero disables). The LUNC
+  // is burned; available only while the insurance fund is at its target.
+  string luna_fee_discount = 36 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
 }
 
 // Market is a perpetual market (spec §19–§22). Governance sets the risk

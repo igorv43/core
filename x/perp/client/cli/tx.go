@@ -45,6 +45,7 @@ func NewTxCmd() *cobra.Command {
 		newTriggerCmd(),
 		newCancelTriggerCmd(),
 		newAutoTopUpCmd(),
+		newFeeInLunaCmd(),
 	)
 	return cmd
 }
@@ -195,6 +196,29 @@ func newAutoTopUpCmd() *cobra.Command {
 				return fmt.Errorf("argument must be on or off")
 			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), &types.MsgSetAutoTopUp{Sender: clientCtx.GetFromAddress().String(), Enabled: enabled})
+		},
+	}
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func newFeeInLunaCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "fee-in-luna [on|off]", Short: "Opt in or out of paying protocol fees in LUNC at the governance discount", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			var enabled bool
+			switch args[0] {
+			case "on":
+				enabled = true
+			case "off":
+			default:
+				return fmt.Errorf("argument must be on or off")
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), &types.MsgSetFeeInLuna{Sender: clientCtx.GetFromAddress().String(), Enabled: enabled})
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)

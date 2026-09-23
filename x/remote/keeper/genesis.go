@@ -34,6 +34,14 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 			return err
 		}
 	}
+	for _, b := range gs.Beacons {
+		if err := k.Beacons.Set(ctx, b.Id, b); err != nil {
+			return err
+		}
+	}
+	if err := k.BeaconSeq.Set(ctx, gs.NextBeaconId); err != nil {
+		return err
+	}
 	for _, w := range gs.Withdrawals {
 		if err := k.Withdrawals.Set(ctx, collections.Join(w.Account, w.Seq), w); err != nil {
 			return err
@@ -82,6 +90,12 @@ func (k Keeper) ExportGenesis(ctx sdk.Context) (*types.GenesisState, error) {
 		gs.Withdrawals = append(gs.Withdrawals, w)
 		return false, nil
 	}); err != nil {
+		return nil, err
+	}
+	if gs.Beacons, err = k.AllBeacons(ctx); err != nil {
+		return nil, err
+	}
+	if gs.NextBeaconId, err = k.BeaconSeq.Peek(ctx); err != nil {
 		return nil, err
 	}
 	return gs, nil

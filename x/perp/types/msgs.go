@@ -91,6 +91,9 @@ func (m MsgCancelTriggerOrder) ValidateBasic() error { return validAddr("sender"
 func (m MsgSetAutoTopUp) ValidateBasic() error { return validAddr("sender", m.Sender) }
 
 // ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgSetFeeInLuna) ValidateBasic() error { return validAddr("sender", m.Sender) }
+
+// ValidateBasic implements sdk.HasValidateBasic.
 func (m MsgFundInsurance) ValidateBasic() error {
 	if err := validAddr("sender", m.Sender); err != nil {
 		return err

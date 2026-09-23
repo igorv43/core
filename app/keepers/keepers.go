@@ -631,6 +631,10 @@ func NewAppKeepers(
 		appKeepers.DistrKeeper,
 	)
 	appKeepers.WarpLedgerKeeper.SetIsmBondKeeper(appKeepers.IsmBondKeeper)
+	// beacons of x/remote read the liquid staking rate, the warp ledger and the
+	// perp positions, and record outbound roots for x/ismbond
+	appKeepers.RemoteKeeper.SetBeaconSources(appKeepers.LiquidStakeKeeper, appKeepers.WarpLedgerKeeper, appKeepers.IsmBondKeeper,
+		authtypes.NewModuleAddress(warptypes.ModuleName))
 
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := appKeepers.newIBCRouter()
