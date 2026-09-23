@@ -150,8 +150,10 @@ func (k Keeper) MarketView(ctx sdk.Context, params types.Params, m types.Market)
 	}
 	_, disp, stale := k.oracleState(ctx, params, m.OracleAsset)
 	lev := leverageInForce(m)
-	return types.MarketView{Market: m, InsuranceInventory: inv, Dispersion: disp, StalePeriods: stale,
-		InitialMargin: types.InitialMargin(lev), MaintenanceMargin: types.MaintenanceMargin(lev)}, nil
+	return types.MarketView{
+		Market: m, InsuranceInventory: inv, Dispersion: disp, StalePeriods: stale,
+		InitialMargin: types.InitialMargin(lev), MaintenanceMargin: types.MaintenanceMargin(lev),
+	}, nil
 }
 
 // assertStRule3 enforces spec §21.5 rule 3: stLUNC never collateralises a

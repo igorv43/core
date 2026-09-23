@@ -296,7 +296,7 @@ func TestFrontendFeeRequiresApproval(t *testing.T) {
 	pref := math.LegacyNewDecWithPrec(1, 4)
 
 	// without approval the attribution is dropped
-	id, batch, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
+	id, _, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
 		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY, AmountIn: sdk.NewCoin("uusd", math.NewInt(1_000_000)),
 		LimitPrice: pref, MinOut: math.ZeroInt(), ExpiryHeight: f.ctx.BlockHeight() + 100, Frontend: frontend.String(),
 	})
@@ -310,7 +310,7 @@ func TestFrontendFeeRequiresApproval(t *testing.T) {
 	// with approval the builder fee (5 bps) is paid on top of the protocol fee
 	require.NoError(t, f.k.ApproveFrontend(f.ctx, f.user.String(), frontend.String(), 5))
 	userLunaBefore := f.balance(f.user, "uluna")
-	_, batch, err = f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
+	_, batch, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
 		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY, AmountIn: sdk.NewCoin("uusd", math.NewInt(1_000_000)),
 		LimitPrice: pref, MinOut: math.ZeroInt(), ExpiryHeight: f.ctx.BlockHeight() + 100, Frontend: frontend.String(),
 	})

@@ -97,8 +97,10 @@ func newSubmitCmd() *cobra.Command {
 			expiry, _ := cmd.Flags().GetInt64(flagExpiry)
 			reduceOnly, _ := cmd.Flags().GetBool(flagReduceOnly)
 			frontend, _ := cmd.Flags().GetString(flagFrontend)
-			msg := &types.MsgSubmitPerpIntent{Sender: clientCtx.GetFromAddress().String(), MarketId: args[0], Side: side, Qty: qty,
-				LimitPrice: price, ExpiryHeight: expiry, ReduceOnly: reduceOnly, Frontend: frontend}
+			msg := &types.MsgSubmitPerpIntent{
+				Sender: clientCtx.GetFromAddress().String(), MarketId: args[0], Side: side, Qty: qty,
+				LimitPrice: price, ExpiryHeight: expiry, ReduceOnly: reduceOnly, Frontend: frontend,
+			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
@@ -149,8 +151,10 @@ func newTriggerCmd() *cobra.Command {
 				}
 				slippage = v
 			}
-			msg := &types.MsgSubmitTriggerOrder{Sender: clientCtx.GetFromAddress().String(), MarketId: args[0], TriggerPrice: price,
-				FireAbove: above, Qty: qty, Slippage: slippage}
+			msg := &types.MsgSubmitTriggerOrder{
+				Sender: clientCtx.GetFromAddress().String(), MarketId: args[0], TriggerPrice: price,
+				FireAbove: above, Qty: qty, Slippage: slippage,
+			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}

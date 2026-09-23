@@ -183,8 +183,10 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 		return err
 	}
 	closed := pos.Qty.IsNil() || pos.Qty.IsZero()
-	ev := &types.EventPositionChanged{Account: account, MarketId: market.Id, Side: pos.Side.String(), Qty: "0",
-		EntryPrice: "0", Collateral: "0", RealizedPnl: "0", Fee: fee.String(), Closed: closed}
+	ev := &types.EventPositionChanged{
+		Account: account, MarketId: market.Id, Side: pos.Side.String(), Qty: "0",
+		EntryPrice: "0", Collateral: "0", RealizedPnl: "0", Fee: fee.String(), Closed: closed,
+	}
 	if !closed {
 		ev.Qty, ev.EntryPrice, ev.Collateral, ev.RealizedPnl = pos.Qty.String(), pos.EntryPrice.String(), pos.Collateral.String(), pos.RealizedPnl.String()
 	}

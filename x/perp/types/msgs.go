@@ -129,8 +129,10 @@ func (m MsgUpdateMarket) ValidateBasic() error {
 	if m.MarketId == "" {
 		return errorsmod.Wrap(ErrInvalidMarket, "market_id is required")
 	}
-	probe := Market{Id: m.MarketId, OracleAsset: "probe", MaxLeverage: m.MaxLeverage, OiCap: m.OiCap, Alpha: m.Alpha, Stress: m.Stress,
-		ListingMinBlocks: m.ListingMinBlocks, MinQty: math.OneInt(), TickSize: math.LegacyOneDec()}
+	probe := Market{
+		Id: m.MarketId, OracleAsset: "probe", MaxLeverage: m.MaxLeverage, OiCap: m.OiCap, Alpha: m.Alpha, Stress: m.Stress,
+		ListingMinBlocks: m.ListingMinBlocks, MinQty: math.OneInt(), TickSize: math.LegacyOneDec(),
+	}
 	return probe.Validate()
 }
 

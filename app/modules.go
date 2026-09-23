@@ -259,6 +259,12 @@ func simulationModules(
 		customwasm.NewAppModule(appCodec, &app.WasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.MsgServiceRouter(), app.GetSubspace(wasmtypes.ModuleName), app.GetKey(wasmtypes.StoreKey)),
 		dyncomm.NewAppModule(appCodec, app.DyncommKeeper, app.StakingKeeper),
 		taxmodule.NewAppModule(appCodec, app.TaxKeeper),
+		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
+		liquidstake.NewAppModule(appCodec, app.LiquidStakeKeeper),
+		batch.NewAppModule(appCodec, app.BatchKeeper),
+		perp.NewAppModule(appCodec, app.PerpKeeper),
+		remote.NewAppModule(appCodec, app.RemoteKeeper),
+		ismbond.NewAppModule(appCodec, app.IsmBondKeeper),
 	}
 }
 

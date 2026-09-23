@@ -1,10 +1,11 @@
 package keeper
 
 import (
+	"errors"
+
 	"cosmossdk.io/collections"
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/math"
-	"errors"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	"github.com/classic-terra/core/v4/x/warpledger/types"

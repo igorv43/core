@@ -177,8 +177,10 @@ func (k Keeper) liquidate(ctx sdk.Context, params types.Params, m *types.Market,
 		if err := k.autoDeleverage(ctx, m, p, val); err != nil {
 			return err
 		}
-		return ctx.EventManager().EmitTypedEvent(&types.EventPositionLiquidated{Account: p.Account, MarketId: m.Id, Side: p.Side.String(),
-			Qty: p.Qty.String(), MarkPrice: m.MarkPrice.String(), Penalty: "0", Shortfall: shortfall.String(), ToAdl: true})
+		return ctx.EventManager().EmitTypedEvent(&types.EventPositionLiquidated{
+			Account: p.Account, MarketId: m.Id, Side: p.Side.String(),
+			Qty: p.Qty.String(), MarkPrice: m.MarkPrice.String(), Penalty: "0", Shortfall: shortfall.String(), ToAdl: true,
+		})
 	}
 
 	// 1–2: the position's margin pays its loss and the penalty
@@ -206,8 +208,10 @@ func (k Keeper) liquidate(ctx sdk.Context, params types.Params, m *types.Market,
 	if err := k.fundTakePosition(ctx, m, p.Side, p.Qty, remaining); err != nil {
 		return err
 	}
-	return ctx.EventManager().EmitTypedEvent(&types.EventPositionLiquidated{Account: p.Account, MarketId: m.Id, Side: p.Side.String(),
-		Qty: p.Qty.String(), MarkPrice: m.MarkPrice.String(), Penalty: penalty.String(), Shortfall: shortfall.String()})
+	return ctx.EventManager().EmitTypedEvent(&types.EventPositionLiquidated{
+		Account: p.Account, MarketId: m.Id, Side: p.Side.String(),
+		Qty: p.Qty.String(), MarkPrice: m.MarkPrice.String(), Penalty: penalty.String(), Shortfall: shortfall.String(),
+	})
 }
 
 // fundTakePosition adds qty on side at the mark to the fund's inventory:
@@ -243,9 +247,11 @@ func (k Keeper) fundTakePosition(ctx sdk.Context, m *types.Market, side batchtyp
 		collateral = collateral.Sub(share)
 	}
 	if !exists {
-		pos = types.Position{Account: fund, MarketId: m.Id, Side: side, Qty: math.ZeroInt(), EntryPrice: m.MarkPrice,
+		pos = types.Position{
+			Account: fund, MarketId: m.Id, Side: side, Qty: math.ZeroInt(), EntryPrice: m.MarkPrice,
 			Collateral: math.ZeroInt(), FundingIndexAtOpen: m.FundingIndex, RealizedPnl: math.ZeroInt(),
-			MaintenanceMargin: types.MaintenanceMargin(m.MaxLeverage)}
+			MaintenanceMargin: types.MaintenanceMargin(m.MaxLeverage),
+		}
 	} else {
 		owed := pos.FundingOwed(m.FundingIndex)
 		pos.Collateral = pos.Collateral.Sub(owed)

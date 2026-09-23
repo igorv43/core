@@ -126,8 +126,10 @@ func (k Keeper) SetBeacon(ctx sdk.Context, msg *types.MsgSetBeacon) (uint64, err
 	if _, err := k.GetApp(ctx, msg.AppId); err != nil {
 		return 0, err
 	}
-	b := types.Beacon{Id: msg.Id, AppId: msg.AppId, Domain: msg.Domain, Recipient: msg.Recipient, Kind: msg.Kind,
-		IntervalBlocks: msg.IntervalBlocks, TokenId: msg.TokenId, Account: msg.Account}
+	b := types.Beacon{
+		Id: msg.Id, AppId: msg.AppId, Domain: msg.Domain, Recipient: msg.Recipient, Kind: msg.Kind,
+		IntervalBlocks: msg.IntervalBlocks, TokenId: msg.TokenId, Account: msg.Account,
+	}
 	if _, err := k.BeaconBody(ctx, b); err != nil {
 		return 0, errorsmod.Wrap(types.ErrInvalidParams, err.Error())
 	}

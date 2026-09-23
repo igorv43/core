@@ -56,8 +56,10 @@ func (k Keeper) SubmitTrigger(ctx sdk.Context, msg *types.MsgSubmitTriggerOrder)
 	if err != nil {
 		return 0, err
 	}
-	t := types.TriggerOrder{Id: id, Account: msg.Sender, MarketId: m.Id, Side: side, TriggerPrice: msg.TriggerPrice,
-		FireAbove: msg.FireAbove, Qty: msg.Qty, Slippage: slippage, CreatedHeight: ctx.BlockHeight()}
+	t := types.TriggerOrder{
+		Id: id, Account: msg.Sender, MarketId: m.Id, Side: side, TriggerPrice: msg.TriggerPrice,
+		FireAbove: msg.FireAbove, Qty: msg.Qty, Slippage: slippage, CreatedHeight: ctx.BlockHeight(),
+	}
 	return id, k.setTrigger(ctx, t)
 }
 

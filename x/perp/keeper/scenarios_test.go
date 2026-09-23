@@ -17,8 +17,10 @@ import (
 func TestScenarioOracleStoppedSuspendsLiquidationsAndTriggers(t *testing.T) {
 	f := setup(t)
 	f.trade(t, 1_000, math.LegacyNewDec(60_000))
-	_, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{Sender: f.long.String(), MarketId: marketID,
-		TriggerPrice: math.LegacyNewDec(50_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2)})
+	_, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{
+		Sender: f.long.String(), MarketId: marketID,
+		TriggerPrice: math.LegacyNewDec(50_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2),
+	})
 	require.NoError(t, err)
 	// the price collapses in the last sample, then the oracle stops for two periods
 	f.at(f.ctx.BlockHeight() + 1)
@@ -119,8 +121,10 @@ func TestScenarioTriggerStormIsBounded(t *testing.T) {
 	f.submit(t, f.short, batchtypes.SIDE_SELL, 5_000, math.LegacyNewDec(60_000), false)
 	f.endBlocks(t, batch+f.bp.CommitWindow+1)
 	for _, a := range accounts {
-		_, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{Sender: a.String(), MarketId: marketID,
-			TriggerPrice: math.LegacyNewDec(58_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2)})
+		_, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{
+			Sender: a.String(), MarketId: marketID,
+			TriggerPrice: math.LegacyNewDec(58_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2),
+		})
 		require.NoError(t, err)
 	}
 	f.at(f.ctx.BlockHeight() + 1)

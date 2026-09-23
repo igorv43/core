@@ -71,8 +71,10 @@ func (k Keeper) runAllocation(ctx sdk.Context, params types.Params) error {
 		return nil
 	}
 	revenue := l.Revenue
-	rec := types.AllocationRecord{Epoch: l.Epoch, Height: ctx.BlockHeight(), Revenue: revenue, ToInsurance: math.ZeroInt(),
-		ToOpex: math.ZeroInt(), ToOraclePool: math.ZeroInt(), ToCommunityPool: math.ZeroInt(), ToBurnBudget: math.ZeroInt(), BurnedUluna: l.BurnedEpoch}
+	rec := types.AllocationRecord{
+		Epoch: l.Epoch, Height: ctx.BlockHeight(), Revenue: revenue, ToInsurance: math.ZeroInt(),
+		ToOpex: math.ZeroInt(), ToOraclePool: math.ZeroInt(), ToCommunityPool: math.ZeroInt(), ToBurnBudget: math.ZeroInt(), BurnedUluna: l.BurnedEpoch,
+	}
 	remaining := revenue
 	denom := params.SettlementDenom
 
@@ -130,8 +132,10 @@ func (k Keeper) runAllocation(ctx sdk.Context, params types.Params) error {
 	if err := k.pruneAllocations(ctx); err != nil {
 		return err
 	}
-	return ctx.EventManager().EmitTypedEvent(&types.EventAllocationExecuted{Epoch: rec.Epoch, Revenue: revenue.String(), ToInsurance: rec.ToInsurance.String(),
-		ToOpex: rec.ToOpex.String(), ToOraclePool: rec.ToOraclePool.String(), ToCommunityPool: rec.ToCommunityPool.String(), ToBurnBudget: rec.ToBurnBudget.String()})
+	return ctx.EventManager().EmitTypedEvent(&types.EventAllocationExecuted{
+		Epoch: rec.Epoch, Revenue: revenue.String(), ToInsurance: rec.ToInsurance.String(),
+		ToOpex: rec.ToOpex.String(), ToOraclePool: rec.ToOraclePool.String(), ToCommunityPool: rec.ToCommunityPool.String(), ToBurnBudget: rec.ToBurnBudget.String(),
+	})
 }
 
 func (k Keeper) pruneAllocations(ctx sdk.Context) error {

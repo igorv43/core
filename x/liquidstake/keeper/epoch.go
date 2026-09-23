@@ -359,7 +359,7 @@ func (k Keeper) redelegateOut(ctx sdk.Context, d delegation, eligible []eligible
 		if !amounts[i].IsPositive() {
 			continue
 		}
-		shares, err := k.stakingKeeper.ValidateUnbondAmount(ctx, k.ModuleAddress(), sdk.ValAddress(mustValAddr(d.Delegation.ValidatorAddress)), amounts[i])
+		shares, err := k.stakingKeeper.ValidateUnbondAmount(ctx, k.ModuleAddress(), mustValAddr(d.Delegation.ValidatorAddress), amounts[i])
 		if err != nil {
 			return moved, err
 		}
@@ -408,7 +408,7 @@ func (k Keeper) undelegateBatch(ctx sdk.Context, epoch uint64) (math.Int, error)
 
 	undelegated := math.ZeroInt()
 	remaining := total
-	var completion = ctx.BlockTime()
+	completion := ctx.BlockTime()
 	for i, d := range dels {
 		if !remaining.IsPositive() {
 			break

@@ -203,14 +203,10 @@ func (k Keeper) reducePositionValued(ctx sdk.Context, market *types.Market, p *t
 	return realized, shortfall, nil
 }
 
-// increasePosition opens or adds qty at price, moving IM·notional from free
-// collateral into the position. Pending funding of the existing size is
-// settled into the collateral first so the funding index can be reset.
-func (k Keeper) increasePosition(ctx sdk.Context, params types.Params, market *types.Market, account string, side batchtypes.Side, qty math.Int, price math.LegacyDec, p *types.Position, exists bool) error {
-	return k.increasePositionValued(ctx, params, market, account, side, qty, price, p, exists, k.stValuation(ctx, params))
-}
-
-// increasePositionValued funds the initial margin from settlement first and,
+// increasePositionValued opens or adds qty at price, moving IM·notional from
+// free collateral into the position; pending funding of the existing size is
+// settled into the collateral first so the funding index can be reset. It
+// funds the initial margin from settlement first and,
 // for markets that allow it, from stLUNC up to st_share_cap of the margin
 // allocated (spec §21.5 rule 5), moving units into the position.
 func (k Keeper) increasePositionValued(ctx sdk.Context, params types.Params, market *types.Market, account string, side batchtypes.Side, qty math.Int, price math.LegacyDec, p *types.Position, exists bool, val StValuation) error {
@@ -224,8 +220,10 @@ func (k Keeper) increasePositionValued(ctx sdk.Context, params types.Params, mar
 		if n >= params.MaxOpenPositionsPerAccount {
 			return errorsmod.Wrapf(types.ErrTooManyPositions, "max %d", params.MaxOpenPositionsPerAccount)
 		}
-		*p = types.Position{Account: account, MarketId: market.Id, Side: side, Qty: math.ZeroInt(), EntryPrice: price,
-			Collateral: math.ZeroInt(), CollateralSt: math.ZeroInt(), FundingIndexAtOpen: market.FundingIndex, RealizedPnl: math.ZeroInt()}
+		*p = types.Position{
+			Account: account, MarketId: market.Id, Side: side, Qty: math.ZeroInt(), EntryPrice: price,
+			Collateral: math.ZeroInt(), CollateralSt: math.ZeroInt(), FundingIndexAtOpen: market.FundingIndex, RealizedPnl: math.ZeroInt(),
+		}
 	} else {
 		if p.CollateralSt.IsNil() {
 			p.CollateralSt = math.ZeroInt()

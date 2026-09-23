@@ -66,7 +66,8 @@ func setup(t *testing.T) *fixture {
 	noop, err := pdSrv.CreateNoopHook(ctx, &pdtypes.MsgCreateNoopHook{Owner: f.owner.String()})
 	require.NoError(t, err)
 	mb, err := corekeeper.NewMsgServerImpl(app.HyperlaneKeeper).CreateMailbox(ctx, &coretypes.MsgCreateMailbox{
-		Owner: f.owner.String(), LocalDomain: localDomain, DefaultIsm: ism.Id, DefaultHook: &noop.Id, RequiredHook: &noop.Id})
+		Owner: f.owner.String(), LocalDomain: localDomain, DefaultIsm: ism.Id, DefaultHook: &noop.Id, RequiredHook: &noop.Id,
+	})
 	require.NoError(t, err)
 	f.mailbox = mb.Id
 	appId, err := f.k.CreateApp(ctx, f.owner.String(), f.mailbox, nil)
@@ -81,8 +82,10 @@ func setup(t *testing.T) *fixture {
 	tok, err := warpSrv.CreateCollateralToken(ctx, &warptypes.MsgCreateCollateralToken{Owner: f.owner.String(), OriginMailbox: f.mailbox, OriginDenom: "uluna"})
 	require.NoError(t, err)
 	f.token = tok.Id
-	_, err = warpSrv.EnrollRemoteRouter(ctx, &warptypes.MsgEnrollRemoteRouter{Owner: f.owner.String(), TokenId: tok.Id,
-		RemoteRouter: &warptypes.RemoteRouter{ReceiverDomain: originDom, ReceiverContract: util.CreateMockHexAddress("router", 1), Gas: math.ZeroInt()}})
+	_, err = warpSrv.EnrollRemoteRouter(ctx, &warptypes.MsgEnrollRemoteRouter{
+		Owner: f.owner.String(), TokenId: tok.Id,
+		RemoteRouter: &warptypes.RemoteRouter{ReceiverDomain: originDom, ReceiverContract: util.CreateMockHexAddress("router", 1), Gas: math.ZeroInt()},
+	})
 	require.NoError(t, err)
 	require.NoError(t, app.WarpLedgerKeeper.SetDomainCap(ctx, tok.Id, originDom, math.NewInt(1_000_000_000_000)))
 	return f
@@ -103,8 +106,10 @@ func (f *fixture) payload(t *testing.T, onBehalfOf []byte, msgs ...sdk.Msg) []by
 
 func (f *fixture) deliver(t *testing.T, sender util.HexAddress, body []byte) {
 	t.Helper()
-	require.NoError(t, f.k.Handle(f.ctx, f.mailbox, util.HyperlaneMessage{Version: 3, Nonce: 1, Origin: originDom, Sender: sender,
-		Destination: localDomain, Recipient: f.appId, Body: body}))
+	require.NoError(t, f.k.Handle(f.ctx, f.mailbox, util.HyperlaneMessage{
+		Version: 3, Nonce: 1, Origin: originDom, Sender: sender,
+		Destination: localDomain, Recipient: f.appId, Body: body,
+	}))
 }
 
 func (f *fixture) rejected(t *testing.T) string {

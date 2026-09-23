@@ -27,10 +27,12 @@ func DefaultGenesisState() *GenesisState {
 
 // DefaultLedger returns an empty ledger.
 func DefaultLedger() Ledger {
-	return Ledger{Insurance: math.ZeroInt(), Revenue: math.ZeroInt(), BurnBudget: math.ZeroInt(),
+	return Ledger{
+		Insurance: math.ZeroInt(), Revenue: math.ZeroInt(), BurnBudget: math.ZeroInt(),
 		BurnSpentEpoch: math.ZeroInt(), BurnedEpoch: math.ZeroInt(), Epoch: 0, EpochStartHeight: 0,
 		TrancheSt: math.ZeroInt(), TrancheUnbondingSt: math.ZeroInt(), TrancheUluna: math.ZeroInt(),
-		TrancheSoldEpoch: math.ZeroInt(), TrancheAdvanced: math.ZeroInt()}
+		TrancheSoldEpoch: math.ZeroInt(), TrancheAdvanced: math.ZeroInt(),
+	}
 }
 
 // Validate performs basic genesis validation.

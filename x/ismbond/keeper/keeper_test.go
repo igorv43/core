@@ -198,12 +198,16 @@ func TestRootHistoryAndInvalidOutbound(t *testing.T) {
 	warpSrv := warpkeeper.NewMsgServerImpl(f.app.WarpKeeper)
 	tok, err := warpSrv.CreateCollateralToken(f.ctx, &warptypes.MsgCreateCollateralToken{Owner: f.owner.String(), OriginMailbox: f.mailbox, OriginDenom: "uluna"})
 	require.NoError(t, err)
-	_, err = warpSrv.EnrollRemoteRouter(f.ctx, &warptypes.MsgEnrollRemoteRouter{Owner: f.owner.String(), TokenId: tok.Id,
-		RemoteRouter: &warptypes.RemoteRouter{ReceiverDomain: remoteDom, ReceiverContract: util.CreateMockHexAddress("router", 1), Gas: math.ZeroInt()}})
+	_, err = warpSrv.EnrollRemoteRouter(f.ctx, &warptypes.MsgEnrollRemoteRouter{
+		Owner: f.owner.String(), TokenId: tok.Id,
+		RemoteRouter: &warptypes.RemoteRouter{ReceiverDomain: remoteDom, ReceiverContract: util.CreateMockHexAddress("router", 1), Gas: math.ZeroInt()},
+	})
 	require.NoError(t, err)
 	require.NoError(t, f.app.WarpLedgerKeeper.SetDomainCap(f.ctx, tok.Id, remoteDom, math.NewInt(1_000_000_000)))
-	transfer := &warptypes.MsgRemoteTransfer{Sender: f.owner.String(), TokenId: tok.Id, DestinationDomain: remoteDom,
-		Recipient: util.CreateMockHexAddress("user", 1), Amount: math.NewInt(1_000_000), GasLimit: math.ZeroInt(), MaxFee: sdk.NewCoin("uluna", math.ZeroInt())}
+	transfer := &warptypes.MsgRemoteTransfer{
+		Sender: f.owner.String(), TokenId: tok.Id, DestinationDomain: remoteDom,
+		Recipient: util.CreateMockHexAddress("user", 1), Amount: math.NewInt(1_000_000), GasLimit: math.ZeroInt(), MaxFee: sdk.NewCoin("uluna", math.ZeroInt()),
+	}
 	handler := f.app.MsgServiceRouter().Handler(transfer)
 	require.NotNil(t, handler)
 	_, err = handler(f.ctx, transfer)

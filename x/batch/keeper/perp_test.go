@@ -122,8 +122,10 @@ func TestPerpIntentReservesAndReleases(t *testing.T) {
 
 	// reservation refused → no intent
 	hook.rejectAll = true
-	_, _, err = f.k.SubmitPerpIntent(f.ctx, keeper.PerpOrder{Sender: f.user.String(), MarketID: perpMarketID, Side: types.SIDE_BUY,
-		Qty: math.NewInt(10_000), LimitPrice: pref, ExpiryHeight: f.ctx.BlockHeight() + 10, ChargeFee: true})
+	_, _, err = f.k.SubmitPerpIntent(f.ctx, keeper.PerpOrder{
+		Sender: f.user.String(), MarketID: perpMarketID, Side: types.SIDE_BUY,
+		Qty: math.NewInt(10_000), LimitPrice: pref, ExpiryHeight: f.ctx.BlockHeight() + 10, ChargeFee: true,
+	})
 	require.Error(t, err)
 }
 

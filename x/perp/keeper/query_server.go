@@ -149,8 +149,10 @@ func (qs queryServer) Collateral(goCtx context.Context, req *types.QueryCollater
 	if err != nil {
 		return nil, err
 	}
-	return &types.QueryCollateralResponse{Free: free, Reserved: reserved, InPositions: inPositions, AutoTopUp: auto,
-		FreeSt: freeSt, StValue: val.Value(freeSt), HaircutEff: val.Haircut, InPositionsSt: inPositionsSt, FeeInLuna: feeInLuna}, nil
+	return &types.QueryCollateralResponse{
+		Free: free, Reserved: reserved, InPositions: inPositions, AutoTopUp: auto,
+		FreeSt: freeSt, StValue: val.Value(freeSt), HaircutEff: val.Haircut, InPositionsSt: inPositionsSt, FeeInLuna: feeInLuna,
+	}, nil
 }
 
 func (qs queryServer) Triggers(goCtx context.Context, req *types.QueryTriggersRequest) (*types.QueryTriggersResponse, error) {

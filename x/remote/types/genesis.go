@@ -4,8 +4,10 @@ import "fmt"
 
 // DefaultGenesisState returns the default genesis state: no app.
 func DefaultGenesisState() *GenesisState {
-	return &GenesisState{Params: DefaultParams(), Apps: []RemoteApp{}, Gateways: []Gateway{}, Accounts: []RemoteAccount{},
-		Sessions: []Session{}, Withdrawals: []Withdrawal{}, Beacons: []Beacon{}}
+	return &GenesisState{
+		Params: DefaultParams(), Apps: []RemoteApp{}, Gateways: []Gateway{}, Accounts: []RemoteAccount{},
+		Sessions: []Session{}, Withdrawals: []Withdrawal{}, Beacons: []Beacon{},
+	}
 }
 
 // Validate performs basic genesis validation.

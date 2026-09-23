@@ -58,8 +58,10 @@ func (k Keeper) ExportGenesis(ctx sdk.Context) (*types.GenesisState, error) {
 	if err != nil {
 		return nil, err
 	}
-	gs := &types.GenesisState{Params: params, Markets: []types.Market{}, Intents: []types.Intent{}, Solvers: []types.Solver{},
-		SolverEscrows: []types.SolverEscrowEntry{}, Frontends: []types.Frontend{}, FrontendApprovals: []types.FrontendApproval{}}
+	gs := &types.GenesisState{
+		Params: params, Markets: []types.Market{}, Intents: []types.Intent{}, Solvers: []types.Solver{},
+		SolverEscrows: []types.SolverEscrowEntry{}, Frontends: []types.Frontend{}, FrontendApprovals: []types.FrontendApproval{},
+	}
 	if err := k.Markets.Walk(ctx, nil, func(_ string, m types.Market) (bool, error) { gs.Markets = append(gs.Markets, m); return false, nil }); err != nil {
 		return nil, err
 	}

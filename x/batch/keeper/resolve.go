@@ -39,8 +39,10 @@ func (k Keeper) resolveMarket(ctx sdk.Context, params types.Params, market types
 	if market.Type == types.MARKET_TYPE_PERP {
 		return k.resolvePerpMarket(ctx, params, market, batch)
 	}
-	result := types.BatchResult{BatchId: batch, MarketId: market.Id, Height: ctx.BlockHeight(),
-		ClearingPrice: math.LegacyZeroDec(), Volume: math.ZeroInt(), ReferencePrice: math.LegacyZeroDec()}
+	result := types.BatchResult{
+		BatchId: batch, MarketId: market.Id, Height: ctx.BlockHeight(),
+		ClearingPrice: math.LegacyZeroDec(), Volume: math.ZeroInt(), ReferencePrice: math.LegacyZeroDec(),
+	}
 
 	pref, err := k.ReferencePrice(ctx, market)
 	if err != nil {
@@ -67,8 +69,10 @@ func (k Keeper) resolveMarket(ctx sdk.Context, params types.Params, market types
 		if in.CreatedHeight > int64(batch) || in.ExpiryHeight <= ctx.BlockHeight() {
 			continue
 		}
-		o := auction.Order{Key: "i:" + strconv.FormatUint(in.Id, 10), Kind: auction.KindIntent, Side: in.Side, Limit: in.LimitPrice,
-			MinOut: in.MinOut, AmountIn: in.AmountIn.Amount}
+		o := auction.Order{
+			Key: "i:" + strconv.FormatUint(in.Id, 10), Kind: auction.KindIntent, Side: in.Side, Limit: in.LimitPrice,
+			MinOut: in.MinOut, AmountIn: in.AmountIn.Amount,
+		}
 		if in.Side == types.SIDE_BUY {
 			o.Quote = in.Remaining
 		} else {

@@ -123,8 +123,10 @@ func (k Keeper) updateMark(ctx sdk.Context, params types.Params, m *types.Market
 		m.MarkPrice = pref.Mul(math.LegacyOneDec().Add(prem))
 	}
 	if prev != m.State {
-		return ctx.EventManager().EmitTypedEvent(&types.EventMarketStateChanged{MarketId: m.Id, From: prev.String(), To: m.State.String(),
-			EffectiveLeverage: m.EffectiveLeverage.String(), EffectiveOiCap: m.EffectiveOiCap.String()})
+		return ctx.EventManager().EmitTypedEvent(&types.EventMarketStateChanged{
+			MarketId: m.Id, From: prev.String(), To: m.State.String(),
+			EffectiveLeverage: m.EffectiveLeverage.String(), EffectiveOiCap: m.EffectiveOiCap.String(),
+		})
 	}
 	return nil
 }

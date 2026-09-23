@@ -38,8 +38,10 @@ func TestBenchmarkSaturatedBatch(t *testing.T) {
 		}
 		limit := pref.Mul(math.LegacyOneDec().Add(math.LegacyNewDecWithPrec(int64(i%20)-10, 4))) // ±0.1%
 		limit = limit.Quo(math.LegacyNewDecWithPrec(1, 6)).TruncateDec().Mul(math.LegacyNewDecWithPrec(1, 6))
-		_, _, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{Sender: acc.String(), MarketId: marketID, Side: side, AmountIn: amount,
-			LimitPrice: limit, MinOut: math.ZeroInt(), ExpiryHeight: f.ctx.BlockHeight() + 100})
+		_, _, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
+			Sender: acc.String(), MarketId: marketID, Side: side, AmountIn: amount,
+			LimitPrice: limit, MinOut: math.ZeroInt(), ExpiryHeight: f.ctx.BlockHeight() + 100,
+		})
 		require.NoError(t, err)
 	}
 	// solvers: each commits and reveals max levels

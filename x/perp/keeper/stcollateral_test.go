@@ -149,8 +149,10 @@ func TestStMarginAllocationWithinShareCap(t *testing.T) {
 	require.NoError(t, f.k.Deposit(f.ctx, poor, sdk.NewCoin("stluna", math.NewInt(1_000_000_000_000))))
 	require.NoError(t, f.k.Deposit(f.ctx, poor, sdk.NewCoin("uusd", math.NewInt(5_000_000))))
 	// the reservation already applies rule 5: 5 settlement + at most 5 of stLUNC capacity < 20 needed
-	_, _, err = f.bk.SubmitPerpIntent(f.ctx, batchkeeper.PerpOrder{Sender: poor.String(), MarketID: marketID, Side: batchtypes.SIDE_BUY,
-		Qty: math.NewInt(1_000), LimitPrice: math.LegacyNewDec(60_000), ExpiryHeight: f.ctx.BlockHeight() + 100})
+	_, _, err = f.bk.SubmitPerpIntent(f.ctx, batchkeeper.PerpOrder{
+		Sender: poor.String(), MarketID: marketID, Side: batchtypes.SIDE_BUY,
+		Qty: math.NewInt(1_000), LimitPrice: math.LegacyNewDec(60_000), ExpiryHeight: f.ctx.BlockHeight() + 100,
+	})
 	require.ErrorIs(t, err, types.ErrInsufficientFree)
 }
 
@@ -185,8 +187,10 @@ func TestStLiquidationSeizesToTrancheAndConverts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, batchtypes.SIDE_SELL, sale.Side)
 	batch := f.ctx.BlockHeight()
-	_, _, err = f.bk.SubmitIntent(f.ctx, &batchtypes.MsgSubmitIntent{Sender: f.short.String(), MarketId: "uluna/uusd", Side: batchtypes.SIDE_BUY,
-		AmountIn: sdk.NewCoin("uusd", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50})
+	_, _, err = f.bk.SubmitIntent(f.ctx, &batchtypes.MsgSubmitIntent{
+		Sender: f.short.String(), MarketId: "uluna/uusd", Side: batchtypes.SIDE_BUY,
+		AmountIn: sdk.NewCoin("uusd", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50,
+	})
 	require.NoError(t, err)
 	f.endBlocks(t, batch+f.bp.CommitWindow+1)
 	f.endBlocks(t, f.ctx.BlockHeight()+1) // the closed sale is settled at the next step

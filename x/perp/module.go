@@ -8,12 +8,14 @@ import (
 	"cosmossdk.io/core/appmodule"
 	"github.com/classic-terra/core/v4/x/perp/client/cli"
 	"github.com/classic-terra/core/v4/x/perp/keeper"
+	"github.com/classic-terra/core/v4/x/perp/simulation"
 	"github.com/classic-terra/core/v4/x/perp/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/spf13/cobra"
 )
@@ -36,12 +38,15 @@ func (AppModuleBasic) Name() string { return types.ModuleName }
 func (AppModuleBasic) RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	types.RegisterLegacyAminoCodec(cdc)
 }
+
 func (AppModuleBasic) RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 	types.RegisterInterfaces(registry)
 }
+
 func (AppModuleBasic) DefaultGenesis(cdc codec.JSONCodec) json.RawMessage {
 	return cdc.MustMarshalJSON(types.DefaultGenesisState())
 }
+
 func (AppModuleBasic) ValidateGenesis(cdc codec.JSONCodec, _ client.TxEncodingConfig, bz json.RawMessage) error {
 	var gs types.GenesisState
 	if err := cdc.UnmarshalJSON(bz, &gs); err != nil {
@@ -49,6 +54,7 @@ func (AppModuleBasic) ValidateGenesis(cdc codec.JSONCodec, _ client.TxEncodingCo
 	}
 	return gs.Validate()
 }
+
 func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *runtime.ServeMux) {
 	if err := types.RegisterQueryHandlerClient(context.Background(), mux, types.NewQueryClient(clientCtx)); err != nil {
 		panic(err)
@@ -61,11 +67,12 @@ func (AppModuleBasic) GetTxCmd() *cobra.Command { return cli.NewTxCmd() }
 // AppModule implements the module with its keeper.
 type AppModule struct {
 	AppModuleBasic
+	cdc    codec.Codec
 	keeper keeper.Keeper
 }
 
 // NewAppModule creates a new AppModule.
-func NewAppModule(_ codec.Codec, k keeper.Keeper) AppModule { return AppModule{keeper: k} }
+func NewAppModule(cdc codec.Codec, k keeper.Keeper) AppModule { return AppModule{cdc: cdc, keeper: k} }
 
 func (AppModule) IsAppModule()             {}
 func (AppModule) IsOnePerModuleType()      {}
@@ -95,4 +102,28 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 // EndBlock runs the perpetuals engine after the batch settlement (spec §18–§22).
 func (am AppModule) EndBlock(ctx context.Context) error {
 	return am.keeper.EndBlocker(sdk.UnwrapSDKContext(ctx))
+}
+
+// AppModuleSimulation functions
+
+// GenerateGenesisState creates a randomized GenState of the module.
+func (AppModule) GenerateGenesisState(simState *module.SimulationState) {
+	simulation.RandomizedGenState(simState)
+}
+
+// ProposalMsgs returns the governance messages the simulation may submit.
+func (am AppModule) ProposalMsgs(_ module.SimulationState) []simtypes.WeightedProposalMsg {
+	return simulation.ProposalMsgs(am.keeper.GetAuthority())
+}
+
+// RegisterStoreDecoder registers a decoder for the module's store.
+func (am AppModule) RegisterStoreDecoder(sdr simtypes.StoreDecoderRegistry) {
+	sdr[types.StoreKey] = simulation.NewDecodeStore(am.cdc)
+}
+
+// WeightedOperations returns the module operations with their weights. The
+// application-level simulation is disabled upstream (app/sim_test.go.todo);
+// message operations are added when it is re-enabled.
+func (AppModule) WeightedOperations(_ module.SimulationState) []simtypes.WeightedOperation {
+	return []simtypes.WeightedOperation{}
 }

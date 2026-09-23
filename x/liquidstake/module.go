@@ -8,12 +8,14 @@ import (
 	"cosmossdk.io/core/appmodule"
 	"github.com/classic-terra/core/v4/x/liquidstake/client/cli"
 	"github.com/classic-terra/core/v4/x/liquidstake/keeper"
+	"github.com/classic-terra/core/v4/x/liquidstake/simulation"
 	"github.com/classic-terra/core/v4/x/liquidstake/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/spf13/cobra"
 )
@@ -73,14 +75,12 @@ func (AppModuleBasic) GetTxCmd() *cobra.Command { return cli.NewTxCmd() }
 // AppModule implements the module with its keeper.
 type AppModule struct {
 	AppModuleBasic
-
+	cdc    codec.Codec
 	keeper keeper.Keeper
 }
 
 // NewAppModule creates a new AppModule.
-func NewAppModule(_ codec.Codec, k keeper.Keeper) AppModule {
-	return AppModule{keeper: k}
-}
+func NewAppModule(cdc codec.Codec, k keeper.Keeper) AppModule { return AppModule{cdc: cdc, keeper: k} }
 
 // IsAppModule implements the appmodule.AppModule marker.
 func (AppModule) IsAppModule() {}
@@ -118,4 +118,28 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 // EndBlock processes the epoch at its boundary (spec §24.4).
 func (am AppModule) EndBlock(ctx context.Context) error {
 	return am.keeper.EndBlocker(sdk.UnwrapSDKContext(ctx))
+}
+
+// AppModuleSimulation functions
+
+// GenerateGenesisState creates a randomized GenState of the module.
+func (AppModule) GenerateGenesisState(simState *module.SimulationState) {
+	simulation.RandomizedGenState(simState)
+}
+
+// ProposalMsgs returns the governance messages the simulation may submit.
+func (am AppModule) ProposalMsgs(_ module.SimulationState) []simtypes.WeightedProposalMsg {
+	return simulation.ProposalMsgs(am.keeper.GetAuthority())
+}
+
+// RegisterStoreDecoder registers a decoder for the module's store.
+func (am AppModule) RegisterStoreDecoder(sdr simtypes.StoreDecoderRegistry) {
+	sdr[types.StoreKey] = simulation.NewDecodeStore(am.cdc)
+}
+
+// WeightedOperations returns the module operations with their weights. The
+// application-level simulation is disabled upstream (app/sim_test.go.todo);
+// message operations are added when it is re-enabled.
+func (AppModule) WeightedOperations(_ module.SimulationState) []simtypes.WeightedOperation {
+	return []simtypes.WeightedOperation{}
 }

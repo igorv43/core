@@ -86,8 +86,10 @@ func newSubmitIntentCmd() *cobra.Command {
 			}
 			expiry, _ := cmd.Flags().GetInt64(flagExpiry)
 			frontend, _ := cmd.Flags().GetString(flagFrontend)
-			msg := &types.MsgSubmitIntent{Sender: clientCtx.GetFromAddress().String(), MarketId: args[0], Side: side,
-				AmountIn: amount, LimitPrice: price, MinOut: minOut, ExpiryHeight: expiry, Frontend: frontend}
+			msg := &types.MsgSubmitIntent{
+				Sender: clientCtx.GetFromAddress().String(), MarketId: args[0], Side: side,
+				AmountIn: amount, LimitPrice: price, MinOut: minOut, ExpiryHeight: expiry, Frontend: frontend,
+			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}

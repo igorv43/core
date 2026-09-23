@@ -23,8 +23,10 @@ type perpLevel struct {
 // excluded and the batch is re-resolved, up to max_resolution_passes. The
 // margin reserved by revealed levels is always released at the end.
 func (k Keeper) resolvePerpMarket(ctx sdk.Context, params types.Params, market types.Market, batch uint64) error {
-	result := types.BatchResult{BatchId: batch, MarketId: market.Id, Height: ctx.BlockHeight(),
-		ClearingPrice: math.LegacyZeroDec(), Volume: math.ZeroInt(), ReferencePrice: math.LegacyZeroDec()}
+	result := types.BatchResult{
+		BatchId: batch, MarketId: market.Id, Height: ctx.BlockHeight(),
+		ClearingPrice: math.LegacyZeroDec(), Volume: math.ZeroInt(), ReferencePrice: math.LegacyZeroDec(),
+	}
 	commits, err := k.commitsOf(ctx, batch, market.Id)
 	if err != nil {
 		return err
@@ -166,8 +168,10 @@ func (k Keeper) settlePerp(ctx sdk.Context, params types.Params, market types.Ma
 				builderFee = math.LegacyNewDecFromInt(f.Qty).Mul(f.Price).MulInt64(int64(fe.FeeBps)).QuoInt64(10_000).TruncateInt()
 			}
 		}
-		if err := k.marginHook.Fill(ctx, types.PerpFill{Batch: batch, Account: addr, Market: market, Side: f.Side, Qty: f.Qty, Price: f.Price,
-			ReduceOnly: in.ReduceOnly, Frontend: in.Frontend, BuilderFee: builderFee}); err != nil {
+		if err := k.marginHook.Fill(ctx, types.PerpFill{
+			Batch: batch, Account: addr, Market: market, Side: f.Side, Qty: f.Qty, Price: f.Price,
+			ReduceOnly: in.ReduceOnly, Frontend: in.Frontend, BuilderFee: builderFee,
+		}); err != nil {
 			k.Logger(ctx).Info("perp fill excluded", "batch", batch, "market", market.Id, "key", f.Key, "err", err)
 			failed = append(failed, f.Key)
 			continue

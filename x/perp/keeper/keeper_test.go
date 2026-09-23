@@ -78,9 +78,11 @@ func (f *fixture) setPrice(t *testing.T, price, dispersion math.LegacyDec) {
 	ok.SetAssetTarget(f.ctx, oracletypes.Asset{Name: asset})
 	ok.SetAssetPrice(f.ctx, asset, price)
 	vp := ok.VotePeriod(f.ctx)
-	ok.SetRateSample(f.ctx, oracletypes.RateSample{Denom: asset, ExchangeRate: price, Dispersion: dispersion,
+	ok.SetRateSample(f.ctx, oracletypes.RateSample{
+		Denom: asset, ExchangeRate: price, Dispersion: dispersion,
 		VotePeriod: uint64(f.ctx.BlockHeight()) / vp, Height: f.ctx.BlockHeight(), Time: f.ctx.BlockTime(),
-		Depth: math.NewInt(1_000_000_000_000_000)})
+		Depth: math.NewInt(1_000_000_000_000_000),
+	})
 }
 
 // forceEnable enables the market on both keepers without the listing check.
@@ -208,16 +210,20 @@ func TestReduceOnlyClosesWithRealizedPnl(t *testing.T) {
 func TestReserveRejectsWithoutCollateralAndInReduceOnlyState(t *testing.T) {
 	f := setup(t)
 	poor := sdk.AccAddress([]byte("perp-poor------------"))
-	_, _, err := f.bk.SubmitPerpIntent(f.ctx, batchkeeper.PerpOrder{Sender: poor.String(), MarketID: marketID, Side: batchtypes.SIDE_BUY,
-		Qty: math.NewInt(1_000), LimitPrice: math.LegacyNewDec(60_000), ExpiryHeight: f.ctx.BlockHeight() + 10})
+	_, _, err := f.bk.SubmitPerpIntent(f.ctx, batchkeeper.PerpOrder{
+		Sender: poor.String(), MarketID: marketID, Side: batchtypes.SIDE_BUY,
+		Qty: math.NewInt(1_000), LimitPrice: math.LegacyNewDec(60_000), ExpiryHeight: f.ctx.BlockHeight() + 10,
+	})
 	require.ErrorIs(t, err, types.ErrInsufficientFree)
 
 	// high dispersion → reduce-only: non reduce-only orders refused
 	f.setPrice(t, math.LegacyNewDec(60_000), math.LegacyNewDecWithPrec(2, 2))
 	f.endBlocks(t, f.ctx.BlockHeight())
 	require.Equal(t, types.ORACLE_STATE_REDUCE_ONLY, f.market(t).State)
-	_, _, err = f.bk.SubmitPerpIntent(f.ctx, batchkeeper.PerpOrder{Sender: f.long.String(), MarketID: marketID, Side: batchtypes.SIDE_BUY,
-		Qty: math.NewInt(1_000), LimitPrice: math.LegacyNewDec(60_000), ExpiryHeight: f.ctx.BlockHeight() + 10})
+	_, _, err = f.bk.SubmitPerpIntent(f.ctx, batchkeeper.PerpOrder{
+		Sender: f.long.String(), MarketID: marketID, Side: batchtypes.SIDE_BUY,
+		Qty: math.NewInt(1_000), LimitPrice: math.LegacyNewDec(60_000), ExpiryHeight: f.ctx.BlockHeight() + 10,
+	})
 	require.ErrorIs(t, err, types.ErrReduceOnly)
 
 	// stale for two periods → paused; restricted halves the leverage in force
@@ -303,8 +309,10 @@ func TestADLWhenFundInventoryCapped(t *testing.T) {
 func TestTriggerFiresReduceOnlyOrder(t *testing.T) {
 	f := setup(t)
 	f.trade(t, 1_000, math.LegacyNewDec(60_000))
-	id, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{Sender: f.long.String(), MarketId: marketID,
-		TriggerPrice: math.LegacyNewDec(58_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2)})
+	id, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{
+		Sender: f.long.String(), MarketId: marketID,
+		TriggerPrice: math.LegacyNewDec(58_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2),
+	})
 	require.NoError(t, err)
 	// not fired above the trigger
 	f.endBlocks(t, f.ctx.BlockHeight()+1)
@@ -454,8 +462,10 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", lunas))
 	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", seller, lunas))
 	batch := f.ctx.BlockHeight()
-	_, _, err = f.bk.SubmitIntent(f.ctx, &batchtypes.MsgSubmitIntent{Sender: seller.String(), MarketId: "uluna/uusd", Side: batchtypes.SIDE_SELL,
-		AmountIn: sdk.NewCoin("uluna", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50})
+	_, _, err = f.bk.SubmitIntent(f.ctx, &batchtypes.MsgSubmitIntent{
+		Sender: seller.String(), MarketId: "uluna/uusd", Side: batchtypes.SIDE_SELL,
+		AmountIn: sdk.NewCoin("uluna", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50,
+	})
 	require.NoError(t, err)
 	burnBefore := f.app.BankKeeper.GetBalance(f.ctx, f.app.AccountKeeper.GetModuleAddress("burn"), "uluna").Amount
 	f.endBlocks(t, batch+f.bp.CommitWindow+1)
