@@ -17,6 +17,12 @@ service Msg {
   rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
   // SetDomainCap sets the net exposure cap of a (token, domain) pair (governance only).
   rpc SetDomainCap(MsgSetDomainCap) returns (MsgSetDomainCapResponse);
+  // SetBasketToken marks a synthetic warp token as a multi-origin basket whose
+  // origins are bound by share caps (spec §11.4 D-29), or unmarks it (governance only).
+  rpc SetBasketToken(MsgSetBasketToken) returns (MsgSetBasketTokenResponse);
+  // SetOriginPolicy sets the share cap override and the pause flag of one
+  // origin of a basket token (governance only).
+  rpc SetOriginPolicy(MsgSetOriginPolicy) returns (MsgSetOriginPolicyResponse);
   // SweepMigration forwards the balance of a derived migration deposit address
   // to its (domain, recipient) through the native warp route. Permissionless.
   rpc SweepMigration(MsgSweepMigration) returns (MsgSweepMigrationResponse);
@@ -59,6 +65,51 @@ message MsgSetDomainCap {
 
 // MsgSetDomainCapResponse defines the Msg/SetDomainCap response type.
 message MsgSetDomainCapResponse {}
+
+// MsgSetBasketToken is the Msg/SetBasketToken request type.
+message MsgSetBasketToken {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/warpledger/MsgSetBasketToken";
+
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // token_id is the hyperlane id of a synthetic warp token.
+  string token_id = 2 [
+    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable)   = false
+  ];
+  // enabled marks (true) or unmarks (false) the token as a basket.
+  bool enabled = 3;
+}
+
+// MsgSetBasketTokenResponse defines the Msg/SetBasketToken response type.
+message MsgSetBasketTokenResponse {}
+
+// MsgSetOriginPolicy is the Msg/SetOriginPolicy request type.
+message MsgSetOriginPolicy {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name)           = "terra/warpledger/MsgSetOriginPolicy";
+
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // token_id is the hyperlane id of the basket token.
+  string token_id = 2 [
+    (gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress",
+    (gogoproto.nullable)   = false
+  ];
+  // domain is the origin hyperlane domain id.
+  uint32 domain = 3;
+  // share_cap is the maximum share of the basket this origin may back;
+  // empty keeps Params.settle_source_cap.
+  string share_cap = 4 [
+    (cosmos_proto.scalar)  = "cosmos.Dec",
+    (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
+    (gogoproto.nullable)   = true
+  ];
+  // paused refuses deposits from and redemptions towards the origin.
+  bool paused = 5;
+}
+
+// MsgSetOriginPolicyResponse defines the Msg/SetOriginPolicy response type.
+message MsgSetOriginPolicyResponse {}
 
 // MsgSweepMigration is the Msg/SweepMigration request type (spec §10.2).
 message MsgSweepMigration {

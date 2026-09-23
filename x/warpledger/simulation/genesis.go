@@ -24,6 +24,7 @@ func RandomizedParams(r *rand.Rand) types.Params {
 	p := types.DefaultParams()
 	p.DefaultDomainCap = math.NewInt(int64(r.Intn(1_000_000_000_000)))
 	p.BondedCapThreshold = math.NewInt(int64(r.Intn(1_000_000_000_000)))
+	p.SettleSourceCap = math.LegacyNewDecWithPrec(int64(r.Intn(101)), 2)
 	if err := p.Validate(); err != nil {
 		panic(err)
 	}

@@ -11,4 +11,6 @@ option go_package = "github.com/classic-terra/core/v4/x/warpledger/types";
 message GenesisState {
   Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
   repeated DomainLedger ledgers = 2 [(gogoproto.nullable) = false];
+  // basket_tokens are the hex ids of the synthetic tokens marked as baskets.
+  repeated string basket_tokens = 3;
 }

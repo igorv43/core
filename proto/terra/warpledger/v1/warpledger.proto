@@ -28,6 +28,14 @@ message Params {
     (gogoproto.customtype) = "cosmossdk.io/math.Int",
     (gogoproto.nullable)   = false
   ];
+  // settle_source_cap is the default share of a basket token's circulation
+  // that one origin domain may back (spec §11.4 D-29 item 4, initial 40%).
+  // An origin whose share would exceed it refuses new deposits.
+  string settle_source_cap = 3 [
+    (cosmos_proto.scalar)  = "cosmos.Dec",
+    (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
+    (gogoproto.nullable)   = false
+  ];
 }
 
 // DomainLedger is the per (warp token, remote domain) accounting record kept
@@ -61,4 +69,17 @@ message DomainLedger {
   ];
   // has_cap is true once governance has set an explicit cap for the pair.
   bool has_cap = 6;
+  // share_cap overrides Params.settle_source_cap for this origin of a basket
+  // token (spec §11.4: origins without native issuance get a smaller cap).
+  // Only meaningful when has_share_cap is true.
+  string share_cap = 7 [
+    (cosmos_proto.scalar)  = "cosmos.Dec",
+    (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec",
+    (gogoproto.nullable)   = false
+  ];
+  bool has_share_cap = 8;
+  // paused refuses new deposits from the origin and redemptions towards it
+  // (spec §11.4 item 4: a failed or depegged origin is paused; item 6: a
+  // paused origin is redeemed through the others).
+  bool paused = 9;
 }

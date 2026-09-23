@@ -1,12 +1,18 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+
+	"cosmossdk.io/math"
+	"github.com/bcp-innovations/hyperlane-cosmos/util"
+)
 
 // DefaultGenesisState returns the default genesis state.
 func DefaultGenesisState() *GenesisState {
 	return &GenesisState{
-		Params:  DefaultParams(),
-		Ledgers: []DomainLedger{},
+		Params:       DefaultParams(),
+		Ledgers:      []DomainLedger{},
+		BasketTokens: []string{},
 	}
 }
 
@@ -32,6 +38,17 @@ func (gs GenesisState) Validate() error {
 			return fmt.Errorf("token %s has more than %d domains", l.TokenId.String(), MaxDomainsPerToken)
 		}
 	}
+	baskets := make(map[string]struct{}, len(gs.BasketTokens))
+	for _, b := range gs.BasketTokens {
+		id, err := util.DecodeHexAddress(b)
+		if err != nil {
+			return fmt.Errorf("basket token %q: %w", b, err)
+		}
+		if _, ok := baskets[id.String()]; ok {
+			return fmt.Errorf("duplicated basket token %s", id.String())
+		}
+		baskets[id.String()] = struct{}{}
+	}
 	return nil
 }
 
@@ -48,6 +65,9 @@ func (l DomainLedger) Validate() error {
 	}
 	if l.HasCap && (l.Cap.IsNil() || l.Cap.IsNegative()) {
 		return fmt.Errorf("ledger cap must be a non-negative integer")
+	}
+	if l.HasShareCap && (l.ShareCap.IsNil() || l.ShareCap.IsNegative() || l.ShareCap.GT(math.LegacyOneDec())) {
+		return fmt.Errorf("ledger share cap must be a fraction in [0, 1]")
 	}
 	return nil
 }

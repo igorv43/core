@@ -117,6 +117,14 @@ func (k Keeper) ledgerResponse(ctx sdk.Context, tokenId util.HexAddress) (*types
 		return nil, err
 	}
 
+	basket, err := k.IsBasket(ctx, tokenId)
+	if err != nil {
+		return nil, err
+	}
+	circulation := math.ZeroInt()
+	for _, ledger := range ledgers {
+		circulation = circulation.Add(Collateral(ledger))
+	}
 	sum := math.ZeroInt()
 	domains := make([]types.DomainExposure, 0, len(ledgers))
 	for _, ledger := range ledgers {
@@ -126,13 +134,29 @@ func (k Keeper) ledgerResponse(ctx sdk.Context, tokenId util.HexAddress) (*types
 		}
 		exposure := Exposure(ledger)
 		sum = sum.Add(exposure)
+		collateral := Collateral(ledger)
+		share, shareCap, headroom := math.LegacyZeroDec(), math.LegacyZeroDec(), math.ZeroInt()
+		if basket {
+			if shareCap, err = k.EffectiveShareCap(ctx, ledger); err != nil {
+				return nil, err
+			}
+			if circulation.IsPositive() {
+				share = math.LegacyNewDecFromInt(collateral).QuoInt(circulation)
+			}
+			headroom = Headroom(collateral, circulation, shareCap)
+		}
 		domains = append(domains, types.DomainExposure{
-			Domain:   ledger.Domain,
-			Sent:     ledger.Sent,
-			Received: ledger.Received,
-			Exposure: exposure,
-			Cap:      cap,
-			HasCap:   ledger.HasCap,
+			Domain:     ledger.Domain,
+			Sent:       ledger.Sent,
+			Received:   ledger.Received,
+			Exposure:   exposure,
+			Cap:        cap,
+			HasCap:     ledger.HasCap,
+			Collateral: collateral,
+			Share:      share,
+			ShareCap:   shareCap,
+			Headroom:   headroom,
+			Paused:     ledger.Paused,
 		})
 	}
 
@@ -148,5 +172,7 @@ func (k Keeper) ledgerResponse(ctx sdk.Context, tokenId util.HexAddress) (*types
 		SumExposure:       sum,
 		Domains:           domains,
 		Height:            ctx.BlockHeight(),
+		Basket:            basket,
+		Circulation:       circulation,
 	}, nil
 }

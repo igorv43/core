@@ -48,6 +48,15 @@ message DomainExposure {
   // cap is the effective cap (explicit or default).
   string cap = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   bool has_cap = 6;
+  // collateral is the amount the origin backs: max(0, received - sent).
+  string collateral = 7 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // share is collateral / basket circulation (zero when not a basket).
+  string share = 8 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // share_cap is the effective share cap of the origin (explicit or default).
+  string share_cap = 9 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // headroom is the largest deposit the origin can still take under its share cap.
+  string headroom = 10 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  bool paused = 11;
 }
 
 message QueryWarpLedgerResponse {
@@ -63,6 +72,11 @@ message QueryWarpLedgerResponse {
   string sum_exposure = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   repeated DomainExposure domains = 7 [(gogoproto.nullable) = false];
   int64 height = 8;
+  // basket is true when the token is a multi-origin settlement basket (D-29).
+  bool basket = 9;
+  // circulation is Σ collateral over the origins of a basket: the synthetic
+  // supply the origins back.
+  string circulation = 10 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }
 
 message QueryWarpLedgersRequest {}

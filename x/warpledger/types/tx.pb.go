@@ -220,6 +220,204 @@ func (m *MsgSetDomainCapResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MsgSetDomainCapResponse proto.InternalMessageInfo
 
+// MsgSetBasketToken is the Msg/SetBasketToken request type.
+type MsgSetBasketToken struct {
+	Authority string `protobuf:"bytes,1,opt,name=authority,proto3" json:"authority,omitempty"`
+	// token_id is the hyperlane id of a synthetic warp token.
+	TokenId github_com_bcp_innovations_hyperlane_cosmos_util.HexAddress `protobuf:"bytes,2,opt,name=token_id,json=tokenId,proto3,customtype=github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress" json:"token_id"`
+	// enabled marks (true) or unmarks (false) the token as a basket.
+	Enabled bool `protobuf:"varint,3,opt,name=enabled,proto3" json:"enabled,omitempty"`
+}
+
+func (m *MsgSetBasketToken) Reset()         { *m = MsgSetBasketToken{} }
+func (m *MsgSetBasketToken) String() string { return proto.CompactTextString(m) }
+func (*MsgSetBasketToken) ProtoMessage()    {}
+func (*MsgSetBasketToken) Descriptor() ([]byte, []int) {
+	return fileDescriptor_da96634d6cdce87f, []int{4}
+}
+func (m *MsgSetBasketToken) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSetBasketToken) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSetBasketToken.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSetBasketToken) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSetBasketToken.Merge(m, src)
+}
+func (m *MsgSetBasketToken) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSetBasketToken) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSetBasketToken.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSetBasketToken proto.InternalMessageInfo
+
+func (m *MsgSetBasketToken) GetAuthority() string {
+	if m != nil {
+		return m.Authority
+	}
+	return ""
+}
+
+func (m *MsgSetBasketToken) GetEnabled() bool {
+	if m != nil {
+		return m.Enabled
+	}
+	return false
+}
+
+// MsgSetBasketTokenResponse defines the Msg/SetBasketToken response type.
+type MsgSetBasketTokenResponse struct {
+}
+
+func (m *MsgSetBasketTokenResponse) Reset()         { *m = MsgSetBasketTokenResponse{} }
+func (m *MsgSetBasketTokenResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgSetBasketTokenResponse) ProtoMessage()    {}
+func (*MsgSetBasketTokenResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_da96634d6cdce87f, []int{5}
+}
+func (m *MsgSetBasketTokenResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSetBasketTokenResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSetBasketTokenResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSetBasketTokenResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSetBasketTokenResponse.Merge(m, src)
+}
+func (m *MsgSetBasketTokenResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSetBasketTokenResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSetBasketTokenResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSetBasketTokenResponse proto.InternalMessageInfo
+
+// MsgSetOriginPolicy is the Msg/SetOriginPolicy request type.
+type MsgSetOriginPolicy struct {
+	Authority string `protobuf:"bytes,1,opt,name=authority,proto3" json:"authority,omitempty"`
+	// token_id is the hyperlane id of the basket token.
+	TokenId github_com_bcp_innovations_hyperlane_cosmos_util.HexAddress `protobuf:"bytes,2,opt,name=token_id,json=tokenId,proto3,customtype=github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress" json:"token_id"`
+	// domain is the origin hyperlane domain id.
+	Domain uint32 `protobuf:"varint,3,opt,name=domain,proto3" json:"domain,omitempty"`
+	// share_cap is the maximum share of the basket this origin may back;
+	// empty keeps Params.settle_source_cap.
+	ShareCap *cosmossdk_io_math.LegacyDec `protobuf:"bytes,4,opt,name=share_cap,json=shareCap,proto3,customtype=cosmossdk.io/math.LegacyDec" json:"share_cap,omitempty"`
+	// paused refuses deposits from and redemptions towards the origin.
+	Paused bool `protobuf:"varint,5,opt,name=paused,proto3" json:"paused,omitempty"`
+}
+
+func (m *MsgSetOriginPolicy) Reset()         { *m = MsgSetOriginPolicy{} }
+func (m *MsgSetOriginPolicy) String() string { return proto.CompactTextString(m) }
+func (*MsgSetOriginPolicy) ProtoMessage()    {}
+func (*MsgSetOriginPolicy) Descriptor() ([]byte, []int) {
+	return fileDescriptor_da96634d6cdce87f, []int{6}
+}
+func (m *MsgSetOriginPolicy) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSetOriginPolicy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSetOriginPolicy.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSetOriginPolicy) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSetOriginPolicy.Merge(m, src)
+}
+func (m *MsgSetOriginPolicy) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSetOriginPolicy) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSetOriginPolicy.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSetOriginPolicy proto.InternalMessageInfo
+
+func (m *MsgSetOriginPolicy) GetAuthority() string {
+	if m != nil {
+		return m.Authority
+	}
+	return ""
+}
+
+func (m *MsgSetOriginPolicy) GetDomain() uint32 {
+	if m != nil {
+		return m.Domain
+	}
+	return 0
+}
+
+func (m *MsgSetOriginPolicy) GetPaused() bool {
+	if m != nil {
+		return m.Paused
+	}
+	return false
+}
+
+// MsgSetOriginPolicyResponse defines the Msg/SetOriginPolicy response type.
+type MsgSetOriginPolicyResponse struct {
+}
+
+func (m *MsgSetOriginPolicyResponse) Reset()         { *m = MsgSetOriginPolicyResponse{} }
+func (m *MsgSetOriginPolicyResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgSetOriginPolicyResponse) ProtoMessage()    {}
+func (*MsgSetOriginPolicyResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_da96634d6cdce87f, []int{7}
+}
+func (m *MsgSetOriginPolicyResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSetOriginPolicyResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSetOriginPolicyResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSetOriginPolicyResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSetOriginPolicyResponse.Merge(m, src)
+}
+func (m *MsgSetOriginPolicyResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSetOriginPolicyResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSetOriginPolicyResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSetOriginPolicyResponse proto.InternalMessageInfo
+
 // MsgSweepMigration is the Msg/SweepMigration request type (spec §10.2).
 type MsgSweepMigration struct {
 	// sender pays the gas of the sweep; it can be any account.
@@ -236,7 +434,7 @@ func (m *MsgSweepMigration) Reset()         { *m = MsgSweepMigration{} }
 func (m *MsgSweepMigration) String() string { return proto.CompactTextString(m) }
 func (*MsgSweepMigration) ProtoMessage()    {}
 func (*MsgSweepMigration) Descriptor() ([]byte, []int) {
-	return fileDescriptor_da96634d6cdce87f, []int{4}
+	return fileDescriptor_da96634d6cdce87f, []int{8}
 }
 func (m *MsgSweepMigration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -293,7 +491,7 @@ func (m *MsgSweepMigrationResponse) Reset()         { *m = MsgSweepMigrationResp
 func (m *MsgSweepMigrationResponse) String() string { return proto.CompactTextString(m) }
 func (*MsgSweepMigrationResponse) ProtoMessage()    {}
 func (*MsgSweepMigrationResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_da96634d6cdce87f, []int{5}
+	return fileDescriptor_da96634d6cdce87f, []int{9}
 }
 func (m *MsgSweepMigrationResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -334,6 +532,10 @@ func init() {
 	proto.RegisterType((*MsgUpdateParamsResponse)(nil), "terra.warpledger.v1.MsgUpdateParamsResponse")
 	proto.RegisterType((*MsgSetDomainCap)(nil), "terra.warpledger.v1.MsgSetDomainCap")
 	proto.RegisterType((*MsgSetDomainCapResponse)(nil), "terra.warpledger.v1.MsgSetDomainCapResponse")
+	proto.RegisterType((*MsgSetBasketToken)(nil), "terra.warpledger.v1.MsgSetBasketToken")
+	proto.RegisterType((*MsgSetBasketTokenResponse)(nil), "terra.warpledger.v1.MsgSetBasketTokenResponse")
+	proto.RegisterType((*MsgSetOriginPolicy)(nil), "terra.warpledger.v1.MsgSetOriginPolicy")
+	proto.RegisterType((*MsgSetOriginPolicyResponse)(nil), "terra.warpledger.v1.MsgSetOriginPolicyResponse")
 	proto.RegisterType((*MsgSweepMigration)(nil), "terra.warpledger.v1.MsgSweepMigration")
 	proto.RegisterType((*MsgSweepMigrationResponse)(nil), "terra.warpledger.v1.MsgSweepMigrationResponse")
 }
@@ -341,49 +543,60 @@ func init() {
 func init() { proto.RegisterFile("terra/warpledger/v1/tx.proto", fileDescriptor_da96634d6cdce87f) }
 
 var fileDescriptor_da96634d6cdce87f = []byte{
-	// 666 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xc4, 0x55, 0x41, 0x4f, 0x13, 0x41,
-	0x18, 0xed, 0x16, 0xad, 0x76, 0x44, 0x08, 0x2b, 0x4a, 0xa9, 0x66, 0x69, 0x1a, 0x62, 0x08, 0xda,
-	0x5d, 0x01, 0xe3, 0x01, 0xa3, 0x09, 0xc5, 0x83, 0x3d, 0x34, 0x31, 0x4b, 0xbc, 0x78, 0x90, 0x4c,
-	0x77, 0x27, 0xdb, 0x09, 0xdd, 0x99, 0xc9, 0xcc, 0xb4, 0xc0, 0xcd, 0x78, 0x31, 0xf1, 0xe4, 0xcf,
-	0xf0, 0xc8, 0x01, 0xaf, 0x9c, 0x39, 0x12, 0xe2, 0xc1, 0x78, 0x20, 0xa6, 0x3d, 0xf4, 0x6f, 0x98,
-	0x9d, 0x1d, 0xec, 0xb6, 0xb4, 0x5a, 0x0d, 0x89, 0x97, 0xa6, 0x3b, 0xdf, 0xfb, 0xde, 0x9b, 0xf7,
-	0xf6, 0x9b, 0x59, 0x70, 0x4f, 0x22, 0xce, 0xa1, 0xb3, 0x0b, 0x39, 0x6b, 0x20, 0x3f, 0x40, 0xdc,
-	0x69, 0xad, 0x38, 0x72, 0xcf, 0x66, 0x9c, 0x4a, 0x6a, 0xde, 0x52, 0x55, 0xbb, 0x57, 0xb5, 0x5b,
-	0x2b, 0xf9, 0xd9, 0x80, 0x06, 0x54, 0xd5, 0x9d, 0xe8, 0x5f, 0x0c, 0xcd, 0xcf, 0x79, 0x54, 0x84,
-	0x54, 0x38, 0xa1, 0x08, 0x22, 0x8a, 0x50, 0x04, 0xba, 0x30, 0x03, 0x43, 0x4c, 0xa8, 0xa3, 0x7e,
-	0xf5, 0xd2, 0x7c, 0x8c, 0xdd, 0x8e, 0x49, 0xe2, 0x07, 0x5d, 0x5a, 0x1c, 0xb6, 0x9f, 0x84, 0xbe,
-	0x42, 0x15, 0x8f, 0x0c, 0x30, 0x5d, 0x15, 0xc1, 0x6b, 0xe6, 0x43, 0x89, 0x5e, 0x41, 0x0e, 0x43,
-	0x61, 0x3e, 0x01, 0x59, 0xd8, 0x94, 0x75, 0xca, 0xb1, 0xdc, 0xcf, 0x19, 0x05, 0x63, 0x29, 0x5b,
-	0xce, 0x9d, 0x1e, 0x96, 0x66, 0x35, 0xfd, 0x86, 0xef, 0x73, 0x24, 0xc4, 0x96, 0xe4, 0x98, 0x04,
-	0x6e, 0x0f, 0x6a, 0x3e, 0x07, 0x19, 0xa6, 0x18, 0x72, 0xe9, 0x82, 0xb1, 0x74, 0x63, 0xf5, 0xae,
-	0x3d, 0xc4, 0xb4, 0x1d, 0x8b, 0x94, 0xb3, 0xc7, 0x67, 0x0b, 0xa9, 0xcf, 0xdd, 0x83, 0x65, 0xc3,
-	0xd5, 0x5d, 0xeb, 0x6b, 0xef, 0xbb, 0x07, 0xcb, 0x3d, 0xbe, 0x8f, 0xdd, 0x83, 0xe5, 0xc2, 0x05,
-	0x13, 0x03, 0x9b, 0x2d, 0xce, 0x83, 0xb9, 0x81, 0x25, 0x17, 0x09, 0x46, 0x89, 0x40, 0xc5, 0x2f,
-	0x69, 0xe5, 0x6d, 0x0b, 0xc9, 0x17, 0x34, 0x84, 0x98, 0x6c, 0x42, 0xf6, 0xcf, 0xde, 0xde, 0x82,
-	0xeb, 0x92, 0xee, 0x20, 0xb2, 0x8d, 0x7d, 0xe5, 0x2e, 0x5b, 0xde, 0x8c, 0x0c, 0x7c, 0x3f, 0x5b,
-	0x78, 0x1a, 0x60, 0x59, 0x6f, 0xd6, 0x6c, 0x8f, 0x86, 0x4e, 0xcd, 0x63, 0x25, 0x4c, 0x08, 0x6d,
-	0x41, 0x89, 0x29, 0x11, 0x4e, 0x7d, 0x9f, 0x21, 0xde, 0x80, 0x04, 0x95, 0xf4, 0x3b, 0x6d, 0x4a,
-	0xdc, 0xb0, 0x5f, 0xa2, 0x3d, 0xad, 0xe3, 0x5e, 0x53, 0xa4, 0x15, 0xdf, 0xbc, 0x03, 0x32, 0xbe,
-	0xda, 0x64, 0x6e, 0xa2, 0x60, 0x2c, 0xdd, 0x74, 0xf5, 0x93, 0xf9, 0x0c, 0x4c, 0x78, 0x90, 0xe5,
-	0xae, 0x28, 0xc9, 0x07, 0x5a, 0xf2, 0x76, 0xcc, 0x26, 0xfc, 0x1d, 0x1b, 0x53, 0x27, 0x84, 0xb2,
-	0x6e, 0x57, 0x88, 0x3c, 0x3d, 0x2c, 0x01, 0x6d, 0xa3, 0x42, 0xa4, 0x1b, 0xf5, 0x8d, 0x1d, 0x69,
-	0x32, 0x23, 0x1d, 0x69, 0x72, 0xe9, 0x57, 0xa4, 0x5f, 0xd3, 0x60, 0x26, 0xaa, 0xed, 0x22, 0xc4,
-	0xaa, 0x38, 0xe0, 0xca, 0xa7, 0xf9, 0x08, 0x64, 0x04, 0x22, 0x3e, 0xe2, 0x7f, 0x4c, 0x54, 0xe3,
-	0xfe, 0x5b, 0x9c, 0x10, 0x64, 0x39, 0xf2, 0x30, 0xc3, 0x88, 0x48, 0x1d, 0xea, 0xa5, 0x08, 0xf7,
-	0x58, 0xd7, 0x57, 0xa3, 0xc8, 0xb5, 0xcf, 0x28, 0xef, 0xe2, 0xd0, 0xbc, 0xfb, 0x02, 0x2c, 0x7e,
-	0x48, 0x83, 0xf9, 0x0b, 0xab, 0xe7, 0xa1, 0x9b, 0x35, 0x00, 0x42, 0x24, 0x04, 0x0c, 0x50, 0x14,
-	0x97, 0x71, 0x89, 0xbb, 0xd6, 0xb4, 0x15, 0xdf, 0xdc, 0x04, 0x19, 0x18, 0xd2, 0x26, 0x91, 0xfa,
-	0x75, 0xfc, 0xd5, 0xa8, 0xe9, 0x56, 0x73, 0x03, 0x4c, 0xfb, 0x88, 0x51, 0x81, 0xe5, 0x36, 0x8c,
-	0x25, 0x54, 0xfc, 0xbf, 0x1b, 0x88, 0x29, 0xdd, 0xa0, 0x57, 0x57, 0x8f, 0xd2, 0x60, 0xa2, 0x2a,
-	0x02, 0xb3, 0x06, 0x26, 0xfb, 0xee, 0xa4, 0xc5, 0xa1, 0x77, 0xc9, 0xc0, 0xc9, 0xcf, 0x3f, 0x1c,
-	0x07, 0x95, 0xc8, 0x75, 0xb2, 0xef, 0x6e, 0x18, 0xa9, 0x91, 0x44, 0x8d, 0xd6, 0x18, 0x76, 0x60,
-	0xcc, 0x3a, 0x98, 0x1a, 0x38, 0x2c, 0xf7, 0x47, 0xf6, 0xf7, 0xe1, 0xf2, 0xf6, 0x78, 0xb8, 0x73,
-	0xa5, 0xfc, 0xd5, 0x77, 0xd1, 0x65, 0x5a, 0xae, 0x1e, 0xb7, 0x2d, 0xe3, 0xa4, 0x6d, 0x19, 0x3f,
-	0xda, 0x96, 0xf1, 0xa9, 0x63, 0xa5, 0x4e, 0x3a, 0x56, 0xea, 0x5b, 0xc7, 0x4a, 0xbd, 0x59, 0x4b,
-	0x8c, 0x8a, 0xd7, 0x80, 0x42, 0x60, 0xaf, 0x14, 0xcf, 0xa6, 0x47, 0x39, 0x72, 0x5a, 0x8f, 0x9d,
-	0xbd, 0xe4, 0x94, 0xca, 0x7d, 0x86, 0x44, 0x2d, 0xa3, 0x3e, 0x13, 0x6b, 0x3f, 0x03, 0x00, 0x00,
-	0xff, 0xff, 0xb8, 0xd1, 0xc8, 0x4d, 0xde, 0x06, 0x00, 0x00,
+	// 834 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x56, 0xcf, 0x4f, 0x3b, 0x45,
+	0x14, 0xef, 0x96, 0xef, 0xb7, 0xd0, 0x11, 0x21, 0xac, 0x08, 0xa5, 0x90, 0xb6, 0xa9, 0x44, 0x09,
+	0xda, 0x5d, 0x01, 0xe5, 0x50, 0xa3, 0x09, 0x85, 0x83, 0x4d, 0xac, 0x92, 0x45, 0x2f, 0x1e, 0x6c,
+	0xa6, 0xbb, 0x93, 0xed, 0xa4, 0xdd, 0x99, 0xcd, 0xcc, 0xb4, 0xd0, 0x9b, 0xf1, 0x62, 0xe2, 0xc9,
+	0x8b, 0xff, 0x83, 0x47, 0x0e, 0x78, 0xf5, 0xcc, 0x91, 0x10, 0x0f, 0x86, 0x43, 0x63, 0xc0, 0x84,
+	0x7f, 0xc2, 0x83, 0xd9, 0xd9, 0xa1, 0xdd, 0xfe, 0xb4, 0x1a, 0x12, 0xf5, 0xd2, 0x74, 0xde, 0xfb,
+	0xcc, 0x7b, 0xf3, 0xf9, 0xbc, 0x37, 0x6f, 0x16, 0x6c, 0x09, 0xc4, 0x18, 0x34, 0xcf, 0x21, 0xf3,
+	0x9b, 0xc8, 0x71, 0x11, 0x33, 0xdb, 0x7b, 0xa6, 0xb8, 0x30, 0x7c, 0x46, 0x05, 0xd5, 0x5f, 0x93,
+	0x5e, 0xa3, 0xef, 0x35, 0xda, 0x7b, 0xe9, 0x55, 0x97, 0xba, 0x54, 0xfa, 0xcd, 0xe0, 0x5f, 0x08,
+	0x4d, 0xaf, 0xdb, 0x94, 0x7b, 0x94, 0x9b, 0x1e, 0x77, 0x83, 0x10, 0x1e, 0x77, 0x95, 0x63, 0x05,
+	0x7a, 0x98, 0x50, 0x53, 0xfe, 0x2a, 0xd3, 0x46, 0x88, 0xad, 0x86, 0x41, 0xc2, 0x85, 0x72, 0x6d,
+	0x8f, 0x3b, 0x4f, 0x24, 0xbf, 0x44, 0xe5, 0x7f, 0xd6, 0xc0, 0x72, 0x85, 0xbb, 0x5f, 0xf8, 0x0e,
+	0x14, 0xe8, 0x14, 0x32, 0xe8, 0x71, 0xfd, 0x10, 0x24, 0x61, 0x4b, 0xd4, 0x29, 0xc3, 0xa2, 0x93,
+	0xd2, 0x72, 0xda, 0x4e, 0xb2, 0x94, 0xba, 0xbd, 0x2a, 0xac, 0xaa, 0xf0, 0x47, 0x8e, 0xc3, 0x10,
+	0xe7, 0x67, 0x82, 0x61, 0xe2, 0x5a, 0x7d, 0xa8, 0xfe, 0x11, 0x48, 0xf8, 0x32, 0x42, 0x2a, 0x9e,
+	0xd3, 0x76, 0x5e, 0xd9, 0xdf, 0x34, 0xc6, 0x90, 0x36, 0xc2, 0x24, 0xa5, 0xe4, 0x75, 0x37, 0x1b,
+	0xfb, 0xf1, 0xf1, 0x72, 0x57, 0xb3, 0xd4, 0xae, 0xe2, 0xc1, 0x37, 0x8f, 0x97, 0xbb, 0xfd, 0x78,
+	0xdf, 0x3d, 0x5e, 0xee, 0xe6, 0x46, 0x48, 0x0c, 0x1d, 0x36, 0xbf, 0x01, 0xd6, 0x87, 0x4c, 0x16,
+	0xe2, 0x3e, 0x25, 0x1c, 0xe5, 0x7f, 0x8a, 0x4b, 0x6e, 0x67, 0x48, 0x9c, 0x50, 0x0f, 0x62, 0x72,
+	0x0c, 0xfd, 0x7f, 0xcc, 0xed, 0x2b, 0xb0, 0x20, 0x68, 0x03, 0x91, 0x2a, 0x76, 0x24, 0xbb, 0x64,
+	0xe9, 0x38, 0x20, 0x70, 0xd7, 0xcd, 0x7e, 0xe0, 0x62, 0x51, 0x6f, 0xd5, 0x0c, 0x9b, 0x7a, 0x66,
+	0xcd, 0xf6, 0x0b, 0x98, 0x10, 0xda, 0x86, 0x02, 0x53, 0xc2, 0xcd, 0x7a, 0xc7, 0x47, 0xac, 0x09,
+	0x09, 0x2a, 0xa8, 0x9a, 0xb6, 0x04, 0x6e, 0x1a, 0x1f, 0xa3, 0x0b, 0x95, 0xc7, 0x9a, 0x97, 0x41,
+	0xcb, 0x8e, 0xbe, 0x06, 0x12, 0x8e, 0x3c, 0x64, 0x6a, 0x2e, 0xa7, 0xed, 0xbc, 0x6a, 0xa9, 0x95,
+	0xfe, 0x21, 0x98, 0xb3, 0xa1, 0x9f, 0x7a, 0x21, 0x53, 0xbe, 0xad, 0x52, 0xbe, 0x1e, 0x46, 0xe3,
+	0x4e, 0xc3, 0xc0, 0xd4, 0xf4, 0xa0, 0xa8, 0x1b, 0x65, 0x22, 0x6e, 0xaf, 0x0a, 0x40, 0xd1, 0x28,
+	0x13, 0x61, 0x05, 0xfb, 0x66, 0x96, 0x34, 0xaa, 0x91, 0x92, 0x34, 0x6a, 0xea, 0x49, 0xfa, 0x87,
+	0x06, 0x56, 0x42, 0x5f, 0x09, 0xf2, 0x06, 0x12, 0x9f, 0x07, 0xc7, 0xff, 0xcf, 0x8a, 0x9a, 0x02,
+	0xf3, 0x88, 0xc0, 0x5a, 0x13, 0x39, 0x52, 0xd5, 0x05, 0xeb, 0x69, 0x59, 0x7c, 0x7f, 0x54, 0x97,
+	0xfc, 0x04, 0x5d, 0x22, 0x44, 0xf3, 0x9b, 0x60, 0x63, 0xc4, 0xd8, 0xd3, 0xe6, 0xf7, 0x38, 0xd0,
+	0x43, 0xef, 0x67, 0x0c, 0xbb, 0x98, 0x9c, 0xd2, 0x26, 0xb6, 0x3b, 0xff, 0xbb, 0x8e, 0xfb, 0x14,
+	0x24, 0x79, 0x1d, 0x32, 0x54, 0xed, 0xf7, 0xdd, 0xde, 0x75, 0x37, 0xab, 0xdd, 0x75, 0xb3, 0x9b,
+	0xa3, 0x7d, 0xf7, 0x09, 0x72, 0xa1, 0xdd, 0x39, 0x41, 0x76, 0xa4, 0xfb, 0x4e, 0x90, 0x6d, 0x2d,
+	0xc8, 0x18, 0xc1, 0x8d, 0x5b, 0x0b, 0xa6, 0x42, 0x8b, 0x23, 0x27, 0xf5, 0x52, 0xd6, 0x40, 0xad,
+	0x8a, 0x87, 0xa3, 0x25, 0x78, 0x63, 0x42, 0x09, 0xa2, 0x7a, 0xe6, 0xb7, 0x40, 0x7a, 0xd4, 0xda,
+	0x2b, 0xc2, 0x2f, 0xf1, 0xb0, 0x41, 0xcf, 0x11, 0xf2, 0x2b, 0xd8, 0x65, 0x52, 0x16, 0xfd, 0x5d,
+	0x90, 0xe0, 0x88, 0x38, 0x88, 0xfd, 0x65, 0x01, 0x14, 0xee, 0x5f, 0x53, 0x1f, 0x82, 0x24, 0x43,
+	0x36, 0xf6, 0x31, 0x22, 0x42, 0xa9, 0xff, 0x2c, 0x89, 0xfb, 0x51, 0x8b, 0xfb, 0x81, 0xf0, 0x8a,
+	0xe7, 0xe4, 0xc6, 0x1f, 0x10, 0x30, 0xff, 0x6d, 0x3c, 0xec, 0xfc, 0x01, 0xeb, 0x93, 0xe8, 0x7a,
+	0x0d, 0x00, 0x0f, 0x71, 0x0e, 0x5d, 0x14, 0xc8, 0xa5, 0x3d, 0xe3, 0xa9, 0x55, 0xd8, 0xb2, 0xa3,
+	0x1f, 0x83, 0x04, 0xf4, 0x68, 0x8b, 0x08, 0x55, 0x8e, 0xbf, 0x35, 0x0b, 0xd5, 0x56, 0xfd, 0x08,
+	0x2c, 0x3b, 0xc8, 0xa7, 0x1c, 0x8b, 0x2a, 0x0c, 0x53, 0x48, 0xf9, 0xa7, 0x35, 0xc4, 0x92, 0xda,
+	0xa0, 0xac, 0xfb, 0x3f, 0xbc, 0x00, 0x73, 0x15, 0xee, 0xea, 0x35, 0xb0, 0x38, 0xf0, 0x68, 0x6e,
+	0x8f, 0x7d, 0xec, 0x86, 0x9e, 0xa6, 0xf4, 0x3b, 0xb3, 0xa0, 0x22, 0xba, 0x2e, 0x0e, 0x3c, 0x5e,
+	0x13, 0x73, 0x44, 0x51, 0x93, 0x73, 0x8c, 0x9b, 0xe8, 0x7a, 0x1d, 0x2c, 0x0d, 0x4d, 0xf3, 0x37,
+	0xa7, 0xec, 0x8f, 0xe0, 0xd2, 0xc6, 0x6c, 0xb8, 0x5e, 0xa6, 0x06, 0x58, 0x1e, 0x9e, 0x8d, 0x6f,
+	0x4d, 0x09, 0x11, 0x05, 0xa6, 0xcd, 0x19, 0x81, 0x03, 0xb4, 0x06, 0x67, 0xc0, 0x64, 0x5a, 0x03,
+	0xb8, 0x29, 0xb4, 0xc6, 0x36, 0x7f, 0xfa, 0xe5, 0xd7, 0xc1, 0x47, 0x4c, 0xa9, 0x72, 0x7d, 0x9f,
+	0xd1, 0x6e, 0xee, 0x33, 0xda, 0x6f, 0xf7, 0x19, 0xed, 0xfb, 0x87, 0x4c, 0xec, 0xe6, 0x21, 0x13,
+	0xfb, 0xf5, 0x21, 0x13, 0xfb, 0xf2, 0x20, 0x72, 0x03, 0xec, 0x26, 0xe4, 0x1c, 0xdb, 0x85, 0xf0,
+	0xca, 0xd9, 0x94, 0x21, 0xb3, 0xfd, 0x9e, 0x79, 0x11, 0xbd, 0x7c, 0xa2, 0xe3, 0x23, 0x5e, 0x4b,
+	0xc8, 0xcf, 0xb3, 0x83, 0x3f, 0x03, 0x00, 0x00, 0xff, 0xff, 0x21, 0x53, 0xc6, 0x61, 0x56, 0x0a,
+	0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -402,6 +615,12 @@ type MsgClient interface {
 	UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error)
 	// SetDomainCap sets the net exposure cap of a (token, domain) pair (governance only).
 	SetDomainCap(ctx context.Context, in *MsgSetDomainCap, opts ...grpc.CallOption) (*MsgSetDomainCapResponse, error)
+	// SetBasketToken marks a synthetic warp token as a multi-origin basket whose
+	// origins are bound by share caps (spec §11.4 D-29), or unmarks it (governance only).
+	SetBasketToken(ctx context.Context, in *MsgSetBasketToken, opts ...grpc.CallOption) (*MsgSetBasketTokenResponse, error)
+	// SetOriginPolicy sets the share cap override and the pause flag of one
+	// origin of a basket token (governance only).
+	SetOriginPolicy(ctx context.Context, in *MsgSetOriginPolicy, opts ...grpc.CallOption) (*MsgSetOriginPolicyResponse, error)
 	// SweepMigration forwards the balance of a derived migration deposit address
 	// to its (domain, recipient) through the native warp route. Permissionless.
 	SweepMigration(ctx context.Context, in *MsgSweepMigration, opts ...grpc.CallOption) (*MsgSweepMigrationResponse, error)
@@ -433,6 +652,24 @@ func (c *msgClient) SetDomainCap(ctx context.Context, in *MsgSetDomainCap, opts 
 	return out, nil
 }
 
+func (c *msgClient) SetBasketToken(ctx context.Context, in *MsgSetBasketToken, opts ...grpc.CallOption) (*MsgSetBasketTokenResponse, error) {
+	out := new(MsgSetBasketTokenResponse)
+	err := c.cc.Invoke(ctx, "/terra.warpledger.v1.Msg/SetBasketToken", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) SetOriginPolicy(ctx context.Context, in *MsgSetOriginPolicy, opts ...grpc.CallOption) (*MsgSetOriginPolicyResponse, error) {
+	out := new(MsgSetOriginPolicyResponse)
+	err := c.cc.Invoke(ctx, "/terra.warpledger.v1.Msg/SetOriginPolicy", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *msgClient) SweepMigration(ctx context.Context, in *MsgSweepMigration, opts ...grpc.CallOption) (*MsgSweepMigrationResponse, error) {
 	out := new(MsgSweepMigrationResponse)
 	err := c.cc.Invoke(ctx, "/terra.warpledger.v1.Msg/SweepMigration", in, out, opts...)
@@ -448,6 +685,12 @@ type MsgServer interface {
 	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
 	// SetDomainCap sets the net exposure cap of a (token, domain) pair (governance only).
 	SetDomainCap(context.Context, *MsgSetDomainCap) (*MsgSetDomainCapResponse, error)
+	// SetBasketToken marks a synthetic warp token as a multi-origin basket whose
+	// origins are bound by share caps (spec §11.4 D-29), or unmarks it (governance only).
+	SetBasketToken(context.Context, *MsgSetBasketToken) (*MsgSetBasketTokenResponse, error)
+	// SetOriginPolicy sets the share cap override and the pause flag of one
+	// origin of a basket token (governance only).
+	SetOriginPolicy(context.Context, *MsgSetOriginPolicy) (*MsgSetOriginPolicyResponse, error)
 	// SweepMigration forwards the balance of a derived migration deposit address
 	// to its (domain, recipient) through the native warp route. Permissionless.
 	SweepMigration(context.Context, *MsgSweepMigration) (*MsgSweepMigrationResponse, error)
@@ -462,6 +705,12 @@ func (*UnimplementedMsgServer) UpdateParams(ctx context.Context, req *MsgUpdateP
 }
 func (*UnimplementedMsgServer) SetDomainCap(ctx context.Context, req *MsgSetDomainCap) (*MsgSetDomainCapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetDomainCap not implemented")
+}
+func (*UnimplementedMsgServer) SetBasketToken(ctx context.Context, req *MsgSetBasketToken) (*MsgSetBasketTokenResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetBasketToken not implemented")
+}
+func (*UnimplementedMsgServer) SetOriginPolicy(ctx context.Context, req *MsgSetOriginPolicy) (*MsgSetOriginPolicyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetOriginPolicy not implemented")
 }
 func (*UnimplementedMsgServer) SweepMigration(ctx context.Context, req *MsgSweepMigration) (*MsgSweepMigrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SweepMigration not implemented")
@@ -507,6 +756,42 @@ func _Msg_SetDomainCap_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_SetBasketToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgSetBasketToken)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).SetBasketToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/terra.warpledger.v1.Msg/SetBasketToken",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).SetBasketToken(ctx, req.(*MsgSetBasketToken))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_SetOriginPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgSetOriginPolicy)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).SetOriginPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/terra.warpledger.v1.Msg/SetOriginPolicy",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).SetOriginPolicy(ctx, req.(*MsgSetOriginPolicy))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Msg_SweepMigration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(MsgSweepMigration)
 	if err := dec(in); err != nil {
@@ -536,6 +821,14 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetDomainCap",
 			Handler:    _Msg_SetDomainCap_Handler,
+		},
+		{
+			MethodName: "SetBasketToken",
+			Handler:    _Msg_SetBasketToken_Handler,
+		},
+		{
+			MethodName: "SetOriginPolicy",
+			Handler:    _Msg_SetOriginPolicy_Handler,
 		},
 		{
 			MethodName: "SweepMigration",
@@ -680,6 +973,169 @@ func (m *MsgSetDomainCapResponse) MarshalTo(dAtA []byte) (int, error) {
 }
 
 func (m *MsgSetDomainCapResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgSetBasketToken) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSetBasketToken) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSetBasketToken) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Enabled {
+		i--
+		if m.Enabled {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
+	{
+		size := m.TokenId.Size()
+		i -= size
+		if _, err := m.TokenId.MarshalTo(dAtA[i:]); err != nil {
+			return 0, err
+		}
+		i = encodeVarintTx(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	if len(m.Authority) > 0 {
+		i -= len(m.Authority)
+		copy(dAtA[i:], m.Authority)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Authority)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgSetBasketTokenResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSetBasketTokenResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSetBasketTokenResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgSetOriginPolicy) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSetOriginPolicy) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSetOriginPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Paused {
+		i--
+		if m.Paused {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.ShareCap != nil {
+		{
+			size := m.ShareCap.Size()
+			i -= size
+			if _, err := m.ShareCap.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+			i = encodeVarintTx(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	if m.Domain != 0 {
+		i = encodeVarintTx(dAtA, i, uint64(m.Domain))
+		i--
+		dAtA[i] = 0x18
+	}
+	{
+		size := m.TokenId.Size()
+		i -= size
+		if _, err := m.TokenId.MarshalTo(dAtA[i:]); err != nil {
+			return 0, err
+		}
+		i = encodeVarintTx(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	if len(m.Authority) > 0 {
+		i -= len(m.Authority)
+		copy(dAtA[i:], m.Authority)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Authority)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgSetOriginPolicyResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSetOriginPolicyResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSetOriginPolicyResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -848,6 +1304,67 @@ func (m *MsgSetDomainCap) Size() (n int) {
 }
 
 func (m *MsgSetDomainCapResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgSetBasketToken) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Authority)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = m.TokenId.Size()
+	n += 1 + l + sovTx(uint64(l))
+	if m.Enabled {
+		n += 2
+	}
+	return n
+}
+
+func (m *MsgSetBasketTokenResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgSetOriginPolicy) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Authority)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = m.TokenId.Size()
+	n += 1 + l + sovTx(uint64(l))
+	if m.Domain != 0 {
+		n += 1 + sovTx(uint64(m.Domain))
+	}
+	if m.ShareCap != nil {
+		l = m.ShareCap.Size()
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if m.Paused {
+		n += 2
+	}
+	return n
+}
+
+func (m *MsgSetOriginPolicyResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -1260,6 +1777,433 @@ func (m *MsgSetDomainCapResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: MsgSetDomainCapResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSetBasketToken) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSetBasketToken: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSetBasketToken: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Authority", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Authority = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TokenId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.TokenId.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Enabled", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Enabled = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSetBasketTokenResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSetBasketTokenResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSetBasketTokenResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSetOriginPolicy) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSetOriginPolicy: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSetOriginPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Authority", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Authority = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TokenId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.TokenId.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Domain", wireType)
+			}
+			m.Domain = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Domain |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ShareCap", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			var v cosmossdk_io_math.LegacyDec
+			m.ShareCap = &v
+			if err := m.ShareCap.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Paused", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Paused = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSetOriginPolicyResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSetOriginPolicyResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSetOriginPolicyResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:

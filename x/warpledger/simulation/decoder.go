@@ -27,6 +27,8 @@ func NewDecodeStore(cdc codec.Codec) func(kvA, kvB kv.Pair) string {
 			cdc.MustUnmarshal(kvA.Value, &a)
 			cdc.MustUnmarshal(kvB.Value, &b)
 			return fmt.Sprintf("%v\n%v", a, b)
+		case hasPrefix(kvA.Key, types.BasketsKey):
+			return fmt.Sprintf("%s\n%s", hex.EncodeToString(kvA.Key), hex.EncodeToString(kvB.Key))
 		default:
 			panic(fmt.Sprintf("invalid warpledger key prefix %X", kvA.Key[:1]))
 		}

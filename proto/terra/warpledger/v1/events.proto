@@ -45,3 +45,13 @@ message EventMigrationSwept {
   string fee             = 6;
   string message_id      = 7;
 }
+
+// EventOriginPolicy is emitted when governance sets the share cap or pause
+// flag of an origin of a basket token (spec §11.4 D-29).
+message EventOriginPolicy {
+  string token_id      = 1;
+  uint32 domain        = 2;
+  string share_cap     = 3;
+  bool   has_share_cap = 4;
+  bool   paused        = 5;
+}

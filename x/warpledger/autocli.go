@@ -59,6 +59,8 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					RpcMethod: "SetDomainCap",
 					Skip:      true, // governance only (authority signer)
 				},
+				{RpcMethod: "SetBasketToken", Skip: true},  // governance only
+				{RpcMethod: "SetOriginPolicy", Skip: true}, // governance only
 				{
 					RpcMethod: "UpdateParams",
 					Skip:      true, // governance only (authority signer)

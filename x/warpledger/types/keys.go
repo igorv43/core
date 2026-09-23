@@ -24,4 +24,6 @@ var (
 	ParamsKey = collections.NewPrefix(0)
 	// LedgersKey is the collections prefix of the (token, domain) ledgers.
 	LedgersKey = collections.NewPrefix(1)
+	// BasketsKey is the collections prefix of the basket token set (D-29).
+	BasketsKey = collections.NewPrefix(2)
 )

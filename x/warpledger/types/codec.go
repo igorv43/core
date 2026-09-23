@@ -12,6 +12,8 @@ import (
 func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgUpdateParams{}, "terra/warpledger/MsgUpdateParams", nil)
 	cdc.RegisterConcrete(&MsgSetDomainCap{}, "terra/warpledger/MsgSetDomainCap", nil)
+	cdc.RegisterConcrete(&MsgSetBasketToken{}, "terra/warpledger/MsgSetBasketToken", nil)
+	cdc.RegisterConcrete(&MsgSetOriginPolicy{}, "terra/warpledger/MsgSetOriginPolicy", nil)
 	cdc.RegisterConcrete(&MsgSweepMigration{}, "terra/warpledger/MsgSweepMigration", nil)
 }
 
@@ -21,6 +23,8 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		(*sdk.Msg)(nil),
 		&MsgUpdateParams{},
 		&MsgSetDomainCap{},
+		&MsgSetBasketToken{},
+		&MsgSetOriginPolicy{},
 		&MsgSweepMigration{},
 	)
 

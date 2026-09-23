@@ -20,6 +20,9 @@ const (
 	CodeTooManyDomains     // 8
 	CodeInvalidFeeQuote    // 9
 	CodeIsmNotBonded       // 10
+	CodeSourceCapExceeded  // 11
+	CodeOriginPaused       // 12
+	CodeNotSyntheticToken  // 13
 )
 
 // Uint32 returns the numeric code for the SDK error registry.
@@ -37,3 +40,10 @@ var (
 )
 
 var ErrIsmNotBonded = errorsmod.Register(ModuleName, CodeIsmNotBonded.Uint32(), "the token ISM must be bonded in x/ismbond for a cap above bonded_cap_threshold")
+
+// Errors of the multi-origin settlement basket (spec §11.4 D-29).
+var (
+	ErrSourceCapExceeded = errorsmod.Register(ModuleName, CodeSourceCapExceeded.Uint32(), "origin share of the basket would exceed its cap")
+	ErrOriginPaused      = errorsmod.Register(ModuleName, CodeOriginPaused.Uint32(), "origin is paused for deposits and redemptions")
+	ErrNotSyntheticToken = errorsmod.Register(ModuleName, CodeNotSyntheticToken.Uint32(), "warp token is not a synthetic token")
+)

@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"errors"
+	"math/big"
 
 	"cosmossdk.io/collections"
 	errorsmod "cosmossdk.io/errors"
@@ -26,7 +27,17 @@ func newLedger(tokenId util.HexAddress, domain uint32) types.DomainLedger {
 		Received: math.ZeroInt(),
 		Cap:      math.ZeroInt(),
 		HasCap:   false,
+		ShareCap: math.LegacyZeroDec(),
 	}
+}
+
+// Collateral returns what an origin backs of a synthetic token:
+// max(0, received - sent).
+func Collateral(l types.DomainLedger) math.Int {
+	if c := l.Received.Sub(l.Sent); c.IsPositive() {
+		return c
+	}
+	return math.ZeroInt()
 }
 
 // Exposure returns the net exposure of a ledger: sent - received.
@@ -106,6 +117,9 @@ func (k Keeper) AssertOutboundAllowed(ctx sdk.Context, tokenId util.HexAddress, 
 	cap, err := k.EffectiveCap(ctx, ledger)
 	if err != nil {
 		return err
+	}
+	if ledger.Paused {
+		return errorsmod.Wrapf(types.ErrOriginPaused, "token %s domain %d", tokenId.String(), domain)
 	}
 	next := Exposure(ledger).Add(amount)
 	if next.GT(cap) {
@@ -259,4 +273,146 @@ func (k Keeper) TotalExposure(ctx sdk.Context, tokenId util.HexAddress) (math.In
 		}
 	}
 	return total, nil
+}
+
+// IsBasket reports whether a token is a multi-origin settlement basket.
+func (k Keeper) IsBasket(ctx sdk.Context, tokenId util.HexAddress) (bool, error) {
+	return k.Baskets.Has(ctx, tokenId.GetInternalId())
+}
+
+// SetBasketToken marks or unmarks a synthetic token as a basket (spec §11.4).
+// Collateral tokens cannot be baskets: their origins hold nothing.
+func (k Keeper) SetBasketToken(ctx sdk.Context, tokenId util.HexAddress, enabled bool) error {
+	token, err := k.GetToken(ctx, tokenId)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return k.Baskets.Remove(ctx, tokenId.GetInternalId())
+	}
+	if token.TokenType != warptypes.HYP_TOKEN_TYPE_SYNTHETIC {
+		return errorsmod.Wrapf(types.ErrNotSyntheticToken, "%s is %s", tokenId.String(), token.TokenType)
+	}
+	return k.Baskets.Set(ctx, tokenId.GetInternalId())
+}
+
+// SetOriginPolicy sets the share cap override (nil keeps the default) and the
+// pause flag of one origin of a token.
+func (k Keeper) SetOriginPolicy(ctx sdk.Context, tokenId util.HexAddress, domain uint32, shareCap *math.LegacyDec, paused bool) error {
+	if _, err := k.GetToken(ctx, tokenId); err != nil {
+		return err
+	}
+	ledger, exists, err := k.GetLedger(ctx, tokenId, domain)
+	if err != nil {
+		return err
+	}
+	if shareCap == nil {
+		ledger.ShareCap, ledger.HasShareCap = math.LegacyZeroDec(), false
+	} else {
+		if shareCap.IsNegative() || shareCap.GT(math.LegacyOneDec()) {
+			return errorsmod.Wrapf(types.ErrSourceCapExceeded, "share cap must be a fraction in [0, 1]: %s", shareCap)
+		}
+		ledger.ShareCap, ledger.HasShareCap = *shareCap, true
+	}
+	ledger.Paused = paused
+	if err := k.setLedger(ctx, ledger, exists); err != nil {
+		return err
+	}
+	return ctx.EventManager().EmitTypedEvent(&types.EventOriginPolicy{
+		TokenId: tokenId.String(), Domain: domain, ShareCap: ledger.ShareCap.String(), HasShareCap: ledger.HasShareCap, Paused: paused,
+	})
+}
+
+// EffectiveShareCap returns the share cap that applies to an origin: the
+// explicit override, otherwise params.settle_source_cap.
+func (k Keeper) EffectiveShareCap(ctx sdk.Context, ledger types.DomainLedger) (math.LegacyDec, error) {
+	if ledger.HasShareCap {
+		return ledger.ShareCap, nil
+	}
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return math.LegacyDec{}, err
+	}
+	return params.SettleSourceCap, nil
+}
+
+// Circulation returns Σ Collateral over the origins of a token: the synthetic
+// supply the origins back.
+func (k Keeper) Circulation(ctx sdk.Context, tokenId util.HexAddress) (math.Int, error) {
+	ledgers, err := k.LedgersOfToken(ctx, tokenId)
+	if err != nil {
+		return math.Int{}, err
+	}
+	total := math.ZeroInt()
+	for _, l := range ledgers {
+		total = total.Add(Collateral(l))
+	}
+	return total, nil
+}
+
+// Headroom returns the largest deposit an origin can still take under its
+// share cap s given its collateral c and the circulation T:
+// (c + x) / (T + x) ≤ s  ⇔  x ≤ (s·T − c) / (1 − s), truncated; unbounded
+// (s = 1) is reported as the maximum Int the caller can display.
+func Headroom(collateral, circulation math.Int, shareCap math.LegacyDec) math.Int {
+	if shareCap.GTE(math.LegacyOneDec()) {
+		return math.NewIntFromBigInt(new(big.Int).Lsh(big.NewInt(1), 200))
+	}
+	num := shareCap.MulInt(circulation).Sub(math.LegacyNewDecFromInt(collateral))
+	if !num.IsPositive() {
+		return math.ZeroInt()
+	}
+	return num.Quo(math.LegacyOneDec().Sub(shareCap)).TruncateInt()
+}
+
+// AssertInboundAllowed rejects a deposit from an origin of a basket token that
+// is paused or whose share of the circulation would exceed its cap after the
+// deposit (spec §11.4 items 4 and 6). Tokens that are not baskets are not
+// constrained. The message stays undelivered (relayers may retry it once
+// governance raises the cap or unpauses the origin), so the collateral locked
+// at the origin is never orphaned.
+func (k Keeper) AssertInboundAllowed(ctx sdk.Context, tokenId util.HexAddress, domain uint32, amount math.Int) error {
+	basket, err := k.IsBasket(ctx, tokenId)
+	if err != nil || !basket {
+		return err
+	}
+	ledger, _, err := k.GetLedger(ctx, tokenId, domain)
+	if err != nil {
+		return err
+	}
+	if ledger.Paused {
+		return errorsmod.Wrapf(types.ErrOriginPaused, "token %s domain %d", tokenId.String(), domain)
+	}
+	shareCap, err := k.EffectiveShareCap(ctx, ledger)
+	if err != nil {
+		return err
+	}
+	circulation, err := k.Circulation(ctx, tokenId)
+	if err != nil {
+		return err
+	}
+	after := Collateral(ledger).Add(amount)
+	total := circulation.Add(amount)
+	if math.LegacyNewDecFromInt(after).GT(shareCap.MulInt(total)) {
+		return errorsmod.Wrapf(types.ErrSourceCapExceeded,
+			"token %s domain %d: collateral %s of %s after the deposit exceeds share cap %s",
+			tokenId.String(), domain, after, total, shareCap)
+	}
+	return nil
+}
+
+// AssertInboundMessage applies AssertInboundAllowed to a hyperlane message
+// before the core processes it; messages that are not warp transfers pass.
+func (k Keeper) AssertInboundMessage(ctx sdk.Context, message util.HyperlaneMessage) error {
+	if message.Recipient.GetType() != uint32(warptypes.HYP_TOKEN_TYPE_SYNTHETIC) {
+		return nil
+	}
+	if has, err := k.warpKeeper.HypTokens.Has(ctx, message.Recipient.GetInternalId()); err != nil || !has {
+		return err
+	}
+	payload, err := warptypes.ParseWarpPayload(message.Body)
+	if err != nil {
+		return nil
+	}
+	return k.AssertInboundAllowed(ctx, message.Recipient, message.Origin, math.NewIntFromBigInt(payload.Amount()))
 }

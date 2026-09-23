@@ -35,6 +35,9 @@ type Keeper struct {
 	Schema  collections.Schema
 	Params  collections.Item[types.Params]
 	Ledgers collections.Map[collections.Pair[uint64, uint32], types.DomainLedger]
+	// Baskets holds the internal ids of the synthetic tokens that are
+	// multi-origin settlement baskets (spec §11.4 D-29).
+	Baskets collections.KeySet[uint64]
 }
 
 // NewKeeper creates a new x/warpledger keeper.
@@ -66,6 +69,7 @@ func NewKeeper(
 		Ledgers: collections.NewMap(sb, types.LedgersKey, "ledgers",
 			collections.PairKeyCodec(collections.Uint64Key, collections.Uint32Key),
 			codec.CollValue[types.DomainLedger](cdc)),
+		Baskets: collections.NewKeySet(sb, types.BasketsKey, "baskets", collections.Uint64Key),
 	}
 
 	schema, err := sb.Build()

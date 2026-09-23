@@ -23,8 +23,20 @@ func NewMsgServer(upstream coretypes.MsgServer, ledger warpledgerkeeper.Keeper) 
 	return &MsgServer{MsgServer: upstream, ledger: ledger}
 }
 
-// ProcessMessage handles MsgProcessMessage with inbound ledger accounting.
+// ProcessMessage handles MsgProcessMessage with inbound ledger accounting:
+// deposits into a basket token are checked against the origin share cap and
+// pause flag before the core processes the message (spec §11.4 D-29), and
+// every warp delivery is recorded afterwards.
 func (s *MsgServer) ProcessMessage(goCtx context.Context, msg *coretypes.MsgProcessMessage) (*coretypes.MsgProcessMessageResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	if raw, err := util.DecodeEthHex(msg.Message); err == nil {
+		if message, err := util.ParseHyperlaneMessage(raw); err == nil {
+			if err := s.ledger.AssertInboundMessage(ctx, message); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	res, err := s.MsgServer.ProcessMessage(goCtx, msg)
 	if err != nil {
 		return nil, err
@@ -40,8 +52,6 @@ func (s *MsgServer) ProcessMessage(goCtx context.Context, msg *coretypes.MsgProc
 	if err != nil {
 		return nil, err
 	}
-
-	ctx := sdk.UnwrapSDKContext(goCtx)
 	if err := s.ledger.RecordInboundMessage(ctx, message); err != nil {
 		return nil, err
 	}

@@ -44,6 +44,30 @@ func (ms msgServer) SetDomainCap(goCtx context.Context, msg *types.MsgSetDomainC
 	return &types.MsgSetDomainCapResponse{}, nil
 }
 
+// SetBasketToken implements types.MsgServer.
+func (ms msgServer) SetBasketToken(goCtx context.Context, msg *types.MsgSetBasketToken) (*types.MsgSetBasketTokenResponse, error) {
+	if ms.k.authority != msg.Authority {
+		return nil, errorsmod.Wrapf(govtypes.ErrInvalidSigner, "expected %s, got %s", ms.k.authority, msg.Authority)
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	if err := ms.k.SetBasketToken(ctx, msg.TokenId, msg.Enabled); err != nil {
+		return nil, err
+	}
+	return &types.MsgSetBasketTokenResponse{}, nil
+}
+
+// SetOriginPolicy implements types.MsgServer.
+func (ms msgServer) SetOriginPolicy(goCtx context.Context, msg *types.MsgSetOriginPolicy) (*types.MsgSetOriginPolicyResponse, error) {
+	if ms.k.authority != msg.Authority {
+		return nil, errorsmod.Wrapf(govtypes.ErrInvalidSigner, "expected %s, got %s", ms.k.authority, msg.Authority)
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	if err := ms.k.SetOriginPolicy(ctx, msg.TokenId, msg.Domain, msg.ShareCap, msg.Paused); err != nil {
+		return nil, err
+	}
+	return &types.MsgSetOriginPolicyResponse{}, nil
+}
+
 // SweepMigration implements types.MsgServer.
 func (ms msgServer) SweepMigration(goCtx context.Context, msg *types.MsgSweepMigration) (*types.MsgSweepMigrationResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
