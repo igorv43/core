@@ -145,6 +145,7 @@ func (k Keeper) settlePerp(ctx sdk.Context, params types.Params, market types.Ma
 			}
 			released[f.Key] = true
 			if err := k.marginHook.Fill(ctx, types.PerpFill{Batch: batch, Account: addr, Market: market, Side: f.Side, Qty: f.Qty, Price: f.Price, Solver: true, BuilderFee: math.ZeroInt()}); err != nil {
+				k.Logger(ctx).Info("perp fill excluded", "batch", batch, "market", market.Id, "key", f.Key, "err", err)
 				failed = append(failed, f.Key)
 			}
 			continue
@@ -167,6 +168,7 @@ func (k Keeper) settlePerp(ctx sdk.Context, params types.Params, market types.Ma
 		}
 		if err := k.marginHook.Fill(ctx, types.PerpFill{Batch: batch, Account: addr, Market: market, Side: f.Side, Qty: f.Qty, Price: f.Price,
 			ReduceOnly: in.ReduceOnly, Frontend: in.Frontend, BuilderFee: builderFee}); err != nil {
+			k.Logger(ctx).Info("perp fill excluded", "batch", batch, "market", market.Id, "key", f.Key, "err", err)
 			failed = append(failed, f.Key)
 			continue
 		}

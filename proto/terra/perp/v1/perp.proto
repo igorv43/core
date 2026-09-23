@@ -74,6 +74,22 @@ message Params {
   // max_liquidations_per_block and max_triggers_per_block bound the EndBlock work (spec §12).
   uint32 max_liquidations_per_block = 26;
   uint32 max_triggers_per_block = 27;
+  // stLUNC as collateral (spec §21.5, D-16). st_denom is the liquid staking denom;
+  // luna_price_denom is the x/oracle denom whose LUNC rate prices it in settlement.
+  string st_denom = 28;
+  string luna_price_denom = 29;
+  // st_haircut is the base discount on the stLUNC value (rule 4).
+  string st_haircut = 30 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // st_share_cap bounds the share of a position's collateral value covered by stLUNC (rule 5).
+  string st_share_cap = 31 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // st_global_cap is the governance cap on stLUNC accepted as collateral, in units (rule 6).
+  string st_global_cap = 32 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // st_global_cap_if_ratio bounds the stLUNC value accepted to a multiple of the fund core (rule 6).
+  string st_global_cap_if_ratio = 33 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // st_haircut_queue_slope raises the haircut with the liquid staking redemption queue (rule 9).
+  string st_haircut_queue_slope = 34 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // st_unwind_cap_per_epoch caps the uluna the tranche sells per allocation epoch (rule 7).
+  string st_unwind_cap_per_epoch = 35 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }
 
 // Market is a perpetual market (spec §19–§22). Governance sets the risk
@@ -118,6 +134,9 @@ message Market {
   uint32 premium_count = 25;
   // last_risk_height is the last vote period boundary at which the risk steps were applied.
   int64 last_risk_height = 26;
+  // st_collateral_allowed lets positions of this market hold stLUNC margin
+  // (spec §21.5 rule 3: never for a market priced by the LUNC rate).
+  bool st_collateral_allowed = 27;
 }
 
 // Position is an isolated-margin position (spec §19.1). Unrealized PnL,
@@ -140,6 +159,9 @@ message Position {
   // liq_price_indexed is the liquidation price under which the position is
   // indexed for the incremental sweep (spec §19.5).
   string liq_price_indexed = 11 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // collateral_st is the stLUNC margin of the position in units (spec §21.5),
+  // valued at ER·P_LUNC·(1 − haircut) whenever the position is read.
+  string collateral_st = 12 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }
 
 // TriggerOrder is a resident stop-loss / take-profit (spec §14.5 layer 4):
@@ -203,4 +225,14 @@ message Ledger {
   int64  epoch_start_height = 7;
   // buyback_intent_id is the open buyback intent in the spot market (0 = none).
   uint64 buyback_intent_id = 8;
+  // stLUNC tranche of the fund (spec §21.5 rule 7): seized units held,
+  // units in the redemption queue, claimed uluna waiting to be sold, the open
+  // sell intent and what was sold in the current epoch. Never part of IF.
+  string tranche_st = 9 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string tranche_unbonding_st = 10 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string tranche_uluna = 11 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  uint64 tranche_sell_intent_id = 12;
+  string tranche_sold_epoch = 13 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // tranche_advanced is the settlement the core advanced against seized stLUNC and not yet repaid.
+  string tranche_advanced = 14 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }

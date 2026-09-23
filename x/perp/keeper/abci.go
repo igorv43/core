@@ -27,6 +27,9 @@ func (k Keeper) EndBlocker(ctx sdk.Context) error {
 	if err := k.runAllocation(ctx, params); err != nil {
 		k.Logger(ctx).Error("allocation failed", "err", err)
 	}
+	if err := k.trancheStep(ctx, params); err != nil {
+		k.Logger(ctx).Error("tranche step failed", "err", err)
+	}
 	if err := k.runBuyback(ctx, params); err != nil {
 		k.Logger(ctx).Error("buyback failed", "err", err)
 	}

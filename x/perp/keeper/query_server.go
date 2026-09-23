@@ -3,6 +3,7 @@ package keeper
 import (
 	"context"
 
+	"cosmossdk.io/math"
 	"github.com/classic-terra/core/v4/x/perp/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"google.golang.org/grpc/codes"
@@ -129,7 +130,23 @@ func (qs queryServer) Collateral(goCtx context.Context, req *types.QueryCollater
 	if err != nil {
 		return nil, err
 	}
-	return &types.QueryCollateralResponse{Free: free, Reserved: reserved, InPositions: inPositions, AutoTopUp: auto}, nil
+	params, err := qs.k.GetParams(ctx)
+	if err != nil {
+		return nil, err
+	}
+	val := qs.k.stValuation(ctx, params)
+	freeSt, err := qs.k.FreeSt(ctx, req.Account)
+	if err != nil {
+		return nil, err
+	}
+	inPositionsSt := math.ZeroInt()
+	for _, p := range positions {
+		if !p.CollateralSt.IsNil() {
+			inPositionsSt = inPositionsSt.Add(p.CollateralSt)
+		}
+	}
+	return &types.QueryCollateralResponse{Free: free, Reserved: reserved, InPositions: inPositions, AutoTopUp: auto,
+		FreeSt: freeSt, StValue: val.Value(freeSt), HaircutEff: val.Haircut, InPositionsSt: inPositionsSt}, nil
 }
 
 func (qs queryServer) Triggers(goCtx context.Context, req *types.QueryTriggersRequest) (*types.QueryTriggersResponse, error) {

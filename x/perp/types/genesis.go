@@ -28,7 +28,9 @@ func DefaultGenesisState() *GenesisState {
 // DefaultLedger returns an empty ledger.
 func DefaultLedger() Ledger {
 	return Ledger{Insurance: math.ZeroInt(), Revenue: math.ZeroInt(), BurnBudget: math.ZeroInt(),
-		BurnSpentEpoch: math.ZeroInt(), BurnedEpoch: math.ZeroInt(), Epoch: 0, EpochStartHeight: 0}
+		BurnSpentEpoch: math.ZeroInt(), BurnedEpoch: math.ZeroInt(), Epoch: 0, EpochStartHeight: 0,
+		TrancheSt: math.ZeroInt(), TrancheUnbondingSt: math.ZeroInt(), TrancheUluna: math.ZeroInt(),
+		TrancheSoldEpoch: math.ZeroInt(), TrancheAdvanced: math.ZeroInt()}
 }
 
 // Validate performs basic genesis validation.
@@ -58,6 +60,9 @@ func (gs GenesisState) Validate() error {
 		}
 		if p.Side != batchtypes.SIDE_BUY && p.Side != batchtypes.SIDE_SELL {
 			return fmt.Errorf("position of %s: invalid side", p.Account)
+		}
+		if !p.CollateralSt.IsNil() && p.CollateralSt.IsNegative() {
+			return fmt.Errorf("position of %s: collateral_st must be non-negative", p.Account)
 		}
 	}
 	for _, c := range gs.Collateral {

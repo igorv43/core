@@ -120,7 +120,7 @@ func (k Keeper) runAllocation(ctx sdk.Context, params types.Params) error {
 	l.Revenue = math.ZeroInt()
 	l.Epoch++
 	l.EpochStartHeight = ctx.BlockHeight()
-	l.BurnSpentEpoch, l.BurnedEpoch = math.ZeroInt(), math.ZeroInt()
+	l.BurnSpentEpoch, l.BurnedEpoch, l.TrancheSoldEpoch = math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
 	if err := k.Ledger.Set(ctx, l); err != nil {
 		return err
 	}
@@ -168,8 +168,13 @@ func (k Keeper) runBuyback(ctx sdk.Context, params types.Params) error {
 			}
 		}
 	}
-	// burn what was bought
+	// a tranche sale owns the module's uluna and settlement surplus while open
+	if l.TrancheSellIntentId != 0 {
+		return k.Ledger.Set(ctx, l)
+	}
+	// burn what was bought (never the tranche's claimed uluna)
 	uluna := k.bankKeeper.GetBalance(ctx, k.ModuleAddress(), "uluna")
+	uluna.Amount = uluna.Amount.Sub(l.TrancheUluna)
 	if uluna.IsPositive() {
 		if err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, k.burnAccount, sdk.NewCoins(uluna)); err != nil {
 			return err

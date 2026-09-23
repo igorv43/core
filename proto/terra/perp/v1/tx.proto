@@ -122,6 +122,7 @@ message MsgCreateMarket {
   bool   venues_attested    = 9;
   string min_qty = 10 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   string tick_size = 11 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  bool   st_collateral_allowed = 12;
 }
 message MsgCreateMarketResponse {}
 
@@ -136,6 +137,7 @@ message MsgUpdateMarket {
   string stress = 6 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
   int64  listing_min_blocks = 7;
   bool   venues_attested    = 8;
+  bool   st_collateral_allowed = 9;
 }
 message MsgUpdateMarketResponse {}
 

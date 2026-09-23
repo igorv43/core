@@ -6,6 +6,7 @@ import (
 	"cosmossdk.io/math"
 	batchkeeper "github.com/classic-terra/core/v4/x/batch/keeper"
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
+	liquidstakekeeper "github.com/classic-terra/core/v4/x/liquidstake/keeper"
 	oracletypes "github.com/classic-terra/core/v4/x/oracle/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -40,6 +41,15 @@ type BatchKeeper interface {
 	GetIntent(ctx sdk.Context, id uint64) (batchtypes.Intent, error)
 	HasOpenIntent(ctx sdk.Context, account, marketID string) (bool, error)
 	GetParams(ctx sdk.Context) (batchtypes.Params, error)
+}
+
+// LiquidStakeKeeper is the subset of x/liquidstake used to value stLUNC
+// collateral and to redeem the fund's tranche (spec §21.5).
+type LiquidStakeKeeper interface {
+	// ExchangeRate returns uluna per stLUNC and the asset breakdown.
+	ExchangeRate(ctx sdk.Context) (math.LegacyDec, liquidstakekeeper.Totals, error)
+	Unstake(ctx sdk.Context, sender sdk.AccAddress, stAmount sdk.Coin) (liquidstakekeeper.UnstakeResult, error)
+	Claim(ctx sdk.Context, sender sdk.AccAddress) (sdk.Coin, []uint64, error)
 }
 
 // DistributionKeeper funds the community pool (allocation cascade).

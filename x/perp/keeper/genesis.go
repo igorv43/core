@@ -185,6 +185,15 @@ func (k Keeper) CheckInvariants(ctx sdk.Context) (string, bool) {
 	if actual.LT(expected) {
 		return "module balance " + actual.String() + " below the ledger total " + expected.String(), true
 	}
+	// stLUNC ledger equals the module's stLUNC balance (spec §21.5)
+	stTotal, err := k.totalSt(ctx)
+	if err != nil {
+		return err.Error(), true
+	}
+	stTotal = stTotal.Add(l.TrancheSt)
+	if bank := k.bankKeeper.GetBalance(ctx, k.ModuleAddress(), params.StDenom).Amount; !bank.Equal(stTotal) {
+		return "module stLUNC balance " + bank.String() + " differs from the ledger total " + stTotal.String(), true
+	}
 	broken := ""
 	_ = k.Collateral.Walk(ctx, nil, func(account string, free math.Int) (bool, error) {
 		reserved, err := k.ReservedTotal(ctx, account)

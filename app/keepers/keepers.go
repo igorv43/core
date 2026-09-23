@@ -599,6 +599,7 @@ func NewAppKeepers(
 		appKeepers.OracleKeeper,
 		&appKeepers.BatchKeeper, // pointer: the hook and sink are registered on it below
 		appKeepers.DistrKeeper,
+		appKeepers.LiquidStakeKeeper,
 		treasurytypes.BurnModuleName,
 	)
 	appKeepers.BatchKeeper.SetMarginHook(perpkeeper.NewMarginHook(appKeepers.PerpKeeper))

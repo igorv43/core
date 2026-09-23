@@ -114,6 +114,7 @@ func (m MsgCreateMarket) Market() Market {
 	return Market{
 		Id: m.Id, OracleAsset: m.OracleAsset, MaxLeverage: m.MaxLeverage, OiCap: m.OiCap, Alpha: m.Alpha, Stress: m.Stress,
 		ListingMinBlocks: m.ListingMinBlocks, VenuesAttested: m.VenuesAttested, MinQty: m.MinQty, TickSize: m.TickSize,
+		StCollateralAllowed: m.StCollateralAllowed,
 	}
 }
 

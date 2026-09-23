@@ -41,7 +41,11 @@ func (h MarginHook) Reserve(ctx sdk.Context, account sdk.AccAddress, bm batchtyp
 		return errorsmod.Wrap(types.ErrReduceOnly, "market in reduce-only state: only reduce_only orders are accepted")
 	}
 	amount := reserveAmount(market, qty, limit)
-	avail, err := k.Available(ctx, account.String())
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return err
+	}
+	avail, err := k.AvailableFor(ctx, params, account.String(), market, k.stValuation(ctx, params))
 	if err != nil {
 		return err
 	}
@@ -93,6 +97,7 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 	}
 	account := f.Account.String()
 	isFund := account == types.InsuranceFundAddress()
+	val := k.stValuation(ctx, params)
 
 	// premium sample of the batch (spec §20.1): p* against P_ref, once per batch
 	if err := k.recordPremium(ctx, params, &market, f.Batch, f.Price); err != nil {
@@ -106,7 +111,7 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 	qty := f.Qty
 	if exists && pos.Side != f.Side {
 		closeQty := math.MinInt(qty, pos.Qty)
-		if _, _, err := k.reducePosition(ctx, &market, &pos, closeQty, f.Price); err != nil {
+		if _, _, err := k.reducePositionValued(ctx, &market, &pos, closeQty, f.Price, val); err != nil {
 			return err
 		}
 		qty = qty.Sub(closeQty)
@@ -115,7 +120,7 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 				return err
 			}
 			exists = false
-		} else if err := k.setPosition(ctx, market, pos); err != nil {
+		} else if err := k.setPositionValued(ctx, market, pos, val); err != nil {
 			return err
 		}
 	}
@@ -137,10 +142,10 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 		if oi.Add(qty).GT(cap) {
 			return errorsmod.Wrapf(types.ErrOICapExceeded, "%s side at %s, cap %s", f.Side, oi, cap)
 		}
-		if err := k.increasePosition(ctx, params, &market, account, f.Side, qty, f.Price, &pos, exists); err != nil {
+		if err := k.increasePositionValued(ctx, params, &market, account, f.Side, qty, f.Price, &pos, exists, val); err != nil {
 			return err
 		}
-		if err := k.setPosition(ctx, market, pos); err != nil {
+		if err := k.setPositionValued(ctx, market, pos, val); err != nil {
 			return err
 		}
 	}
@@ -149,14 +154,14 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 	fee := math.ZeroInt()
 	if !isFund {
 		fee = math.LegacyNewDecFromInt(f.Qty).Mul(f.Price).MulInt64(int64(params.PerpFeeBps)).QuoInt64(10_000).Ceil().TruncateInt()
-		if err := k.addFree(ctx, account, fee.Neg()); err != nil {
+		if _, _, err := k.chargeSettlement(ctx, val, account, fee); err != nil {
 			return errorsmod.Wrapf(types.ErrInsufficientFree, "protocol fee %s: %v", fee, err)
 		}
 		if err := k.routeFee(ctx, fee, false); err != nil {
 			return err
 		}
 		if f.Frontend != "" && !f.BuilderFee.IsNil() && f.BuilderFee.IsPositive() {
-			if err := k.addFree(ctx, account, f.BuilderFee.Neg()); err != nil {
+			if _, _, err := k.chargeSettlement(ctx, val, account, f.BuilderFee); err != nil {
 				return errorsmod.Wrapf(types.ErrInsufficientFree, "builder fee %s: %v", f.BuilderFee, err)
 			}
 			fe, err := sdk.AccAddressFromBech32(f.Frontend)

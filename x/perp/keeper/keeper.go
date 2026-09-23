@@ -26,6 +26,7 @@ type Keeper struct {
 	oracleKeeper types.OracleKeeper
 	batchKeeper  types.BatchKeeper
 	distrKeeper  types.DistributionKeeper
+	lsKeeper     types.LiquidStakeKeeper
 	burnAccount  string
 
 	Schema            collections.Schema
@@ -34,6 +35,8 @@ type Keeper struct {
 	Positions         collections.Map[collections.Pair[string, string], types.Position]
 	PositionsByMarket collections.KeySet[collections.Pair[string, string]]
 	Collateral        collections.Map[string, math.Int]
+	// CollateralSt is the free stLUNC of an account, in units (spec §21.5).
+	CollateralSt      collections.Map[string, math.Int]
 	Reservations      collections.Map[collections.Pair[string, string], math.Int]
 	Triggers          collections.Map[uint64, types.TriggerOrder]
 	TriggerSeq        collections.Sequence
@@ -60,6 +63,7 @@ func NewKeeper(
 	oracleKeeper types.OracleKeeper,
 	batchKeeper types.BatchKeeper,
 	distrKeeper types.DistributionKeeper,
+	lsKeeper types.LiquidStakeKeeper,
 	burnAccount string,
 ) Keeper {
 	if _, err := sdk.AccAddressFromBech32(authority); err != nil {
@@ -68,14 +72,15 @@ func NewKeeper(
 	sb := collections.NewSchemaBuilder(storeService)
 	k := Keeper{
 		cdc: cdc, authority: authority, bankKeeper: bankKeeper, oracleKeeper: oracleKeeper, batchKeeper: batchKeeper,
-		distrKeeper: distrKeeper, burnAccount: burnAccount,
+		distrKeeper: distrKeeper, lsKeeper: lsKeeper, burnAccount: burnAccount,
 		Params:  collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
 		Markets: collections.NewMap(sb, types.MarketsKey, "markets", collections.StringKey, codec.CollValue[types.Market](cdc)),
 		Positions: collections.NewMap(sb, types.PositionsKey, "positions",
 			collections.PairKeyCodec(collections.StringKey, collections.StringKey), codec.CollValue[types.Position](cdc)),
 		PositionsByMarket: collections.NewKeySet(sb, types.PositionsByMarketKey, "positions_by_market",
 			collections.PairKeyCodec(collections.StringKey, collections.StringKey)),
-		Collateral: collections.NewMap(sb, types.CollateralKey, "collateral", collections.StringKey, sdk.IntValue),
+		Collateral:   collections.NewMap(sb, types.CollateralKey, "collateral", collections.StringKey, sdk.IntValue),
+		CollateralSt: collections.NewMap(sb, types.CollateralStKey, "collateral_st", collections.StringKey, sdk.IntValue),
 		Reservations: collections.NewMap(sb, types.ReservationsKey, "reservations",
 			collections.PairKeyCodec(collections.StringKey, collections.StringKey), sdk.IntValue),
 		Triggers:   collections.NewMap(sb, types.TriggersKey, "triggers", collections.Uint64Key, codec.CollValue[types.TriggerOrder](cdc)),

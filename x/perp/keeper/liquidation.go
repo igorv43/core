@@ -57,25 +57,26 @@ func (k Keeper) sweepLiquidations(ctx sdk.Context, params types.Params, m *types
 	if err != nil {
 		return err
 	}
+	val := k.stValuation(ctx, params)
 	fund := types.InsuranceFundAddress()
 	for _, p := range candidates {
 		if p.Account == fund {
 			continue
 		}
-		equity := p.Equity(m.MarkPrice, m.FundingIndex)
+		equity := valued(p, val).Equity(m.MarkPrice, m.FundingIndex)
 		required := p.MaintenanceRequirement(m.MarkPrice)
 		if equity.GTE(required) {
-			if err := k.setPosition(ctx, *m, p); err != nil { // stale index entry: refresh
+			if err := k.setPositionValued(ctx, *m, p, val); err != nil { // stale index entry: refresh
 				return err
 			}
 			continue
 		}
-		if rescued, err := k.autoTopUp(ctx, *m, &p, equity); err != nil {
+		if rescued, err := k.autoTopUp(ctx, params, *m, &p, equity, val); err != nil {
 			return err
 		} else if rescued {
 			continue
 		}
-		if err := k.liquidate(ctx, params, m, p); err != nil {
+		if err := k.liquidate(ctx, params, m, p, val); err != nil {
 			return err
 		}
 	}
@@ -83,8 +84,9 @@ func (k Keeper) sweepLiquidations(ctx sdk.Context, params types.Params, m *types
 }
 
 // autoTopUp moves free collateral into the position up to the initial margin
-// when the account opted in (spec §14.5 layer 4, item 2).
-func (k Keeper) autoTopUp(ctx sdk.Context, m types.Market, p *types.Position, equity math.Int) (bool, error) {
+// when the account opted in (spec §14.5 layer 4, item 2): settlement first,
+// then stLUNC within the share cap when the market allows it.
+func (k Keeper) autoTopUp(ctx sdk.Context, params types.Params, m types.Market, p *types.Position, equity math.Int, val StValuation) (bool, error) {
 	if has, err := k.AutoTopUp.Has(ctx, p.Account); err != nil || !has {
 		return false, err
 	}
@@ -96,14 +98,42 @@ func (k Keeper) autoTopUp(ctx sdk.Context, m types.Market, p *types.Position, eq
 	if err != nil {
 		return false, err
 	}
-	if avail.LT(need) {
-		return false, nil
+	if avail.IsNegative() {
+		avail = math.ZeroInt()
 	}
-	if err := k.addFree(ctx, p.Account, need.Neg()); err != nil {
+	fromSettlement := math.MinInt(avail, need)
+	rest := need.Sub(fromSettlement)
+	stUnits := math.ZeroInt()
+	if rest.IsPositive() {
+		if !m.StCollateralAllowed || !val.Available {
+			return false, nil
+		}
+		freeSt, err := k.FreeSt(ctx, p.Account)
+		if err != nil {
+			return false, err
+		}
+		if p.CollateralSt.IsNil() {
+			p.CollateralSt = math.ZeroInt()
+		}
+		// rule 5 on the position after the top-up
+		room := stCapacity(params, p.Collateral.Add(fromSettlement), val.Value(freeSt).Add(val.Value(p.CollateralSt))).Sub(val.Value(p.CollateralSt))
+		if room.LT(rest) {
+			return false, nil
+		}
+		stUnits = val.Units(rest)
+		if freeSt.LT(stUnits) {
+			return false, nil
+		}
+		if err := k.addFreeSt(ctx, p.Account, stUnits.Neg()); err != nil {
+			return false, err
+		}
+	}
+	if err := k.addFree(ctx, p.Account, fromSettlement.Neg()); err != nil {
 		return false, err
 	}
-	p.Collateral = p.Collateral.Add(need)
-	if err := k.setPosition(ctx, m, *p); err != nil {
+	p.Collateral = p.Collateral.Add(fromSettlement)
+	p.CollateralSt = p.CollateralSt.Add(stUnits)
+	if err := k.setPositionValued(ctx, m, *p, val); err != nil {
 		return false, err
 	}
 	return true, ctx.EventManager().EmitTypedEvent(&types.EventAutoTopUp{Account: p.Account, MarketId: m.Id, Amount: need.String()})
@@ -113,10 +143,15 @@ func (k Keeper) autoTopUp(ctx sdk.Context, m types.Market, p *types.Position, eq
 // maintenance: penalty on the notional to the fund, transfer of the position
 // to the fund at the mark (the fund absorbs a negative equity), or ADL when
 // the fund's inventory cap is hit or the fund cannot absorb the loss.
-func (k Keeper) liquidate(ctx sdk.Context, params types.Params, m *types.Market, p types.Position) error {
+func (k Keeper) liquidate(ctx sdk.Context, params types.Params, m *types.Market, p types.Position, val StValuation) error {
 	notional := types.Notional(p.Qty, m.MarkPrice)
 	penalty := params.LiqPenalty.MulInt(notional).Ceil().TruncateInt()
-	equity := p.Equity(m.MarkPrice, m.FundingIndex)
+	equity := valued(p, val).Equity(m.MarkPrice, m.FundingIndex)
+	stUnits := p.CollateralSt
+	if stUnits.IsNil() {
+		stUnits = math.ZeroInt()
+	}
+	stValue := val.Value(stUnits)
 
 	inv, err := k.insuranceInventory(ctx, m.Id)
 	if err != nil {
@@ -135,9 +170,11 @@ func (k Keeper) liquidate(ctx sdk.Context, params types.Params, m *types.Market,
 	if equity.LT(penalty) {
 		shortfall = penalty.Sub(equity)
 	}
-	toADL := inv.Add(delta).Abs().GT(maxInventory) || balance.LT(shortfall)
+	// the core must absorb the shortfall and advance the haircut value of the
+	// seized stLUNC (repaid by the tranche, spec §21.5 rule 7)
+	toADL := inv.Add(delta).Abs().GT(maxInventory) || balance.LT(shortfall.Add(stValue))
 	if toADL {
-		if err := k.autoDeleverage(ctx, m, p); err != nil {
+		if err := k.autoDeleverage(ctx, m, p, val); err != nil {
 			return err
 		}
 		return ctx.EventManager().EmitTypedEvent(&types.EventPositionLiquidated{Account: p.Account, MarketId: m.Id, Side: p.Side.String(),
@@ -147,6 +184,11 @@ func (k Keeper) liquidate(ctx sdk.Context, params types.Params, m *types.Market,
 	// 1–2: the position's margin pays its loss and the penalty
 	if err := k.removePosition(ctx, p); err != nil {
 		return err
+	}
+	if stUnits.IsPositive() {
+		if err := k.seizeToTranche(ctx, stUnits, stValue, true); err != nil {
+			return err
+		}
 	}
 	remaining := equity.Sub(penalty) // collateral left after loss and penalty (may be negative)
 	if err := k.creditInsurance(ctx, math.MinInt(penalty, math.MaxInt(equity, math.ZeroInt()))); err != nil {
@@ -232,6 +274,11 @@ func (k Keeper) insuranceInventory(ctx sdk.Context, marketID string) (math.Int, 
 // adlRank returns the positions of the opposite side ranked by ADL score
 // (spec §18.2): highest score first, ties by account address.
 func (k Keeper) adlRank(ctx sdk.Context, m types.Market, side batchtypes.Side) ([]types.ADLEntry, []types.Position, error) {
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	val := k.stValuation(ctx, params)
 	positions, err := k.positionsOfMarket(ctx, m.Id)
 	if err != nil {
 		return nil, nil, err
@@ -242,7 +289,7 @@ func (k Keeper) adlRank(ctx sdk.Context, m types.Market, side batchtypes.Side) (
 		if p.Side != side || p.Account == types.InsuranceFundAddress() {
 			continue
 		}
-		entries = append(entries, types.ADLEntry{Account: p.Account, Side: p.Side, Qty: p.Qty, Score: p.ADLScore(m.MarkPrice, m.FundingIndex)})
+		entries = append(entries, types.ADLEntry{Account: p.Account, Side: p.Side, Qty: p.Qty, Score: valued(p, val).ADLScore(m.MarkPrice, m.FundingIndex)})
 		ranked = append(ranked, p)
 	}
 	idx := make([]int, len(entries))
@@ -266,8 +313,8 @@ func (k Keeper) adlRank(ctx sdk.Context, m types.Market, side batchtypes.Side) (
 
 // autoDeleverage closes a defaulting position at its bankruptcy price
 // against the highest-scored positions of the opposite side (spec §18.2).
-func (k Keeper) autoDeleverage(ctx sdk.Context, m *types.Market, p types.Position) error {
-	price := p.BankruptcyPrice(m.FundingIndex)
+func (k Keeper) autoDeleverage(ctx sdk.Context, m *types.Market, p types.Position, val StValuation) error {
+	price := valued(p, val).BankruptcyPrice(m.FundingIndex)
 	if !price.IsPositive() {
 		price = m.MarkPrice
 	}
@@ -285,14 +332,14 @@ func (k Keeper) autoDeleverage(ctx sdk.Context, m *types.Market, p types.Positio
 			break
 		}
 		q := math.MinInt(remaining, cp.Qty)
-		if _, _, err := k.reducePosition(ctx, m, &cp, q, price); err != nil {
+		if _, _, err := k.reducePositionValued(ctx, m, &cp, q, price, val); err != nil {
 			return err
 		}
 		if cp.Qty.IsZero() {
 			if err := k.removePosition(ctx, cp); err != nil {
 				return err
 			}
-		} else if err := k.setPosition(ctx, *m, cp); err != nil {
+		} else if err := k.setPositionValued(ctx, *m, cp, val); err != nil {
 			return err
 		}
 		if err := ctx.EventManager().EmitTypedEvent(&types.EventADLExecuted{MarketId: m.Id, Defaulter: p.Account, Counterparty: cp.Account, Qty: q.String(), Price: price.String()}); err != nil {
@@ -302,7 +349,7 @@ func (k Keeper) autoDeleverage(ctx sdk.Context, m *types.Market, p types.Positio
 	}
 	closed := p.Qty.Sub(remaining)
 	if closed.IsPositive() {
-		if _, _, err := k.reducePosition(ctx, m, &p, closed, price); err != nil {
+		if _, _, err := k.reducePositionValued(ctx, m, &p, closed, price, val); err != nil {
 			return err
 		}
 	}
@@ -310,5 +357,5 @@ func (k Keeper) autoDeleverage(ctx sdk.Context, m *types.Market, p types.Positio
 		return k.removePosition(ctx, p)
 	}
 	// no counterparties left for the remainder: it stays until the next block
-	return k.setPosition(ctx, *m, p)
+	return k.setPositionValued(ctx, *m, p, val)
 }

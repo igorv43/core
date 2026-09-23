@@ -11,6 +11,9 @@ import (
 // governance sets the bridged settlement denom (spec §11).
 const DefaultSettlementDenom = "uusd"
 
+// DefaultStDenom is the liquid staking denom accepted as collateral (spec §21.5).
+const DefaultStDenom = "stluna"
+
 // DefaultParams returns the initial parameters of spec Annex B.
 func DefaultParams() Params {
 	return Params{
@@ -41,6 +44,14 @@ func DefaultParams() Params {
 		SpotMarketId:               "",
 		MaxLiquidationsPerBlock:    MaxLiquidationsPerBlockDefault,
 		MaxTriggersPerBlock:        MaxTriggersPerBlockDefault,
+		StDenom:                    DefaultStDenom,
+		LunaPriceDenom:             "uusd",
+		StHaircut:                  math.LegacyNewDecWithPrec(35, 2), // 35% (D-16)
+		StShareCap:                 math.LegacyNewDecWithPrec(50, 2), // 50% of a position's collateral value
+		StGlobalCap:                math.ZeroInt(),                   // governance opens it; zero = stLUNC refused
+		StGlobalCapIfRatio:         math.LegacyNewDec(2),             // stLUNC value at most 2× the fund core
+		StHaircutQueueSlope:        math.LegacyNewDecWithPrec(50, 2), // +50% of haircut per 100% of assets queued
+		StUnwindCapPerEpoch:        math.NewInt(100_000_000_000),     // 100,000 LUNC sold per epoch
 	}
 }
 
@@ -107,6 +118,29 @@ func (p Params) Validate() error {
 	}
 	if p.MaxLiquidationsPerBlock == 0 || p.MaxTriggersPerBlock == 0 {
 		return fmt.Errorf("max_liquidations_per_block and max_triggers_per_block must be positive")
+	}
+	if err := sdk.ValidateDenom(p.StDenom); err != nil {
+		return fmt.Errorf("st_denom: %w", err)
+	}
+	if p.StDenom == p.SettlementDenom {
+		return fmt.Errorf("st_denom must differ from the settlement denom")
+	}
+	if err := sdk.ValidateDenom(p.LunaPriceDenom); err != nil {
+		return fmt.Errorf("luna_price_denom: %w", err)
+	}
+	for name, d := range map[string]math.LegacyDec{"st_haircut": p.StHaircut, "st_share_cap": p.StShareCap} {
+		if err := fraction(name, d); err != nil {
+			return err
+		}
+	}
+	if p.StShareCap.Equal(math.LegacyOneDec()) {
+		return fmt.Errorf("st_share_cap must be below 1: some settlement is always required")
+	}
+	if p.StGlobalCap.IsNil() || p.StGlobalCap.IsNegative() || p.StUnwindCapPerEpoch.IsNil() || p.StUnwindCapPerEpoch.IsNegative() {
+		return fmt.Errorf("st_global_cap and st_unwind_cap_per_epoch must be non-negative")
+	}
+	if p.StGlobalCapIfRatio.IsNil() || p.StGlobalCapIfRatio.IsNegative() || p.StHaircutQueueSlope.IsNil() || p.StHaircutQueueSlope.IsNegative() {
+		return fmt.Errorf("st_global_cap_if_ratio and st_haircut_queue_slope must be non-negative")
 	}
 	return nil
 }

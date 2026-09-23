@@ -157,11 +157,12 @@ func (k Keeper) applyFunding(ctx sdk.Context, params types.Params, m *types.Mark
 	if err != nil {
 		return err
 	}
+	val := k.stValuation(ctx, params)
 	for i, p := range positions {
 		if i >= types.MaxFundingReindexPerApply {
 			break
 		}
-		if err := k.setPosition(ctx, *m, p); err != nil {
+		if err := k.setPositionValued(ctx, *m, p, val); err != nil {
 			return err
 		}
 	}

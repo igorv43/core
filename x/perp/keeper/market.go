@@ -30,6 +30,9 @@ func (k Keeper) CreateMarket(ctx sdk.Context, m types.Market) error {
 	if !ok || quote != params.SettlementDenom || base == "" {
 		return errorsmod.Wrapf(types.ErrInvalidMarket, "id must be <base>/%s", params.SettlementDenom)
 	}
+	if err := assertStRule3(params, m); err != nil {
+		return err
+	}
 	if err := k.batchKeeper.CreateMarket(ctx, batchtypes.Market{
 		Id: m.Id, BaseDenom: base, QuoteDenom: quote, Type: batchtypes.MARKET_TYPE_PERP, OracleDenom: m.OracleAsset,
 		Enabled: false, MinQty: m.MinQty, TickSize: m.TickSize,
@@ -57,9 +60,16 @@ func (k Keeper) UpdateMarket(ctx sdk.Context, msg *types.MsgUpdateMarket) error 
 		return err
 	}
 	m.MaxLeverage, m.OiCap, m.Alpha, m.Stress = msg.MaxLeverage, msg.OiCap, msg.Alpha, msg.Stress
-	m.ListingMinBlocks, m.VenuesAttested = msg.ListingMinBlocks, msg.VenuesAttested
+	m.ListingMinBlocks, m.VenuesAttested, m.StCollateralAllowed = msg.ListingMinBlocks, msg.VenuesAttested, msg.StCollateralAllowed
 	if err := m.Validate(); err != nil {
 		return errorsmod.Wrap(types.ErrInvalidMarket, err.Error())
+	}
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return err
+	}
+	if err := assertStRule3(params, m); err != nil {
+		return err
 	}
 	// a lower governance cap applies immediately to new positions; a higher one climbs by steps
 	if m.EffectiveLeverage.GT(m.MaxLeverage) {
@@ -142,4 +152,13 @@ func (k Keeper) MarketView(ctx sdk.Context, params types.Params, m types.Market)
 	lev := leverageInForce(m)
 	return types.MarketView{Market: m, InsuranceInventory: inv, Dispersion: disp, StalePeriods: stale,
 		InitialMargin: types.InitialMargin(lev), MaintenanceMargin: types.MaintenanceMargin(lev)}, nil
+}
+
+// assertStRule3 enforces spec §21.5 rule 3: stLUNC never collateralises a
+// market priced by the LUNC rate (LUNC-PERP), whatever governance sets.
+func assertStRule3(params types.Params, m types.Market) error {
+	if m.StCollateralAllowed && m.OracleAsset == params.LunaPriceDenom {
+		return errorsmod.Wrapf(types.ErrInvalidMarket, "stLUNC cannot collateralise %s: perfectly correlated with the underlying (spec §21.5)", m.Id)
+	}
+	return nil
 }

@@ -45,6 +45,7 @@ var (
 	UnwindIntentsKey     = collections.NewPrefix(13)
 	LiqIndexKey          = collections.NewPrefix(14)
 	PremiumsKey          = collections.NewPrefix(15)
+	CollateralStKey      = collections.NewPrefix(16)
 
 	// InsuranceFundName derives the account under which the insurance fund
 	// holds its inventory positions.

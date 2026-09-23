@@ -77,13 +77,43 @@ func (k Keeper) Deposit(ctx sdk.Context, account sdk.AccAddress, amount sdk.Coin
 	if err != nil {
 		return err
 	}
+	if amount.Denom == params.StDenom {
+		return k.depositSt(ctx, params, account, amount)
+	}
 	if amount.Denom != params.SettlementDenom {
-		return errorsmod.Wrapf(types.ErrInvalidCollateral, "collateral must be %s", params.SettlementDenom)
+		return errorsmod.Wrapf(types.ErrInvalidCollateral, "collateral must be %s or %s", params.SettlementDenom, params.StDenom)
 	}
 	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, account, types.ModuleName, sdk.NewCoins(amount)); err != nil {
 		return err
 	}
 	if err := k.addFree(ctx, account.String(), amount.Amount); err != nil {
+		return err
+	}
+	return ctx.EventManager().EmitTypedEvent(&types.EventCollateralDeposited{Account: account.String(), Amount: amount.String()})
+}
+
+// depositSt accepts stLUNC as collateral (spec §21.5): only while the
+// internal LUNC/settlement spot market is enabled (rule 8, the conversion
+// path of seized collateral) and within the global cap (rule 6).
+func (k Keeper) depositSt(ctx sdk.Context, params types.Params, account sdk.AccAddress, amount sdk.Coin) error {
+	if params.SpotMarketId == "" {
+		return errorsmod.Wrap(types.ErrInvalidCollateral, "stLUNC needs the internal LUNC/settlement spot market (spot_market_id unset)")
+	}
+	spot, err := k.batchKeeper.GetMarket(ctx, params.SpotMarketId)
+	if err != nil || !spot.Enabled || spot.QuoteDenom != params.SettlementDenom {
+		return errorsmod.Wrap(types.ErrInvalidCollateral, "stLUNC needs the internal LUNC/settlement spot market enabled")
+	}
+	val := k.stValuation(ctx, params)
+	if !val.Available {
+		return errorsmod.Wrap(types.ErrInvalidCollateral, "stLUNC cannot be valued now (exchange rate or LUNC price missing)")
+	}
+	if err := k.assertGlobalCap(ctx, params, val, amount.Amount); err != nil {
+		return err
+	}
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, account, types.ModuleName, sdk.NewCoins(amount)); err != nil {
+		return err
+	}
+	if err := k.addFreeSt(ctx, account.String(), amount.Amount); err != nil {
 		return err
 	}
 	return ctx.EventManager().EmitTypedEvent(&types.EventCollateralDeposited{Account: account.String(), Amount: amount.String()})
@@ -95,8 +125,11 @@ func (k Keeper) Withdraw(ctx sdk.Context, account sdk.AccAddress, amount sdk.Coi
 	if err != nil {
 		return err
 	}
+	if amount.Denom == params.StDenom {
+		return k.withdrawSt(ctx, params, account, amount)
+	}
 	if amount.Denom != params.SettlementDenom {
-		return errorsmod.Wrapf(types.ErrInvalidCollateral, "collateral is %s", params.SettlementDenom)
+		return errorsmod.Wrapf(types.ErrInvalidCollateral, "collateral is %s or %s", params.SettlementDenom, params.StDenom)
 	}
 	avail, err := k.Available(ctx, account.String())
 	if err != nil {
@@ -106,6 +139,37 @@ func (k Keeper) Withdraw(ctx sdk.Context, account sdk.AccAddress, amount sdk.Coi
 		return errorsmod.Wrapf(types.ErrInsufficientFree, "available %s, requested %s", avail, amount.Amount)
 	}
 	if err := k.addFree(ctx, account.String(), amount.Amount.Neg()); err != nil {
+		return err
+	}
+	if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, account, sdk.NewCoins(amount)); err != nil {
+		return err
+	}
+	return ctx.EventManager().EmitTypedEvent(&types.EventCollateralWithdrawn{Account: account.String(), Amount: amount.String()})
+}
+
+// withdrawSt returns free stLUNC as long as the reservations of the account
+// stay covered by what remains (settlement plus stLUNC capacity).
+func (k Keeper) withdrawSt(ctx sdk.Context, params types.Params, account sdk.AccAddress, amount sdk.Coin) error {
+	freeSt, err := k.FreeSt(ctx, account.String())
+	if err != nil {
+		return err
+	}
+	if freeSt.LT(amount.Amount) {
+		return errorsmod.Wrapf(types.ErrInsufficientFree, "free stLUNC %s, requested %s", freeSt, amount.Amount)
+	}
+	free, err := k.FreeCollateral(ctx, account.String())
+	if err != nil {
+		return err
+	}
+	reserved, err := k.ReservedTotal(ctx, account.String())
+	if err != nil {
+		return err
+	}
+	val := k.stValuation(ctx, params)
+	if reserved.GT(free.Add(stCapacity(params, free, val.Value(freeSt.Sub(amount.Amount))))) {
+		return errorsmod.Wrap(types.ErrInsufficientFree, "open orders reserve this stLUNC")
+	}
+	if err := k.addFreeSt(ctx, account.String(), amount.Amount.Neg()); err != nil {
 		return err
 	}
 	if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, account, sdk.NewCoins(amount)); err != nil {
