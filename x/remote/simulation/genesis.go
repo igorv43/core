@@ -24,7 +24,7 @@ func RandomizedParams(r *rand.Rand) types.Params {
 	p := types.DefaultParams()
 	p.SessionTtlSeconds = int64(1 + r.Intn(60*24*3600))
 	p.MaxSessions = uint32(1 + r.Intn(10))
-	p.MsgFee = sdk.NewCoin("uusd", math.NewInt(int64(r.Intn(1_000_000))))
+	p.MsgFee = sdk.NewCoin("uluna", math.NewInt(int64(r.Intn(100_000_000))))
 	p.MaxMsgsPerPayload = uint32(1 + r.Intn(types.MaxMsgsPerPayloadAbsolute))
 	p.PaymasterDailyCap = sdk.NewCoin("uluna", math.NewInt(int64(r.Intn(1_000_000_000))))
 	p.PaymasterMinCollateral = math.NewInt(int64(r.Intn(100_000_000)))

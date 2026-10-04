@@ -126,6 +126,16 @@ func (f *fixture) rejected(t *testing.T) string {
 	return ""
 }
 
+// hasEvent reports whether an event of the type reached the context.
+func (f *fixture) hasEvent(typ string) bool {
+	for _, ev := range f.ctx.EventManager().Events() {
+		if ev.Type == typ {
+			return true
+		}
+	}
+	return false
+}
+
 func TestPayloadDepositsCollateral(t *testing.T) {
 	f := setup(t)
 	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(20_000_000))})
@@ -134,12 +144,43 @@ func TestPayloadDepositsCollateral(t *testing.T) {
 	free, err := f.app.PerpKeeper.FreeCollateral(f.ctx, f.derived.String())
 	require.NoError(t, err)
 	require.Equal(t, "20000000", free.String())
-	// the message fee left the account
-	require.Equal(t, "29900000", f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uusd").Amount.String())
+	// the paymaster is empty: the message fee (10 LUNC) left the account itself, in uluna
+	require.Equal(t, "30000000", f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uusd").Amount.String())
+	require.Equal(t, "990000000", f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount.String())
 	acc, err := f.k.GetAccount(f.ctx, f.derived.String())
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), acc.Payloads)
 	require.Equal(t, uint32(originDom), acc.Domain)
+	// the events of the executed message reach the transaction (the message
+	// router returns them only inside the handler result)
+	require.True(t, f.hasEvent("terra.perp.v1.EventCollateralDeposited"), "handler events are re-emitted")
+	require.True(t, f.hasEvent("terra.remote.v1.EventRemoteExecuted"))
+}
+
+func TestPaymasterSponsorsTheMsgFee(t *testing.T) {
+	f := setup(t)
+	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(100_000_000))))
+	pm := types.PaymasterAddress()
+	// an account funded only through a gateway holds no uluna
+	settlementOnly := types.DeriveAddress(originDom, util.CreateMockHexAddress("evm-user", 2))
+	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, settlementOnly, sdk.NewCoins(sdk.NewCoin("uusd", math.NewInt(5_000_000)))))
+	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: settlementOnly.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))})
+	f.deliver(t, util.CreateMockHexAddress("evm-user", 2), body)
+	require.Empty(t, f.rejected(t))
+	require.Equal(t, "90000000", f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount.String(), "the paymaster paid the fee")
+	require.Equal(t, "4000000", f.app.BankKeeper.GetBalance(f.ctx, settlementOnly, "uusd").Amount.String())
+	// a two-message payload costs two fees; once the paymaster runs dry the account must pay
+	p, err := f.k.GetParams(f.ctx)
+	require.NoError(t, err)
+	p.MsgFee = sdk.NewCoin("uluna", math.NewInt(50_000_000))
+	require.NoError(t, f.k.SetParams(f.ctx, p))
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
+	f.deliver(t, util.CreateMockHexAddress("evm-user", 2), f.payload(t, nil,
+		&perptypes.MsgDepositCollateral{Sender: settlementOnly.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))},
+		&perptypes.MsgSetAutoTopUp{Sender: settlementOnly.String(), Enabled: true},
+	))
+	require.Contains(t, f.rejected(t), "paymaster and remote account cannot pay")
+	require.Equal(t, "90000000", f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount.String(), "a rejected payload moves nothing")
 }
 
 func TestPayloadRejections(t *testing.T) {
@@ -226,11 +267,19 @@ func TestWithdrawLockedToController(t *testing.T) {
 	require.Empty(t, f.rejected(t))
 
 	before := f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount
+	pmBefore := f.app.BankKeeper.GetBalance(f.ctx, types.PaymasterAddress(), "uluna").Amount
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
 	id, err := f.k.Withdraw(f.ctx, f.derived.String(), f.token, math.NewInt(500_000_000), "", nil)
 	require.NoError(t, err)
 	require.False(t, id.IsZeroAddress())
 	after := f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount
-	require.True(t, after.LT(before), "collateral left the account through warp")
+	require.Equal(t, before.SubRaw(500_000_000).String(), after.String(), "exactly the amount left the account through warp")
+	// noop hooks quote nothing: the paymaster advances nothing
+	require.Equal(t, pmBefore.String(), f.app.BankKeeper.GetBalance(f.ctx, types.PaymasterAddress(), "uluna").Amount.String())
+	// the mailbox events of the dispatch reach the transaction for the agents
+	require.True(t, f.hasEvent("hyperlane.core.v1.EventDispatch"), "EventDispatch re-emitted from the handler result")
+	require.True(t, f.hasEvent("hyperlane.warp.v1.EventSendRemoteTransfer"))
+	require.True(t, f.hasEvent("terra.remote.v1.EventRemoteWithdraw"))
 	ws, err := f.k.WithdrawalsOf(f.ctx, f.derived.String())
 	require.NoError(t, err)
 	require.Len(t, ws, 1)
@@ -250,6 +299,77 @@ func TestWithdrawLockedToController(t *testing.T) {
 	require.Len(t, gs.Apps, 1)
 	require.Len(t, gs.Accounts, 1)
 	require.NoError(t, gs.Validate())
+}
+
+// The paymaster advances exactly the IGP quote of the route (what `warp
+// QuoteRemoteTransfer` returns), never the cap, and refuses a quote above it.
+func TestWithdrawAdvancesExactlyTheInterchainQuote(t *testing.T) {
+	f := setup(t)
+	owner := f.owner.String()
+	pdSrv := pdkeeper.NewMsgServerImpl(&f.app.HyperlaneKeeper.PostDispatchKeeper)
+	igp, err := pdSrv.CreateIgp(f.ctx, &pdtypes.MsgCreateIgp{Owner: owner, Denom: "uluna"})
+	require.NoError(t, err)
+	_, err = pdSrv.SetDestinationGasConfig(f.ctx, &pdtypes.MsgSetDestinationGasConfig{
+		Owner: owner, IgpId: igp.Id,
+		DestinationGasConfig: &pdtypes.DestinationGasConfig{
+			RemoteDomain: originDom,
+			GasOracle:    &pdtypes.GasOracle{TokenExchangeRate: pdtypes.TokenExchangeRateScale, GasPrice: math.NewInt(10)},
+			GasOverhead:  math.NewInt(50_000),
+		},
+	})
+	require.NoError(t, err)
+	noop, err := pdSrv.CreateNoopHook(f.ctx, &pdtypes.MsgCreateNoopHook{Owner: owner})
+	require.NoError(t, err)
+	ism, err := ismkeeper.NewMsgServerImpl(&f.app.HyperlaneKeeper.IsmKeeper).CreateNoopIsm(f.ctx, &ismtypes.MsgCreateNoopIsm{Creator: owner})
+	require.NoError(t, err)
+	mb, err := corekeeper.NewMsgServerImpl(f.app.HyperlaneKeeper).CreateMailbox(f.ctx, &coretypes.MsgCreateMailbox{
+		Owner: owner, LocalDomain: localDomain, DefaultIsm: ism.Id, DefaultHook: &noop.Id, RequiredHook: &igp.Id,
+	})
+	require.NoError(t, err)
+	warpSrv := warpkeeper.NewMsgServerImpl(f.app.WarpKeeper)
+	tok, err := warpSrv.CreateCollateralToken(f.ctx, &warptypes.MsgCreateCollateralToken{Owner: owner, OriginMailbox: mb.Id, OriginDenom: "uluna"})
+	require.NoError(t, err)
+	_, err = warpSrv.EnrollRemoteRouter(f.ctx, &warptypes.MsgEnrollRemoteRouter{
+		Owner: owner, TokenId: tok.Id,
+		RemoteRouter: &warptypes.RemoteRouter{ReceiverDomain: originDom, ReceiverContract: util.CreateMockHexAddress("router", 2), Gas: math.NewInt(200_000)},
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.app.WarpLedgerKeeper.SetDomainCap(f.ctx, tok.Id, originDom, math.NewInt(1_000_000_000_000)))
+	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(1_000_000_000))))
+	f.deliver(t, f.controller, f.payload(t, nil, &perptypes.MsgSetAutoTopUp{Sender: f.derived.String(), Enabled: true}))
+	require.Empty(t, f.rejected(t))
+
+	// (200,000 router gas + 50,000 overhead) × 10 × 1e10 / 1e10 = 2,500,000 uluna
+	const quote = int64(2_500_000)
+	pm := types.PaymasterAddress()
+	pmBefore := f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount
+	accBefore := f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
+	_, err = f.k.Withdraw(f.ctx, f.derived.String(), tok.Id, math.NewInt(500_000_000), "", nil)
+	require.NoError(t, err)
+	require.Equal(t, pmBefore.SubRaw(quote).String(), f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount.String(), "the paymaster advanced the quote, not the cap")
+	require.Equal(t, accBefore.SubRaw(500_000_000).String(), f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount.String(), "the IGP took the advance: nothing stranded")
+	require.True(t, f.hasEvent("hyperlane.core.post_dispatch.v1.EventGasPayment"))
+
+	// a quote above withdraw_fee_cap is refused before anything moves
+	p, err := f.k.GetParams(f.ctx)
+	require.NoError(t, err)
+	p.WithdrawFeeCap = sdk.NewCoin("uluna", math.NewInt(quote-1))
+	require.NoError(t, f.k.SetParams(f.ctx, p))
+	_, err = f.k.Withdraw(f.ctx, f.derived.String(), tok.Id, math.NewInt(1_000_000), "", nil)
+	require.ErrorIs(t, err, types.ErrInvalidWithdraw)
+	require.Contains(t, err.Error(), "exceeds withdraw_fee_cap")
+	require.Equal(t, pmBefore.SubRaw(quote).String(), f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount.String())
+	require.Equal(t, accBefore.SubRaw(500_000_000).String(), f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount.String())
+
+	// an empty paymaster leaves the quote to the account (max_fee = quote)
+	p.WithdrawFeeCap = sdk.NewCoin("uluna", math.NewInt(200_000_000))
+	require.NoError(t, f.k.SetParams(f.ctx, p))
+	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, pm, f.owner, f.app.BankKeeper.GetAllBalances(f.ctx, pm)))
+	accBefore = f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount
+	_, err = f.k.Withdraw(f.ctx, f.derived.String(), tok.Id, math.NewInt(1_000_000), "", nil)
+	require.NoError(t, err)
+	require.Equal(t, accBefore.SubRaw(1_000_000+quote).String(), f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount.String())
 }
 
 func TestBeaconsDispatchStateFacts(t *testing.T) {

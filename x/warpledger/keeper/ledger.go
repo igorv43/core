@@ -54,6 +54,16 @@ func (k Keeper) GetToken(ctx sdk.Context, tokenId util.HexAddress) (warptypes.Hy
 	return token, nil
 }
 
+// GetRemoteRouter returns the router enrolled for (token, domain) in x/warp;
+// its gas is the limit the IGP quotes for a transfer to that domain.
+func (k Keeper) GetRemoteRouter(ctx sdk.Context, tokenId util.HexAddress, domain uint32) (warptypes.RemoteRouter, error) {
+	router, err := k.warpKeeper.EnrolledRouters.Get(ctx, collections.Join(tokenId.GetInternalId(), domain))
+	if err != nil {
+		return warptypes.RemoteRouter{}, errorsmod.Wrapf(types.ErrTokenNotFound, "no remote router for %s on domain %d", tokenId.String(), domain)
+	}
+	return router, nil
+}
+
 // GetLedger returns the ledger of a pair, or an empty ledger when none exists.
 // The second return value reports whether the ledger exists in state.
 func (k Keeper) GetLedger(ctx sdk.Context, tokenId util.HexAddress, domain uint32) (types.DomainLedger, bool, error) {

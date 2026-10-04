@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"strings"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -327,6 +328,100 @@ func TestTriggerFiresReduceOnlyOrder(t *testing.T) {
 	has, err := f.bk.HasOpenIntent(f.ctx, f.long.String(), marketID)
 	require.NoError(t, err)
 	require.True(t, has)
+}
+
+// triggerRejected returns the reason of the EventTriggerRejected of a trigger
+// id, or "" when none was emitted (typed event attributes are JSON-quoted).
+func (f *fixture) triggerRejected(id uint64) string {
+	for _, ev := range f.ctx.EventManager().Events() {
+		if ev.Type != "terra.perp.v1.EventTriggerRejected" {
+			continue
+		}
+		var tid, reason string
+		for _, a := range ev.Attributes {
+			switch a.Key {
+			case "trigger_id":
+				tid = strings.Trim(a.Value, `"`)
+			case "reason":
+				reason = strings.Trim(a.Value, `"`)
+			}
+		}
+		if tid == math.NewIntFromUint64(id).String() {
+			return reason
+		}
+	}
+	return ""
+}
+
+func TestTriggerValidatesMinQtyAndTick(t *testing.T) {
+	f := setup(t)
+	f.trade(t, 2_000, math.LegacyNewDec(60_000))
+	stop := func(qty int64, price math.LegacyDec) error {
+		_, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{
+			Sender: f.long.String(), MarketId: marketID, TriggerPrice: price, FireAbove: false,
+			Qty: math.NewInt(qty), Slippage: math.LegacyNewDecWithPrec(1, 2),
+		})
+		return err
+	}
+	// a partial stop below min_qty (1,000) could never be placed by x/batch: refused at submission
+	err := stop(500, math.LegacyNewDec(58_000))
+	require.ErrorIs(t, err, types.ErrInvalidTrigger)
+	require.Contains(t, err.Error(), "below the market minimum")
+	// a trigger price off the tick (1)
+	err = stop(1_000, math.LegacyNewDecWithPrec(580_005, 1))
+	require.ErrorIs(t, err, types.ErrInvalidTrigger)
+	require.Contains(t, err.Error(), "tick size")
+	// min_qty itself and the whole position (qty 0) are accepted
+	require.NoError(t, stop(1_000, math.LegacyNewDec(58_000)))
+	require.NoError(t, stop(0, math.LegacyNewDec(57_000)))
+	triggers, err := f.k.TriggersOfAccount(f.ctx, f.long.String())
+	require.NoError(t, err)
+	require.Len(t, triggers, 2)
+}
+
+func TestTriggerRejectedIsReported(t *testing.T) {
+	f := setup(t)
+	f.trade(t, 1_000, math.LegacyNewDec(60_000))
+	id, err := f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{
+		Sender: f.long.String(), MarketId: marketID,
+		TriggerPrice: math.LegacyNewDec(58_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2),
+	})
+	require.NoError(t, err)
+	// the long closes by hand before the stop fires
+	batch := f.ctx.BlockHeight()
+	f.submit(t, f.long, batchtypes.SIDE_SELL, 1_000, math.LegacyNewDec(60_000), true)
+	f.submit(t, f.short, batchtypes.SIDE_BUY, 1_000, math.LegacyNewDec(60_000), true)
+	f.endBlocks(t, batch+f.bp.CommitWindow+1)
+	_, ok, _ := f.k.GetPosition(f.ctx, f.long.String(), marketID)
+	require.False(t, ok)
+	// the stop fires on a closed position: removed, reported, nothing placed
+	f.at(f.ctx.BlockHeight() + 1)
+	f.setPrice(t, math.LegacyNewDec(57_000), math.LegacyZeroDec())
+	f.endBlocks(t, f.ctx.BlockHeight())
+	_, err = f.k.Triggers.Get(f.ctx, id)
+	require.Error(t, err)
+	require.Equal(t, "position closed", f.triggerRejected(id))
+	has, _ := f.bk.HasOpenIntent(f.ctx, f.long.String(), marketID)
+	require.False(t, has)
+
+	// a stop whose intent x/batch refuses (market disabled there) is reported with the error
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
+	f.at(f.ctx.BlockHeight() + 1)
+	f.setPrice(t, math.LegacyNewDec(60_000), math.LegacyZeroDec())
+	f.trade(t, 1_000, math.LegacyNewDec(60_000))
+	id, err = f.k.SubmitTrigger(f.ctx, &types.MsgSubmitTriggerOrder{
+		Sender: f.long.String(), MarketId: marketID,
+		TriggerPrice: math.LegacyNewDec(58_000), FireAbove: false, Qty: math.ZeroInt(), Slippage: math.LegacyNewDecWithPrec(1, 2),
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.bk.SetMarketEnabled(f.ctx, marketID, false))
+	f.at(f.ctx.BlockHeight() + 1)
+	f.setPrice(t, math.LegacyNewDec(57_000), math.LegacyZeroDec())
+	f.endBlocks(t, f.ctx.BlockHeight())
+	_, err = f.k.Triggers.Get(f.ctx, id)
+	require.Error(t, err)
+	require.Contains(t, f.triggerRejected(id), "disabled")
+	require.Empty(t, f.triggerRejected(id+1))
 }
 
 func TestListingCheckGatesEnable(t *testing.T) {

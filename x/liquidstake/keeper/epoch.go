@@ -218,13 +218,10 @@ func (k Keeper) ProcessEpoch(ctx sdk.Context) (EpochReport, error) {
 	if err != nil {
 		return EpochReport{}, err
 	}
-	if rep.RateAfter.LT(rep.RateBefore) {
-		// the rate only falls through slashing (or the fee on an epoch whose
-		// pending rewards were already priced in); record it either way
-		if err := ctx.EventManager().EmitTypedEvent(&types.EventSlashAbsorbed{Epoch: epoch.Number - 1, ExchangeRateBefore: rep.RateBefore.String(), ExchangeRateAfter: rep.RateAfter.String()}); err != nil {
-			return EpochReport{}, err
-		}
-	}
+	// RateAfter may be below RateBefore on a normal epoch: the pending rewards
+	// were priced in before and the fee leaves at the epoch. That dip is not a
+	// slash; EventSlashAbsorbed is emitted by the staking hook (hooks.go) when
+	// a validator holding module delegations is actually slashed.
 	return rep, ctx.EventManager().EmitTypedEvent(&types.EventEpochProcessed{
 		Epoch: epoch.Number - 1, Height: ctx.BlockHeight(),
 		Rewards: rep.Rewards.String(), Fee: rep.Fee.String(), Burned: rep.Burned.String(),

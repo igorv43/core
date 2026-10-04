@@ -12,7 +12,7 @@ func DefaultParams() Params {
 	return Params{
 		SessionTtlSeconds:      30 * 24 * 3600,                                 // 30 days
 		MaxSessions:            3,                                              // param_remote_max_sessions
-		MsgFee:                 sdk.NewCoin("uusd", math.NewInt(100_000)),      // ~$0.10 per message
+		MsgFee:                 sdk.NewCoin("uluna", math.NewInt(10_000_000)),  // param_remote_msg_fee: ~2x a simple tx at 28.325 uluna/gas, in the paymaster's denom
 		MaxMsgsPerPayload:      5,                                              // max in code 10
 		PaymasterDailyCap:      sdk.NewCoin("uluna", math.NewInt(200_000_000)), // 200 LUNC of gas per period (~17 orders at 400k gas)
 		PaymasterMinCollateral: math.NewInt(10_000_000),                        // 10 USD

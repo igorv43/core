@@ -30,6 +30,7 @@ type CoreKeeper interface {
 	GetMailbox(ctx context.Context, mailboxId util.HexAddress) (coretypes.Mailbox, error)
 	DispatchMessage(ctx sdk.Context, originMailboxId util.HexAddress, sender util.HexAddress, maxFee sdk.Coins, destinationDomain uint32,
 		recipient util.HexAddress, body []byte, metadata util.StandardHookMetadata, postDispatchHookId *util.HexAddress) (util.HexAddress, error)
+	QuoteDispatch(ctx context.Context, mailboxId, overwriteHookId util.HexAddress, metadata util.StandardHookMetadata, message util.HyperlaneMessage) (sdk.Coins, error)
 }
 
 // LiquidStakeKeeper gives the exchange rate for the EXCHANGE_RATE beacon.
@@ -37,9 +38,11 @@ type LiquidStakeKeeper interface {
 	ExchangeRate(ctx sdk.Context) (math.LegacyDec, liquidstakekeeper.Totals, error)
 }
 
-// WarpLedgerKeeper gives the route ledger for the ROUTE_SOLVENCY beacon.
+// WarpLedgerKeeper gives the route ledger for the ROUTE_SOLVENCY beacon and
+// the warp token and router data the withdrawal fee quote needs.
 type WarpLedgerKeeper interface {
 	GetToken(ctx sdk.Context, tokenId util.HexAddress) (warptypes.HypToken, error)
+	GetRemoteRouter(ctx sdk.Context, tokenId util.HexAddress, domain uint32) (warptypes.RemoteRouter, error)
 	GetLedger(ctx sdk.Context, tokenId util.HexAddress, domain uint32) (warpledgertypes.DomainLedger, bool, error)
 	EffectiveCap(ctx sdk.Context, ledger warpledgertypes.DomainLedger) (math.Int, error)
 	TotalExposure(ctx sdk.Context, tokenId util.HexAddress) (math.Int, error)

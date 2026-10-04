@@ -70,6 +70,15 @@ message EventTriggerFired {
   string mark_price = 4;
   uint64 intent_id  = 5;
 }
+// EventTriggerRejected reports a trigger that was removed without placing its
+// reduce-only order: the position was gone or flipped, or x/batch refused the
+// intent (reason carries the error). Without it a stop would vanish silently.
+message EventTriggerRejected {
+  uint64 trigger_id = 1;
+  string account    = 2;
+  string market_id  = 3;
+  string reason     = 4;
+}
 message EventAutoTopUp {
   string account   = 1;
   string market_id = 2;

@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -244,6 +245,75 @@ func TestRewardsRaiseTheRateAndFeeIsBurned(t *testing.T) {
 	require.True(t, rateAfter.GT(math.LegacyOneDec()))
 	require.True(t, totals.PendingRewards.IsZero(), "rewards were withdrawn at the epoch")
 	require.NoError(t, k.CheckInvariants(f.ctx))
+	// the fee lowers the rate that had the pending rewards priced in: a normal
+	// epoch, not a slash
+	require.True(t, rateAfter.LT(rateBefore), "the 5% fee leaves at the epoch")
+	require.Nil(t, f.event("terra.liquidstake.v1.EventSlashAbsorbed"), "the epoch fee is not reported as a slash")
+}
+
+// event returns the first event of the type in the context, or nil.
+func (f *fixture) event(typ string) *sdk.Event {
+	for _, ev := range f.ctx.EventManager().Events() {
+		if ev.Type == typ {
+			return &ev
+		}
+	}
+	return nil
+}
+
+func attr(ev *sdk.Event, key string) string {
+	for _, a := range ev.Attributes {
+		if a.Key == key {
+			return strings.Trim(a.Value, `"`)
+		}
+	}
+	return ""
+}
+
+func TestSlashIsReportedByTheStakingHook(t *testing.T) {
+	f := setup(t)
+	k := f.app.LiquidStakeKeeper
+	_, _, err := k.Stake(f.ctx, f.user, sdk.NewCoin("uluna", math.NewInt(100_000_000)))
+	require.NoError(t, err)
+	f.advance(t, 10, time.Minute)
+	require.NoError(t, k.EndBlocker(f.ctx))
+	del, err := f.app.StakingKeeper.GetDelegation(f.ctx, k.ModuleAddress(), f.valAddr)
+	require.NoError(t, err)
+	val, err := f.app.StakingKeeper.GetValidator(f.ctx, f.valAddr)
+	require.NoError(t, err)
+	delegated := val.TokensFromShares(del.Shares).TruncateInt()
+	require.True(t, delegated.IsPositive())
+	rateBefore, _, err := k.ExchangeRate(f.ctx)
+	require.NoError(t, err)
+
+	// a 10% slash of the only validator the module delegates to
+	consAddr, err := val.GetConsAddr()
+	require.NoError(t, err)
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
+	fraction := math.LegacyNewDecWithPrec(1, 1)
+	_, err = f.app.StakingKeeper.Slash(f.ctx, consAddr, f.ctx.BlockHeight(), val.GetConsensusPower(sdk.DefaultPowerReduction), fraction)
+	require.NoError(t, err)
+
+	ev := f.event("terra.liquidstake.v1.EventSlashAbsorbed")
+	require.NotNil(t, ev, "the hook reports the slash")
+	require.Equal(t, f.valAddr.String(), attr(ev, "validator"))
+	require.Equal(t, fraction.String(), attr(ev, "fraction"))
+	require.Equal(t, fraction.MulInt(delegated).TruncateInt().String(), attr(ev, "loss"))
+	require.Equal(t, rateBefore.String(), attr(ev, "exchange_rate_before"))
+	expectedAfter := math.LegacyMustNewDecFromStr(attr(ev, "exchange_rate_after"))
+	require.True(t, expectedAfter.LT(rateBefore))
+	rateAfter, _, err := k.ExchangeRate(f.ctx)
+	require.NoError(t, err)
+	require.True(t, rateAfter.LT(rateBefore), "stLUNC holders absorbed the slash")
+	// the estimate made before the burn matches the realised rate to the truncation of one uluna
+	require.True(t, rateAfter.Sub(expectedAfter).Abs().LTE(math.LegacyNewDecWithPrec(1, 6)), "estimate %s, realised %s", expectedAfter, rateAfter)
+	require.NoError(t, k.CheckInvariants(f.ctx))
+
+	// a slash of a validator without module delegations is silent
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
+	other := f.app.LiquidStakeKeeper.StakingHooks()
+	require.NoError(t, other.BeforeValidatorSlashed(f.ctx, sdk.ValAddress([]byte("no-module-delegation")), fraction))
+	require.Nil(t, f.event("terra.liquidstake.v1.EventSlashAbsorbed"))
 }
 
 func TestGenesisRoundTrip(t *testing.T) {

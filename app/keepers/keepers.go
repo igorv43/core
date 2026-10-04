@@ -298,11 +298,9 @@ func NewAppKeepers(
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
-	// register the staking hooks
-	// NOTE: stakingKeeper above is passed by reference, so that it will contain these hooks
-	appKeepers.StakingKeeper.SetHooks(
-		stakingtypes.NewMultiStakingHooks(customstaking.NewTerraStakingHooks(*appKeepers.StakingKeeper), appKeepers.DistrKeeper.Hooks(), appKeepers.SlashingKeeper.Hooks()),
-	)
+	// the staking hooks are registered below, once x/liquidstake exists (it
+	// reports slashes of validators holding module delegations); the staking
+	// keeper is passed by reference everywhere, so every keeper sees them
 
 	// Create IBC Keeper (v10 signature)
 	appKeepers.IBCKeeper = ibckeeper.NewKeeper(
@@ -574,6 +572,17 @@ func NewAppKeepers(
 		appKeepers.DistrKeeper,
 		appKeepers.SlashingKeeper,
 		treasurytypes.BurnModuleName,
+	)
+
+	// register the staking hooks
+	// NOTE: stakingKeeper above is passed by reference, so that it will contain these hooks
+	appKeepers.StakingKeeper.SetHooks(
+		stakingtypes.NewMultiStakingHooks(
+			customstaking.NewTerraStakingHooks(*appKeepers.StakingKeeper),
+			appKeepers.DistrKeeper.Hooks(),
+			appKeepers.SlashingKeeper.Hooks(),
+			appKeepers.LiquidStakeKeeper.StakingHooks(),
+		),
 	)
 
 	// x/batch (Part II): sealed-bid uniform-price call auctions; fees and

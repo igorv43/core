@@ -36,6 +36,15 @@ func (k Keeper) SubmitTrigger(ctx sdk.Context, msg *types.MsgSubmitTriggerOrder)
 	if msg.Qty.IsPositive() && msg.Qty.GT(pos.Qty) {
 		return 0, errorsmod.Wrap(types.ErrInvalidTrigger, "qty exceeds the position")
 	}
+	// the fired order is an x/batch intent, which refuses quantities below
+	// the market minimum and prices off the tick: refuse them now instead of
+	// accepting a stop that could never be placed
+	if msg.Qty.IsPositive() && msg.Qty.LT(m.MinQty) {
+		return 0, errorsmod.Wrapf(types.ErrInvalidTrigger, "qty %s below the market minimum %s", msg.Qty, m.MinQty)
+	}
+	if !msg.TriggerPrice.IsPositive() || !msg.TriggerPrice.Quo(m.TickSize).IsInteger() {
+		return 0, errorsmod.Wrapf(types.ErrInvalidTrigger, "trigger_price must be a positive multiple of the tick size %s", m.TickSize)
+	}
 	n := uint32(0)
 	if err := k.TriggersByAccount.Walk(ctx, collections.NewPrefixedPairRange[string, uint64](msg.Sender),
 		func(_ collections.Pair[string, uint64]) (bool, error) { n++; return false, nil }); err != nil {
@@ -158,6 +167,13 @@ func (k Keeper) fireTriggers(ctx sdk.Context, params types.Params, m types.Marke
 			return err
 		}
 		if !exists || pos.Side == t.Side {
+			reason := "position closed"
+			if exists {
+				reason = "position flipped"
+			}
+			if err := k.rejectTrigger(ctx, t, reason); err != nil {
+				return err
+			}
 			continue
 		}
 		qty := pos.Qty
@@ -174,7 +190,10 @@ func (k Keeper) fireTriggers(ctx sdk.Context, params types.Params, m types.Marke
 			ExpiryHeight: ctx.BlockHeight() + bp.CommitWindow + 3, ReduceOnly: true,
 		})
 		if err != nil {
-			k.Logger(ctx).Error("trigger order rejected", "trigger", t.Id, "err", err)
+			k.Logger(ctx).Info("trigger order rejected", "trigger", t.Id, "err", err)
+			if err := k.rejectTrigger(ctx, t, err.Error()); err != nil {
+				return err
+			}
 			continue
 		}
 		if err := ctx.EventManager().EmitTypedEvent(&types.EventTriggerFired{TriggerId: t.Id, Account: t.Account, MarketId: m.Id, MarkPrice: m.MarkPrice.String(), IntentId: id}); err != nil {
@@ -182,4 +201,10 @@ func (k Keeper) fireTriggers(ctx sdk.Context, params types.Params, m types.Marke
 		}
 	}
 	return nil
+}
+
+// rejectTrigger reports a fired trigger that placed no order. The trigger is
+// already removed; without the event the user's stop would vanish silently.
+func (k Keeper) rejectTrigger(ctx sdk.Context, t types.TriggerOrder, reason string) error {
+	return ctx.EventManager().EmitTypedEvent(&types.EventTriggerRejected{TriggerId: t.Id, Account: t.Account, MarketId: t.MarketId, Reason: reason})
 }

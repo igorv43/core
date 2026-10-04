@@ -154,11 +154,11 @@ func (k *Keeper) execute(ctx sdk.Context, domain uint32, controller util.HexAddr
 	if err := k.Accounts.Set(cacheCtx, derived.String(), account); err != nil {
 		return err
 	}
-	// anti-spam fee per message from the remote account (spec §14.4 item 7)
+	// anti-spam fee per message (spec §14.4 item 7), sponsored like the gas
 	if params.MsgFee.IsPositive() {
 		fee := sdk.NewCoin(params.MsgFee.Denom, params.MsgFee.Amount.MulRaw(int64(len(msgs))))
-		if err := k.bankKeeper.SendCoinsFromAccountToModule(cacheCtx, derived, authtypes.FeeCollectorName, sdk.NewCoins(fee)); err != nil {
-			return errorsmod.Wrap(types.ErrFeeUnpaid, err.Error())
+		if err := k.chargeMsgFee(cacheCtx, derived, fee); err != nil {
+			return err
 		}
 	}
 	for _, msg := range msgs {
@@ -166,12 +166,41 @@ func (k *Keeper) execute(ctx sdk.Context, domain uint32, controller util.HexAddr
 		if handler == nil {
 			return errorsmod.Wrap(types.ErrMsgNotWhitelisted, sdk.MsgTypeURL(msg))
 		}
-		if _, err := handler(cacheCtx, msg); err != nil {
+		res, err := handler(cacheCtx, msg)
+		if err != nil {
 			return errorsmod.Wrapf(err, "%s", sdk.MsgTypeURL(msg))
 		}
+		// the message service router runs every handler on a fresh event
+		// manager and returns its events only inside the result (SDK 0.53,
+		// baseapp/msg_service_router.go); re-emit them like x/authz does, or
+		// the Hyperlane dispatch events of a MsgWithdraw never reach the tx
+		// and the agents (which index by events) never see the message
+		cacheCtx.EventManager().EmitEvents(res.GetEvents())
 	}
 	write()
 	return ctx.EventManager().EmitTypedEvent(&types.EventRemoteExecuted{Account: derived.String(), Domain: domain, Controller: controller.String(), Msgs: uint32(len(msgs))})
+}
+
+// chargeMsgFee pays the anti-spam fee of a payload to the fee collector. The
+// paymaster pays when it holds the fee (spec §14.4 item 4: the protocol
+// sponsors the local costs of remote users and recovers them through the
+// trading fee; a remote account funded only with the settlement asset through
+// a gateway holds no local denom); otherwise the remote account pays itself.
+// The spam bound is the paymaster's float plus the origin gas and IGP quote
+// every remote message already costs, not the fee alone.
+func (k Keeper) chargeMsgFee(ctx sdk.Context, derived sdk.AccAddress, fee sdk.Coin) error {
+	coins := sdk.NewCoins(fee)
+	paymaster := types.PaymasterAddress()
+	if k.bankKeeper.GetBalance(ctx, paymaster, fee.Denom).IsGTE(fee) {
+		if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, paymaster, authtypes.FeeCollectorName, coins); err != nil {
+			return errorsmod.Wrap(types.ErrFeeUnpaid, err.Error())
+		}
+		return nil
+	}
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, derived, authtypes.FeeCollectorName, coins); err != nil {
+		return errorsmod.Wrapf(types.ErrFeeUnpaid, "paymaster and remote account cannot pay %s: %s", fee, err.Error())
+	}
+	return nil
 }
 
 func (k *Keeper) reject(ctx sdk.Context, domain uint32, controller util.HexAddress, account string, err error) error {

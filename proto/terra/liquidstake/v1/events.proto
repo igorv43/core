@@ -43,8 +43,17 @@ message EventValidatorRemoved {
   string reason = 2;
 }
 
+// EventSlashAbsorbed is emitted from the staking BeforeValidatorSlashed hook
+// when a validator holding module delegations is slashed: validator is the
+// operator address, fraction the slash fraction, loss the uluna the module's
+// delegation loses (truncated estimate from the shares) and the exchange
+// rates are the one before the slash and the one expected after it. The
+// epoch fee never emits it.
 message EventSlashAbsorbed {
   uint64 epoch = 1;
   string exchange_rate_before = 2;
   string exchange_rate_after = 3;
+  string validator = 4;
+  string fraction = 5;
+  string loss = 6;
 }
