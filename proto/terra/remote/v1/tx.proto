@@ -23,6 +23,9 @@ service Msg {
   // Withdraw sends tokens back through warp to the controller of the account (destination locked).
   rpc Withdraw(MsgWithdraw) returns (MsgWithdrawResponse);
   rpc FundPaymaster(MsgFundPaymaster) returns (MsgFundPaymasterResponse);
+  // SetAutoReturn opts the account in or out of the automatic return of its
+  // matured liquid-staking claims (payload message, cross-chain liquid staking §4.4).
+  rpc SetAutoReturn(MsgSetAutoReturn) returns (MsgSetAutoReturnResponse);
   // governance
   rpc CreateRemoteApp(MsgCreateRemoteApp) returns (MsgCreateRemoteAppResponse);
   rpc SetGateway(MsgSetGateway) returns (MsgSetGatewayResponse);
@@ -82,10 +85,41 @@ message MsgWithdraw {
   // min_accepted is the minimum of token_out the user accepts; below it the
   // exit pays USDC instead.
   string min_accepted = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = true];
+  // amount_from = AMOUNT_FROM_PREVIOUS_RESULT takes the amount from the typed
+  // response of the immediately preceding message of the same payload
+  // (MsgStakeResponse.minted, MsgUnstakeResponse.amount when instant,
+  // MsgClaimResponse.amount); amount must then be empty. Resolved only by
+  // x/remote inside a payload; a resolved zero skips the withdrawal.
+  AmountSource amount_from = 6;
+  // min_amount is the minimum resolved amount (e.g. minSt, minLuna): a
+  // positive result below it fails the whole payload. Only with amount_from.
+  string min_amount = 7 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = true];
 }
+
+// AmountSource is the closed list of amount sources of a MsgWithdraw.
+enum AmountSource {
+  option (gogoproto.goproto_enum_prefix) = false;
+  // AMOUNT_FROM_LITERAL: the amount field (default).
+  AMOUNT_FROM_LITERAL = 0;
+  // AMOUNT_FROM_PREVIOUS_RESULT: the result of the preceding payload message.
+  AMOUNT_FROM_PREVIOUS_RESULT = 1;
+}
+
 message MsgWithdrawResponse {
   string message_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
 }
+
+message MsgSetAutoReturn {
+  option (cosmos.msg.v1.signer) = "controller";
+  option (amino.name)           = "terra/remote/MsgSetAutoReturn";
+  // controller is the derived remote account.
+  string controller = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  bool enabled = 2;
+  // token_id is the warp token (on Terra Classic) the claimed uluna returns
+  // through; it must route to the account's domain. Ignored when disabling.
+  string token_id = 3 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+}
+message MsgSetAutoReturnResponse {}
 
 message MsgFundPaymaster {
   option (cosmos.msg.v1.signer) = "sender";

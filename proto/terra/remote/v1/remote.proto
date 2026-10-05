@@ -47,6 +47,18 @@ message Params {
   cosmos.base.v1beta1.Coin control_fee_cap = 13 [(gogoproto.nullable) = false];
   // max_control_msgs_per_block bounds the control messages dispatched per block.
   uint32 max_control_msgs_per_block = 14;
+  // max_pending_per_account bounds the payloads of one account waiting for
+  // their deposit (cross-chain liquid staking §4.3; absolute maximum in code).
+  uint32 max_pending_per_account = 15;
+  // pending_ttl_blocks is how long a pending payload (and a deposit credit)
+  // waits before it expires with EventRemoteRejected "deposit not received".
+  int64 pending_ttl_blocks = 16;
+  // max_pending_execs_per_block bounds the pending payloads executed, expired
+  // or pruned in one EndBlock (spec §12).
+  uint32 max_pending_execs_per_block = 17;
+  // max_auto_returns_per_epoch bounds the matured claims returned to their
+  // controllers at one liquid-staking epoch (cross-chain liquid staking §4.4).
+  uint32 max_auto_returns_per_epoch = 18;
 }
 
 // BeaconKind is the fact a beacon transmits (spec §14.6 item 3): only chain
@@ -151,6 +163,61 @@ message RemotePayload {
   // message comes from the vault chain's gateway. Only from that gateway, and
   // only for a registered port whose vault is the message origin.
   uint32 port_domain = 5;
+  // after_deposit holds the payload until the derived account received this
+  // warp deposit from the same origin domain (cross-chain liquid staking
+  // §4.3); only from the enrolled gateway. Unset keeps the plain behaviour.
+  AfterDeposit after_deposit = 6;
+}
+
+// AfterDeposit names the warp deposit a payload waits for: the token
+// (32-byte hex id of the warp token on Terra Classic) and the amount released
+// to the derived account (base units, decimal string).
+message AfterDeposit {
+  string token_id = 1 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  string amount = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+}
+
+// PendingPayload is a payload stored until its deposit arrives (§4.3).
+message PendingPayload {
+  uint64 id = 1;
+  string account = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // domain is the domain of the derived account (the port domain for port users).
+  uint32 domain = 3;
+  // origin is the domain the message (and the deposit) came from.
+  uint32 origin = 4;
+  string controller = 5 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  repeated google.protobuf.Any msgs = 6;
+  AfterDeposit after_deposit = 7 [(gogoproto.nullable) = false];
+  int64 height = 8;
+  // message_id is the hyperlane id of the control message.
+  string message_id = 9 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+}
+
+// DepositCredit is the evidence of warp deposits received by an account from
+// an origin with an enrolled gateway, not yet consumed by a pending payload.
+// It is evidence, never a balance; it expires after pending_ttl_blocks.
+message DepositCredit {
+  string account = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string token_id = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  uint32 origin = 3;
+  string amount = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // height is the block of the last deposit added to the credit.
+  int64 height = 5;
+}
+
+// AutoReturn is the opt-in of a remote account to the automatic return of
+// its matured liquid-staking claims (§4.4) through the warp token token_id.
+message AutoReturn {
+  string account = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string token_id = 2 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  int64 set_height = 3;
+}
+
+// AutoReturnBudget is the interchain gas the paymaster advanced for
+// auto-returns in the current paymaster period (bounded by paymaster_daily_cap).
+message AutoReturnBudget {
+  int64 period_start = 1;
+  cosmos.base.v1beta1.Coin spent = 2 [(gogoproto.nullable) = false];
 }
 
 // Executor is the FabricExecutor of a vault chain (spec §11.5, D-31): owner

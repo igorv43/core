@@ -223,7 +223,9 @@ func appModules(
 		taxmodule.NewAppModule(appCodec, app.TaxKeeper),
 		// Liquidity Fabric (phase 1)
 		customcircuit.NewAppModule(appCodec, app.CircuitKeeper),
-		customhyperlane.NewAppModule(appCodec, app.HyperlaneKeeper, app.WarpLedgerKeeper),
+		// x/remote observes warp deposits for the pending payloads of
+		// cross-chain liquid staking (§4.3)
+		customhyperlane.NewAppModule(appCodec, app.HyperlaneKeeper, app.WarpLedgerKeeper, &app.RemoteKeeper),
 		customwarp.NewAppModule(appCodec, app.WarpKeeper, app.WarpLedgerKeeper, app.IsmBondKeeper),
 		warpledger.NewAppModule(appCodec, app.WarpLedgerKeeper),
 		liquidstake.NewAppModule(appCodec, app.LiquidStakeKeeper),

@@ -198,3 +198,12 @@ func (qs queryServer) Ports(goCtx context.Context, _ *types.QueryPortsRequest) (
 	})
 	return res, err
 }
+
+// RemoteStaking returns the pending payloads, deposit credits and auto-return
+// opt-in of an account (cross-chain liquid staking §4).
+func (qs queryServer) RemoteStaking(goCtx context.Context, req *types.QueryRemoteStakingRequest) (*types.QueryRemoteStakingResponse, error) {
+	if req == nil || req.Address == "" {
+		return nil, status.Error(codes.InvalidArgument, "address is required")
+	}
+	return qs.k.RemoteStaking(sdk.UnwrapSDKContext(goCtx), req.Address)
+}

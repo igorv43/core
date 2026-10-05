@@ -15,7 +15,7 @@ import (
 
 const (
 	chainID  = "batch-test"
-	marketID = "uluna/uusd"
+	marketID = "uluna/uusdc.lf"
 )
 
 type fixture struct {
@@ -42,18 +42,18 @@ func setup(t *testing.T) *fixture {
 	params, err := k.GetParams(ctx)
 	require.NoError(t, err)
 
-	// P_ref = 0.0001 uusd per uluna
+	// P_ref = 0.0001 USD (oracle uusd rate) per uluna; USDC ~ USD
 	app.OracleKeeper.SetLunaExchangeRate(ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 
 	require.NoError(t, k.CreateMarket(ctx, types.Market{
-		Id: marketID, BaseDenom: "uluna", QuoteDenom: "uusd", Type: types.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: marketID, BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: types.MARKET_TYPE_SPOT, OracleDenom: "uusd",
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 
 	user := sdk.AccAddress([]byte("batch-user-----------"))
 	solver := sdk.AccAddress([]byte("batch-solver---------"))
-	h.FundAcc(user, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000_000)), sdk.NewCoin("uusd", math.NewInt(100_000_000))))
-	h.FundAcc(solver, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000_000)), sdk.NewCoin("uusd", math.NewInt(100_000_000_000))))
+	h.FundAcc(user, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000))))
+	h.FundAcc(solver, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000_000))))
 
 	f := &fixture{app: app, ctx: ctx, k: k, user: user, solver: solver, params: params}
 	f.at(10)
@@ -74,14 +74,14 @@ func (f *fixture) registerSolver(t *testing.T) {
 	t.Helper()
 	require.NoError(t, f.k.RegisterSolver(f.ctx, f.solver.String(), f.params.SolverBondMin))
 	require.NoError(t, f.k.DepositSolverEscrow(f.ctx, f.solver.String(), sdk.NewCoin("uluna", math.NewInt(50_000_000_000))))
-	require.NoError(t, f.k.DepositSolverEscrow(f.ctx, f.solver.String(), sdk.NewCoin("uusd", math.NewInt(10_000_000))))
+	require.NoError(t, f.k.DepositSolverEscrow(f.ctx, f.solver.String(), sdk.NewCoin("uusdc.lf", math.NewInt(10_000_000))))
 }
 
 func (f *fixture) submitBuy(t *testing.T, quote int64, limit math.LegacyDec) (uint64, uint64) {
 	t.Helper()
 	id, batch, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
 		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY,
-		AmountIn: sdk.NewCoin("uusd", math.NewInt(quote)), LimitPrice: limit, MinOut: math.ZeroInt(),
+		AmountIn: sdk.NewCoin("uusdc.lf", math.NewInt(quote)), LimitPrice: limit, MinOut: math.ZeroInt(),
 		ExpiryHeight: f.ctx.BlockHeight() + 100,
 	})
 	require.NoError(t, err)
@@ -113,10 +113,10 @@ func TestPipelineClearsIntentAgainstSolverLevel(t *testing.T) {
 
 	// height 10: 1 USD buys LUNC at up to P_ref → 10,000 LUNC of demand
 	userLunaBefore := f.balance(f.user, "uluna")
-	userUsdBefore := f.balance(f.user, "uusd")
+	userUsdBefore := f.balance(f.user, "uusdc.lf")
 	id, batch := f.submitBuy(t, 1_000_000, pref)
 	require.Equal(t, uint64(10), batch)
-	require.Equal(t, userUsdBefore.SubRaw(1_000_000).String(), f.balance(f.user, "uusd").String())
+	require.Equal(t, userUsdBefore.SubRaw(1_000_000).String(), f.balance(f.user, "uusdc.lf").String())
 	// the anti-spam intent fee left the account
 	require.Equal(t, userLunaBefore.Sub(f.params.IntentFee.Amount).String(), f.balance(f.user, "uluna").String())
 
@@ -143,11 +143,11 @@ func TestPipelineClearsIntentAgainstSolverLevel(t *testing.T) {
 	esc, err := f.k.SolverEscrowBalances(f.ctx, f.solver.String())
 	require.NoError(t, err)
 	require.Equal(t, "40000000000", esc.AmountOf("uluna").String())
-	require.Equal(t, "10999000", esc.AmountOf("uusd").String())
+	require.Equal(t, "10999000", esc.AmountOf("uusdc.lf").String())
 
 	// the module holds exactly bond + escrow; nothing leaked
 	moduleLuna := f.balance(f.k.ModuleAddress(), "uluna")
-	moduleUsd := f.balance(f.k.ModuleAddress(), "uusd")
+	moduleUsd := f.balance(f.k.ModuleAddress(), "uusdc.lf")
 	require.Equal(t, "40000000000", moduleLuna.String())
 	require.Equal(t, f.params.SolverBondMin.Amount.AddRaw(10_999_000).String(), moduleUsd.String())
 
@@ -378,27 +378,27 @@ func TestIntentOutsideBandDoesNotExecute(t *testing.T) {
 
 func TestExpiredIntentIsRefunded(t *testing.T) {
 	f := setup(t)
-	before := f.balance(f.user, "uusd")
+	before := f.balance(f.user, "uusdc.lf")
 	id, _ := f.submitBuy(t, 1_000_000, math.LegacyNewDecWithPrec(1, 4))
-	require.Equal(t, before.SubRaw(1_000_000).String(), f.balance(f.user, "uusd").String())
+	require.Equal(t, before.SubRaw(1_000_000).String(), f.balance(f.user, "uusdc.lf").String())
 
 	f.at(110)
 	require.NoError(t, f.k.EndBlocker(f.ctx))
-	require.Equal(t, before.String(), f.balance(f.user, "uusd").String())
+	require.Equal(t, before.String(), f.balance(f.user, "uusdc.lf").String())
 	_, err := f.k.GetIntent(f.ctx, id)
 	require.ErrorIs(t, err, types.ErrIntentNotFound)
 }
 
 func TestCancelRefundsAndOnlyOwner(t *testing.T) {
 	f := setup(t)
-	before := f.balance(f.user, "uusd")
+	before := f.balance(f.user, "uusdc.lf")
 	id, _ := f.submitBuy(t, 1_000_000, math.LegacyNewDecWithPrec(1, 4))
 	_, err := f.k.CancelIntent(f.ctx, f.solver.String(), id)
 	require.ErrorIs(t, err, types.ErrUnauthorized)
 	refund, err := f.k.CancelIntent(f.ctx, f.user.String(), id)
 	require.NoError(t, err)
-	require.Equal(t, "1000000uusd", refund.String())
-	require.Equal(t, before.String(), f.balance(f.user, "uusd").String())
+	require.Equal(t, "1000000uusdc.lf", refund.String())
+	require.Equal(t, before.String(), f.balance(f.user, "uusdc.lf").String())
 }
 
 func TestEscrowWithdrawRespectsRevealedReservation(t *testing.T) {
@@ -412,14 +412,14 @@ func TestEscrowWithdrawRespectsRevealedReservation(t *testing.T) {
 	err := f.k.WithdrawSolverEscrow(f.ctx, f.solver.String(), sdk.NewCoin("uluna", math.NewInt(1)))
 	require.ErrorIs(t, err, types.ErrInsufficientEscrow)
 	// quote is free
-	require.NoError(t, f.k.WithdrawSolverEscrow(f.ctx, f.solver.String(), sdk.NewCoin("uusd", math.NewInt(1_000_000))))
+	require.NoError(t, f.k.WithdrawSolverEscrow(f.ctx, f.solver.String(), sdk.NewCoin("uusdc.lf", math.NewInt(1_000_000))))
 }
 
 func TestSolverUnbondRefundsBondAndEscrow(t *testing.T) {
 	f := setup(t)
 	f.registerSolver(t)
 	lunaBefore := f.balance(f.solver, "uluna")
-	usdBefore := f.balance(f.solver, "uusd")
+	usdBefore := f.balance(f.solver, "uusdc.lf")
 
 	until, err := f.k.UnbondSolver(f.ctx, f.solver.String())
 	require.NoError(t, err)
@@ -433,7 +433,7 @@ func TestSolverUnbondRefundsBondAndEscrow(t *testing.T) {
 	_, err = f.k.GetSolver(f.ctx, f.solver.String())
 	require.ErrorIs(t, err, types.ErrSolverNotFound)
 	require.Equal(t, lunaBefore.AddRaw(50_000_000_000).String(), f.balance(f.solver, "uluna").String())
-	require.Equal(t, usdBefore.AddRaw(10_000_000).Add(f.params.SolverBondMin.Amount).String(), f.balance(f.solver, "uusd").String())
+	require.Equal(t, usdBefore.AddRaw(10_000_000).Add(f.params.SolverBondMin.Amount).String(), f.balance(f.solver, "uusdc.lf").String())
 }
 
 func TestFrontendFeeRequiresApproval(t *testing.T) {
@@ -446,7 +446,7 @@ func TestFrontendFeeRequiresApproval(t *testing.T) {
 
 	// without approval the attribution is dropped
 	id, _, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
-		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY, AmountIn: sdk.NewCoin("uusd", math.NewInt(1_000_000)),
+		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY, AmountIn: sdk.NewCoin("uusdc.lf", math.NewInt(1_000_000)),
 		LimitPrice: pref, MinOut: math.ZeroInt(), ExpiryHeight: f.ctx.BlockHeight() + 100, Frontend: frontend.String(),
 	})
 	require.NoError(t, err)
@@ -460,7 +460,7 @@ func TestFrontendFeeRequiresApproval(t *testing.T) {
 	require.NoError(t, f.k.ApproveFrontend(f.ctx, f.user.String(), frontend.String(), 5))
 	userLunaBefore := f.balance(f.user, "uluna")
 	_, batch, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
-		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY, AmountIn: sdk.NewCoin("uusd", math.NewInt(1_000_000)),
+		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY, AmountIn: sdk.NewCoin("uusdc.lf", math.NewInt(1_000_000)),
 		LimitPrice: pref, MinOut: math.ZeroInt(), ExpiryHeight: f.ctx.BlockHeight() + 100, Frontend: frontend.String(),
 	})
 	require.NoError(t, err)
@@ -475,7 +475,7 @@ func TestFrontendFeeRequiresApproval(t *testing.T) {
 func TestPerpMarketNeedsMarginHook(t *testing.T) {
 	f := setup(t)
 	err := f.k.CreateMarket(f.ctx, types.Market{
-		Id: "uluna-perp/uusd", BaseDenom: "uluna", QuoteDenom: "uusd", Type: types.MARKET_TYPE_PERP, OracleDenom: "uusd",
+		Id: "uluna-perp/uusdc.lf", BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: types.MARKET_TYPE_PERP, OracleDenom: "uusd",
 		Enabled: false, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	})
 	require.ErrorIs(t, err, types.ErrInvalidMarket)

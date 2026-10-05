@@ -29,10 +29,10 @@ func TestBenchmarkSaturatedBatch(t *testing.T) {
 	// intents: alternating buys and sells around P_ref inside the band
 	for i := 0; i < nIntents; i++ {
 		acc := sdk.AccAddress([]byte(fmt.Sprintf("bench-intent-%06d----", i)))
-		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000_000)), sdk.NewCoin("uusd", math.NewInt(10_000_000)))
+		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(10_000_000)))
 		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
 		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", acc, coins))
-		side, amount := types.SIDE_BUY, sdk.NewCoin("uusd", math.NewInt(1_000_000))
+		side, amount := types.SIDE_BUY, sdk.NewCoin("uusdc.lf", math.NewInt(1_000_000))
 		if i%2 == 1 {
 			side, amount = types.SIDE_SELL, sdk.NewCoin("uluna", math.NewInt(10_000_000_000))
 		}
@@ -49,12 +49,12 @@ func TestBenchmarkSaturatedBatch(t *testing.T) {
 	bids := make([]types.Bid, nSolvers)
 	for s := range solvers {
 		solvers[s] = sdk.AccAddress([]byte(fmt.Sprintf("bench-solver-%06d----", s)))
-		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)), sdk.NewCoin("uusd", math.NewInt(100_000_000_000)))
+		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000_000)))
 		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
 		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", solvers[s], coins))
 		require.NoError(t, f.k.RegisterSolver(f.ctx, solvers[s].String(), f.params.SolverBondMin))
 		require.NoError(t, f.k.DepositSolverEscrow(f.ctx, solvers[s].String(), sdk.NewCoin("uluna", math.NewInt(500_000_000_000))))
-		require.NoError(t, f.k.DepositSolverEscrow(f.ctx, solvers[s].String(), sdk.NewCoin("uusd", math.NewInt(50_000_000))))
+		require.NoError(t, f.k.DepositSolverEscrow(f.ctx, solvers[s].String(), sdk.NewCoin("uusdc.lf", math.NewInt(50_000_000))))
 		levels := make([]types.Level, nLevels)
 		for l := range levels {
 			side := types.SIDE_SELL

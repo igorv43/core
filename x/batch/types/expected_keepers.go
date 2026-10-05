@@ -22,10 +22,14 @@ type OracleKeeper interface {
 	GetPrice(ctx sdk.Context, name string) (math.LegacyDec, error)
 }
 
-// FeeSink receives protocol fees and slashes. Until the insurance fund of
-// x/perp exists the default sink funds the community pool (spec §23).
+// FeeSink receives protocol fees and slashes. The app registers the x/perp
+// sink, which routes them into the allocation cascade of spec §23.1; the
+// community pool sink is only the fallback of a keeper built without x/perp.
 type FeeSink interface {
 	Deposit(ctx sdk.Context, from string, coins sdk.Coins) error
+	// DepositInsurance receives solver slashes: spec §16.2 "Slash destinado ao
+	// fundo de seguro" — 100% to the insurance fund, outside the cascade.
+	DepositInsurance(ctx sdk.Context, from string, coins sdk.Coins) error
 }
 
 // PerpFill is one cleared quantity of a perpetual market handed to the

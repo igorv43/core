@@ -8,7 +8,8 @@ import (
 // EndBlocker runs after x/batch settled the block's fills: per market, the
 // oracle state and mark, funding when due, the liquidation sweep, trigger
 // evaluation, the fund's unwind order and the risk steps; then the
-// allocation epoch and the buyback. Every step is bounded (spec §12) and a
+// revenue sale settlement, the allocation epoch, the stLUNC tranche, the
+// buyback and the sale of revenue held in kind. Every step is bounded (spec §12) and a
 // market failure is logged, never fatal.
 func (k Keeper) EndBlocker(ctx sdk.Context) error {
 	params, err := k.GetParams(ctx)
@@ -24,6 +25,11 @@ func (k Keeper) EndBlocker(ctx sdk.Context) error {
 			k.Logger(ctx).Error("perp market end block failed", "market", m.Id, "err", err)
 		}
 	}
+	// a closed revenue sale is booked first, so the epoch counts its proceeds
+	// and no other pipeline mistakes its refund or proceeds for its own
+	if err := k.settleRevenueSale(ctx, params); err != nil {
+		k.Logger(ctx).Error("revenue sale settlement failed", "err", err)
+	}
 	if err := k.runAllocation(ctx, params); err != nil {
 		k.Logger(ctx).Error("allocation failed", "err", err)
 	}
@@ -32,6 +38,9 @@ func (k Keeper) EndBlocker(ctx sdk.Context) error {
 	}
 	if err := k.runBuyback(ctx, params); err != nil {
 		k.Logger(ctx).Error("buyback failed", "err", err)
+	}
+	if err := k.placeRevenueSale(ctx, params); err != nil {
+		k.Logger(ctx).Error("revenue sale failed", "err", err)
 	}
 	return nil
 }

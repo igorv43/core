@@ -14,7 +14,9 @@ type DistributionKeeper interface {
 }
 
 // CommunityPoolSink sends protocol fees and slashes to the community pool.
-// It is the default until the insurance fund of x/perp exists (spec §23).
+// It is only the fallback of a keeper built without x/perp: the app replaces
+// it with the x/perp sink, which routes them into the allocation cascade of
+// spec §23.1.
 type CommunityPoolSink struct {
 	distr DistributionKeeper
 }
@@ -24,6 +26,12 @@ var _ types.FeeSink = CommunityPoolSink{}
 // NewCommunityPoolSink creates the default fee sink.
 func NewCommunityPoolSink(distr DistributionKeeper) CommunityPoolSink {
 	return CommunityPoolSink{distr: distr}
+}
+
+// DepositInsurance implements types.FeeSink; without x/perp there is no
+// insurance fund, so slashes fall back to the community pool too.
+func (s CommunityPoolSink) DepositInsurance(ctx sdk.Context, fromModule string, coins sdk.Coins) error {
+	return s.Deposit(ctx, fromModule, coins)
 }
 
 // Deposit implements types.FeeSink.

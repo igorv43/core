@@ -57,6 +57,20 @@ type Keeper struct {
 	WithdrawSeq collections.Map[string, uint64]
 	Beacons     collections.Map[uint64, types.Beacon]
 	BeaconSeq   collections.Sequence
+	// Deposit-then-execute (cross-chain liquid staking §4.3).
+	Pending          collections.Map[uint64, types.PendingPayload]
+	PendingByAccount collections.KeySet[collections.Pair[string, uint64]]
+	PendingSeq       collections.Sequence
+	PendingReady     collections.KeySet[uint64]
+	// Credits are keyed by creditKey(account, token, origin); CreditExpiry
+	// indexes them by the height of their last deposit.
+	Credits      collections.Map[string, types.DepositCredit]
+	CreditExpiry collections.KeySet[collections.Pair[int64, string]]
+	// Auto-return of matured claims (§4.4).
+	AutoReturns      collections.Map[string, types.AutoReturn]
+	AutoReturnCursor collections.Item[string]
+	AutoReturnEpoch  collections.Item[uint64]
+	AutoReturnBudget collections.Item[types.AutoReturnBudget]
 }
 
 // NewKeeper creates the x/remote keeper and registers it as Hyperlane app 3.
@@ -97,6 +111,18 @@ func NewKeeper(
 		WithdrawSeq: collections.NewMap(sb, types.WithdrawSeqKey, "withdraw_seq", collections.StringKey, collections.Uint64Value),
 		Beacons:     collections.NewMap(sb, types.BeaconsKey, "beacons", collections.Uint64Key, codec.CollValue[types.Beacon](cdc)),
 		BeaconSeq:   collections.NewSequence(sb, types.BeaconSeqKey, "beacon_seq"),
+		Pending:     collections.NewMap(sb, types.PendingKey, "pending", collections.Uint64Key, codec.CollValue[types.PendingPayload](cdc)),
+		PendingByAccount: collections.NewKeySet(sb, types.PendingByAccountKey, "pending_by_account",
+			collections.PairKeyCodec(collections.StringKey, collections.Uint64Key)),
+		PendingSeq:   collections.NewSequence(sb, types.PendingSeqKey, "pending_seq"),
+		PendingReady: collections.NewKeySet(sb, types.PendingReadyKey, "pending_ready", collections.Uint64Key),
+		Credits:      collections.NewMap(sb, types.CreditsKey, "credits", collections.StringKey, codec.CollValue[types.DepositCredit](cdc)),
+		CreditExpiry: collections.NewKeySet(sb, types.CreditExpiryKey, "credit_expiry",
+			collections.PairKeyCodec(collections.Int64Key, collections.StringKey)),
+		AutoReturns:      collections.NewMap(sb, types.AutoReturnsKey, "auto_returns", collections.StringKey, codec.CollValue[types.AutoReturn](cdc)),
+		AutoReturnCursor: collections.NewItem(sb, types.AutoReturnCursorKey, "auto_return_cursor", collections.StringValue),
+		AutoReturnEpoch:  collections.NewItem(sb, types.AutoReturnEpochKey, "auto_return_epoch", collections.Uint64Value),
+		AutoReturnBudget: collections.NewItem(sb, types.AutoReturnBudgetKey, "auto_return_budget", codec.CollValue[types.AutoReturnBudget](cdc)),
 	}
 	schema, err := sb.Build()
 	if err != nil {

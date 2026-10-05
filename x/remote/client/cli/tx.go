@@ -71,7 +71,7 @@ func newEncodePayloadCmd() *cobra.Command {
 		Use:   "encode-payload [msgs.json] [on-behalf-of-hex]",
 		Short: "Encode a RemotePayload (hex) from a JSON array of messages signed by the derived account",
 		Long: `The JSON file holds an array of proto-JSON messages, e.g.
-[{"@type":"/terra.perp.v1.MsgDepositCollateral","sender":"terra1...","amount":{"denom":"uusd","amount":"1000000"}}]
+[{"@type":"/terra.perp.v1.MsgDepositCollateral","sender":"terra1...","amount":{"denom":"uusdc.lf","amount":"1000000"}}]
 The optional on-behalf-of is the 32-byte hex controller a trusted gateway acts for.`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -59,6 +59,7 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 			return err
 		}
 	}
+	gs.Ledger.Normalize()
 	if err := k.Ledger.Set(ctx, gs.Ledger); err != nil {
 		return err
 	}

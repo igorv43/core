@@ -108,7 +108,7 @@ func TestConvertedDepositWritesReceipt(t *testing.T) {
 	require.Contains(t, f.rejected(t), "enrolled gateway")
 
 	// onboard: conversion plus a message in the same payload
-	body := f.conversionPayload(t, f.controller.Bytes(), conv, nil, &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))})
+	body := f.conversionPayload(t, f.controller.Bytes(), conv, nil, &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin(settle, math.NewInt(1_000_000))})
 	f.deliver(t, gateway, body)
 	rs, err = f.k.ReceiptsOf(f.ctx, f.derived.String())
 	require.NoError(t, err)

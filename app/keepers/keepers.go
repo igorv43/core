@@ -586,7 +586,7 @@ func NewAppKeepers(
 	)
 
 	// x/batch (Part II): sealed-bid uniform-price call auctions; fees and
-	// slashes go to the community pool until the x/perp insurance fund exists.
+	// slashes go to the x/perp sink registered below (allocation cascade).
 	appKeepers.BatchKeeper = batchkeeper.NewKeeper(
 		appCodec,
 		runtime.NewKVStoreService(appKeepers.keys[batchtypes.StoreKey]),
@@ -613,6 +613,9 @@ func NewAppKeepers(
 	)
 	appKeepers.BatchKeeper.SetMarginHook(perpkeeper.NewMarginHook(appKeepers.PerpKeeper))
 	appKeepers.BatchKeeper.SetFeeSink(perpkeeper.NewFeeSink(appKeepers.PerpKeeper))
+	// spec §24.6: the x/liquidstake fee remainder (after the direct burn)
+	// enters the allocation cascade of §23.1 through the same sink
+	appKeepers.LiquidStakeKeeper.SetFeeSink(perpkeeper.NewFeeSink(appKeepers.PerpKeeper))
 
 	// x/remote (Part II, D-19/D-27): Hyperlane app 3; accounts derived from
 	// (origin domain, sender), session keys via x/authz, paymaster via

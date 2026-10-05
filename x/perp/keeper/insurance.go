@@ -125,7 +125,8 @@ func (k Keeper) trancheStep(ctx sdk.Context, params types.Params) error {
 			return k.Ledger.Set(ctx, l) // still open
 		}
 		l.TrancheSellIntentId = 0
-		l.TrancheUluna = k.bankKeeper.GetBalance(ctx, module, "uluna").Amount
+		// every module uluna except the revenue held in kind (spec §23.1, §24.6)
+		l.TrancheUluna = k.bankKeeper.GetBalance(ctx, module, lunaDenom).Amount.Sub(l.RevenueUluna)
 		expected, err := k.ledgerTotal(ctx, l)
 		if err != nil {
 			return err
@@ -139,8 +140,9 @@ func (k Keeper) trancheStep(ctx sdk.Context, params types.Params) error {
 	if err := k.Ledger.Set(ctx, l); err != nil {
 		return err
 	}
-	// 4. sell within the epoch cap
-	if !l.TrancheUluna.IsPositive() || params.SpotMarketId == "" {
+	// 4. sell within the epoch cap (never while a revenue sale is open: one
+	// sale of the module's uluna at a time, see revenue.go)
+	if !l.TrancheUluna.IsPositive() || params.SpotMarketId == "" || l.RevenueSellIntentId != 0 {
 		return nil
 	}
 	room := params.StUnwindCapPerEpoch.Sub(l.TrancheSoldEpoch)

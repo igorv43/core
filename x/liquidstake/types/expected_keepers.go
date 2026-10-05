@@ -62,3 +62,10 @@ type SlashingKeeper interface {
 	SignedBlocksWindow(ctx context.Context) (int64, error)
 	GetValidatorSigningInfo(ctx context.Context, address sdk.ConsAddress) (slashingtypes.ValidatorSigningInfo, error)
 }
+
+// FeeSink receives the fee remainder after the burn share (spec §24.6): the
+// app registers the x/perp sink, which routes it into the allocation cascade
+// of §23.1 (insurance fund first, then operations, then the surplus).
+type FeeSink interface {
+	Deposit(ctx sdk.Context, fromModule string, coins sdk.Coins) error
+}

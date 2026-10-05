@@ -28,6 +28,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// settle is the perp settlement denom (the gateway deposits it).
+const settle = perptypes.DefaultSettlementDenom
+
 const (
 	chainID     = "remote-test"
 	localDomain = 1325
@@ -57,7 +60,7 @@ func setup(t *testing.T) *fixture {
 	require.NoError(t, app.RemoteKeeper.InitGenesis(ctx, types.DefaultGenesisState()))
 	f := &fixture{app: app, ctx: ctx, k: app.RemoteKeeper}
 	f.owner = sdk.AccAddress([]byte("remote-owner---------"))
-	h.FundAcc(f.owner, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)), sdk.NewCoin("uusd", math.NewInt(1_000_000_000))))
+	h.FundAcc(f.owner, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)), sdk.NewCoin(settle, math.NewInt(1_000_000_000))))
 
 	ismSrv := ismkeeper.NewMsgServerImpl(&app.HyperlaneKeeper.IsmKeeper)
 	ism, err := ismSrv.CreateNoopIsm(ctx, &ismtypes.MsgCreateNoopIsm{Creator: f.owner.String()})
@@ -76,7 +79,7 @@ func setup(t *testing.T) *fixture {
 	f.controller = util.CreateMockHexAddress("evm-user", 1)
 	f.derived = types.DeriveAddress(originDom, f.controller)
 	// the derived account received a warp deposit of settlement and holds uluna for the message fee
-	h.FundAcc(f.derived, sdk.NewCoins(sdk.NewCoin("uusd", math.NewInt(50_000_000)), sdk.NewCoin("uluna", math.NewInt(1_000_000_000))))
+	h.FundAcc(f.derived, sdk.NewCoins(sdk.NewCoin(settle, math.NewInt(50_000_000)), sdk.NewCoin("uluna", math.NewInt(1_000_000_000))))
 
 	warpSrv := warpkeeper.NewMsgServerImpl(app.WarpKeeper)
 	tok, err := warpSrv.CreateCollateralToken(ctx, &warptypes.MsgCreateCollateralToken{Owner: f.owner.String(), OriginMailbox: f.mailbox, OriginDenom: "uluna"})
@@ -138,14 +141,14 @@ func (f *fixture) hasEvent(typ string) bool {
 
 func TestPayloadDepositsCollateral(t *testing.T) {
 	f := setup(t)
-	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(20_000_000))})
+	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin(settle, math.NewInt(20_000_000))})
 	f.deliver(t, f.controller, body)
 	require.Empty(t, f.rejected(t))
 	free, err := f.app.PerpKeeper.FreeCollateral(f.ctx, f.derived.String())
 	require.NoError(t, err)
 	require.Equal(t, "20000000", free.String())
 	// the paymaster is empty: the message fee (10 LUNC) left the account itself, in uluna
-	require.Equal(t, "30000000", f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uusd").Amount.String())
+	require.Equal(t, "30000000", f.app.BankKeeper.GetBalance(f.ctx, f.derived, settle).Amount.String())
 	require.Equal(t, "990000000", f.app.BankKeeper.GetBalance(f.ctx, f.derived, "uluna").Amount.String())
 	acc, err := f.k.GetAccount(f.ctx, f.derived.String())
 	require.NoError(t, err)
@@ -163,12 +166,12 @@ func TestPaymasterSponsorsTheMsgFee(t *testing.T) {
 	pm := types.PaymasterAddress()
 	// an account funded only through a gateway holds no uluna
 	settlementOnly := types.DeriveAddress(originDom, util.CreateMockHexAddress("evm-user", 2))
-	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, settlementOnly, sdk.NewCoins(sdk.NewCoin("uusd", math.NewInt(5_000_000)))))
-	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: settlementOnly.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))})
+	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, settlementOnly, sdk.NewCoins(sdk.NewCoin(settle, math.NewInt(5_000_000)))))
+	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: settlementOnly.String(), Amount: sdk.NewCoin(settle, math.NewInt(1_000_000))})
 	f.deliver(t, util.CreateMockHexAddress("evm-user", 2), body)
 	require.Empty(t, f.rejected(t))
 	require.Equal(t, "90000000", f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount.String(), "the paymaster paid the fee")
-	require.Equal(t, "4000000", f.app.BankKeeper.GetBalance(f.ctx, settlementOnly, "uusd").Amount.String())
+	require.Equal(t, "4000000", f.app.BankKeeper.GetBalance(f.ctx, settlementOnly, settle).Amount.String())
 	// a two-message payload costs two fees; once the paymaster runs dry the account must pay
 	p, err := f.k.GetParams(f.ctx)
 	require.NoError(t, err)
@@ -176,7 +179,7 @@ func TestPaymasterSponsorsTheMsgFee(t *testing.T) {
 	require.NoError(t, f.k.SetParams(f.ctx, p))
 	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
 	f.deliver(t, util.CreateMockHexAddress("evm-user", 2), f.payload(t, nil,
-		&perptypes.MsgDepositCollateral{Sender: settlementOnly.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))},
+		&perptypes.MsgDepositCollateral{Sender: settlementOnly.String(), Amount: sdk.NewCoin(settle, math.NewInt(1_000_000))},
 		&perptypes.MsgSetAutoTopUp{Sender: settlementOnly.String(), Enabled: true},
 	))
 	require.Contains(t, f.rejected(t), "paymaster and remote account cannot pay")
@@ -186,17 +189,17 @@ func TestPaymasterSponsorsTheMsgFee(t *testing.T) {
 func TestPayloadRejections(t *testing.T) {
 	f := setup(t)
 	// a message signed by someone else
-	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: f.owner.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1))})
+	body := f.payload(t, nil, &perptypes.MsgDepositCollateral{Sender: f.owner.String(), Amount: sdk.NewCoin(settle, math.NewInt(1))})
 	f.deliver(t, f.controller, body)
 	require.Contains(t, f.rejected(t), "signed by")
 	// a message outside the whitelist
 	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
-	body = f.payload(t, nil, &batchtypes.MsgRegisterSolver{Sender: f.derived.String(), Bond: sdk.NewCoin("uusd", math.NewInt(1))})
+	body = f.payload(t, nil, &batchtypes.MsgRegisterSolver{Sender: f.derived.String(), Bond: sdk.NewCoin(settle, math.NewInt(1))})
 	f.deliver(t, f.controller, body)
 	require.Contains(t, f.rejected(t), "not allowed")
 	// on_behalf_of from a sender that is not the enrolled gateway
 	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
-	body = f.payload(t, f.controller.Bytes(), &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1))})
+	body = f.payload(t, f.controller.Bytes(), &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin(settle, math.NewInt(1))})
 	f.deliver(t, util.CreateMockHexAddress("gateway", 1), body)
 	require.Contains(t, f.rejected(t), "gateway")
 	free, _ := f.app.PerpKeeper.FreeCollateral(f.ctx, f.derived.String())
@@ -207,7 +210,7 @@ func TestGatewayActsOnBehalfOfController(t *testing.T) {
 	f := setup(t)
 	gateway := util.CreateMockHexAddress("gateway", 1)
 	require.NoError(t, f.k.SetGateway(f.ctx, f.appId, originDom, gateway, util.NewZeroAddress(), nil))
-	body := f.payload(t, f.controller.Bytes(), &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))})
+	body := f.payload(t, f.controller.Bytes(), &perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin(settle, math.NewInt(1_000_000))})
 	f.deliver(t, gateway, body)
 	require.Empty(t, f.rejected(t))
 	free, _ := f.app.PerpKeeper.FreeCollateral(f.ctx, f.derived.String())
@@ -220,7 +223,7 @@ func TestSessionKeysAndPaymaster(t *testing.T) {
 	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(100_000_000))))
 	// deposit enough collateral for the paymaster, then grant the key, in one payload
 	body := f.payload(t, nil,
-		&perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(20_000_000))},
+		&perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin(settle, math.NewInt(20_000_000))},
 		&types.MsgGrantSessionKey{Controller: f.derived.String(), SessionKey: session.String()},
 	)
 	f.deliver(t, f.controller, body)
@@ -443,7 +446,7 @@ func TestScenarioExpiredSessionKeyStillProtected(t *testing.T) {
 	session := sdk.AccAddress([]byte("remote-session-exp---"))
 	// deposit, grant a 1-second session and opt into the auto top-up, all by payload
 	f.deliver(t, f.controller, f.payload(t, nil,
-		&perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin("uusd", math.NewInt(40_000_000))},
+		&perptypes.MsgDepositCollateral{Sender: f.derived.String(), Amount: sdk.NewCoin(settle, math.NewInt(40_000_000))},
 		&types.MsgGrantSessionKey{Controller: f.derived.String(), SessionKey: session.String(), TtlSeconds: 1},
 		&perptypes.MsgSetAutoTopUp{Sender: f.derived.String(), Enabled: true},
 	))

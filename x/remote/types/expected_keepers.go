@@ -10,6 +10,7 @@ import (
 	coretypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	liquidstakekeeper "github.com/classic-terra/core/v4/x/liquidstake/keeper"
+	lstypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	warpledgertypes "github.com/classic-terra/core/v4/x/warpledger/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
@@ -33,9 +34,13 @@ type CoreKeeper interface {
 	QuoteDispatch(ctx context.Context, mailboxId, overwriteHookId util.HexAddress, metadata util.StandardHookMetadata, message util.HyperlaneMessage) (sdk.Coins, error)
 }
 
-// LiquidStakeKeeper gives the exchange rate for the EXCHANGE_RATE beacon.
+// LiquidStakeKeeper gives the exchange rate for the EXCHANGE_RATE beacon, and
+// the epoch and claim of matured requests for the auto-return (cross-chain
+// liquid staking §4.4).
 type LiquidStakeKeeper interface {
 	ExchangeRate(ctx sdk.Context) (math.LegacyDec, liquidstakekeeper.Totals, error)
+	GetEpoch(ctx sdk.Context) (lstypes.Epoch, error)
+	Claim(ctx sdk.Context, sender sdk.AccAddress) (sdk.Coin, []uint64, error)
 }
 
 // WarpLedgerKeeper gives the route ledger for the ROUTE_SOLVENCY beacon and

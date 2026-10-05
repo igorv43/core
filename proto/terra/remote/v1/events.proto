@@ -72,3 +72,79 @@ message EventControlSent {
   // params renders the order: destination domain and amount, fees, limits or leg.
   string params = 5;
 }
+
+// EventRemotePending is emitted when a payload waits for its deposit (§4.3).
+message EventRemotePending {
+  string account = 1;
+  uint32 domain = 2;
+  string controller = 3;
+  uint64 pending_id = 4;
+  string token_id = 5;
+  string amount = 6;
+  int64 expiry_height = 7;
+}
+
+// EventRemoteSkipped is emitted when a withdrawal that references a zero
+// result is skipped (§4.2); it is not an error.
+message EventRemoteSkipped {
+  string account = 1;
+  uint32 domain = 2;
+  string controller = 3;
+  uint32 index = 4;
+  string msg_type = 5;
+  string reason = 6;
+}
+
+// EventDepositCredited is emitted when a warp deposit from an origin with an
+// enrolled gateway is recorded as a deposit credit (§4.3).
+message EventDepositCredited {
+  string account = 1;
+  string token_id = 2;
+  uint32 origin = 3;
+  string amount = 4;
+  string credit = 5;
+}
+
+// EventRemoteStake is the receipt of a remote liquid stake (§2.1): uluna
+// staked, stLUNC minted at the rate, and the withdrawal that returns it.
+message EventRemoteStake {
+  string account = 1;
+  string controller = 2;
+  uint32 domain = 3;
+  string uluna = 4;
+  string minted = 5;
+  string rate = 6;
+  string withdrawal_message_id = 7;
+}
+
+// EventRemoteUnstake is the receipt of a remote unstake (§2.2).
+message EventRemoteUnstake {
+  string account = 1;
+  string controller = 2;
+  uint32 domain = 3;
+  string st_amount = 4;
+  string amount = 5;
+  bool instant = 6;
+  uint64 request_id = 7;
+  string rate = 8;
+  string withdrawal_message_id = 9;
+}
+
+// EventRemoteClaim is the receipt of a remote claim of matured requests;
+// auto is true when it was made by the epoch auto-return (§4.4).
+message EventRemoteClaim {
+  string account = 1;
+  string controller = 2;
+  uint32 domain = 3;
+  string amount = 4;
+  repeated uint64 request_ids = 5;
+  string withdrawal_message_id = 6;
+  bool auto = 7;
+}
+
+// EventAutoReturnSet is emitted when an account opts in or out of the auto-return.
+message EventAutoReturnSet {
+  string account = 1;
+  bool enabled = 2;
+  string token_id = 3;
+}

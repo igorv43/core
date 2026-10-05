@@ -99,7 +99,7 @@ func TestFabric(t *testing.T) {
 		require.NoError(t, err, "%s.%s", module, field)
 		require.Equal(t, want, got, "%s.%s", module, field)
 	}
-	assertField("perp", "settlement_denom", "uusd", "params")
+	assertField("perp", "settlement_denom", "uusdc.lf", "params") // D-29: USDC basket, never USTC (D-18)
 	assertField("perp", "st_denom", "stluna", "params")
 	assertField("liquidstake", "epoch_blocks", "5", "params")
 	assertField("batch", "commit_window", "2", "params")

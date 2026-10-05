@@ -153,15 +153,15 @@ func TestPortOfEntryDepositAndWithdraw(t *testing.T) {
 	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(1_000_000_000))))
 	user := util.CreateMockHexAddress("solana-user", 1) // 32-byte pubkey as-is
 	portAccount := types.DeriveAddress(portSo, user)
-	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, portAccount, sdk.NewCoins(sdk.NewCoin("uusd", math.NewInt(30_000_000)), sdk.NewCoin("uluna", math.NewInt(100_000_000)))))
+	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, portAccount, sdk.NewCoins(sdk.NewCoin(settle, math.NewInt(30_000_000)), sdk.NewCoin("uluna", math.NewInt(100_000_000)))))
 
 	// an unregistered port is refused, and so is a port claimed by a direct sender
-	body := f.conversionPayloadPort(t, user.Bytes(), portSo, &perptypes.MsgDepositCollateral{Sender: portAccount.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))})
+	body := f.conversionPayloadPort(t, user.Bytes(), portSo, &perptypes.MsgDepositCollateral{Sender: portAccount.String(), Amount: sdk.NewCoin(settle, math.NewInt(1_000_000))})
 	f.deliver(t, gateway, body)
 	require.Contains(t, f.rejected(t), "not served")
 	require.NoError(t, f.k.SetPort(f.ctx, &types.MsgSetPort{Authority: gov, PortDomain: portSo, VaultDomain: originDom, CctpDomain: 5}))
 	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
-	f.deliver(t, f.controller, f.conversionPayloadPort(t, nil, portSo, &perptypes.MsgDepositCollateral{Sender: portAccount.String(), Amount: sdk.NewCoin("uusd", math.NewInt(1_000_000))}))
+	f.deliver(t, f.controller, f.conversionPayloadPort(t, nil, portSo, &perptypes.MsgDepositCollateral{Sender: portAccount.String(), Amount: sdk.NewCoin(settle, math.NewInt(1_000_000))}))
 	require.Contains(t, f.rejected(t), "not served")
 
 	// the vault's gateway credits the port user's account

@@ -54,6 +54,11 @@ service Query {
   rpc BeaconBody(QueryBeaconBodyRequest) returns (QueryBeaconBodyResponse) {
     option (google.api.http).get = "/terra/remote/v1/beacons/{id}/body";
   }
+  // RemoteStaking returns the payloads of an account waiting for their deposit,
+  // its deposit credits and its auto-return opt-in (cross-chain liquid staking §4).
+  rpc RemoteStaking(QueryRemoteStakingRequest) returns (QueryRemoteStakingResponse) {
+    option (google.api.http).get = "/terra/remote/v1/staking/{address}";
+  }
 }
 
 message QueryParamsRequest {}
@@ -142,4 +147,14 @@ message QueryBeaconBodyRequest {
 }
 message QueryBeaconBodyResponse {
   bytes body = 1;
+}
+
+message QueryRemoteStakingRequest {
+  string address = 1;
+}
+message QueryRemoteStakingResponse {
+  repeated PendingPayload pending = 1 [(gogoproto.nullable) = false];
+  repeated DepositCredit credits = 2 [(gogoproto.nullable) = false];
+  // auto_return is set when the account opted in.
+  AutoReturn auto_return = 3;
 }

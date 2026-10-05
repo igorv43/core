@@ -10,20 +10,24 @@ import (
 // DefaultParams returns the initial parameters of spec Annex B.
 func DefaultParams() Params {
 	return Params{
-		SessionTtlSeconds:      30 * 24 * 3600,                                 // 30 days
-		MaxSessions:            3,                                              // param_remote_max_sessions
-		MsgFee:                 sdk.NewCoin("uluna", math.NewInt(10_000_000)),  // param_remote_msg_fee: ~2x a simple tx at 28.325 uluna/gas, in the paymaster's denom
-		MaxMsgsPerPayload:      5,                                              // max in code 10
-		PaymasterDailyCap:      sdk.NewCoin("uluna", math.NewInt(200_000_000)), // 200 LUNC of gas per period (~17 orders at 400k gas)
-		PaymasterMinCollateral: math.NewInt(10_000_000),                        // 10 USD
-		PaymasterPeriodSeconds: 24 * 3600,
-		WithdrawFeeCap:         sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one withdrawal
-		BeaconFeeCap:           sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one beacon
-		MaxBeaconsPerBlock:     4,
-		RebalanceEpochBlocks:   600,                                            // ~1 h at 6 s (param_rebalance_epoch)
-		DynamicFeeBandBps:      50,                                             // up to 0.5 % (param_dynamic_fee_band)
-		ControlFeeCap:          sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one control order
-		MaxControlMsgsPerBlock: 8,
+		SessionTtlSeconds:       30 * 24 * 3600,                                 // 30 days
+		MaxSessions:             3,                                              // param_remote_max_sessions
+		MsgFee:                  sdk.NewCoin("uluna", math.NewInt(10_000_000)),  // param_remote_msg_fee: ~2x a simple tx at 28.325 uluna/gas, in the paymaster's denom
+		MaxMsgsPerPayload:       5,                                              // max in code 10
+		PaymasterDailyCap:       sdk.NewCoin("uluna", math.NewInt(200_000_000)), // 200 LUNC of gas per period (~17 orders at 400k gas)
+		PaymasterMinCollateral:  math.NewInt(10_000_000),                        // 10 USD
+		PaymasterPeriodSeconds:  24 * 3600,
+		WithdrawFeeCap:          sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one withdrawal
+		BeaconFeeCap:            sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one beacon
+		MaxBeaconsPerBlock:      4,
+		RebalanceEpochBlocks:    600,                                            // ~1 h at 6 s (param_rebalance_epoch)
+		DynamicFeeBandBps:       50,                                             // up to 0.5 % (param_dynamic_fee_band)
+		ControlFeeCap:           sdk.NewCoin("uluna", math.NewInt(200_000_000)), // interchain gas of one control order
+		MaxControlMsgsPerBlock:  8,
+		MaxPendingPerAccount:    3,
+		PendingTtlBlocks:        600, // ~1 h at 6 s
+		MaxPendingExecsPerBlock: 10,
+		MaxAutoReturnsPerEpoch:  50,
 	}
 }
 
@@ -70,6 +74,18 @@ func (p Params) Validate() error {
 	}
 	if p.MaxBeaconsPerBlock == 0 || p.MaxBeaconsPerBlock > 50 {
 		return fmt.Errorf("max_beacons_per_block must be within [1, 50]")
+	}
+	if p.MaxPendingPerAccount == 0 || p.MaxPendingPerAccount > MaxPendingPerAccountAbsolute {
+		return fmt.Errorf("max_pending_per_account must be within [1, %d]", MaxPendingPerAccountAbsolute)
+	}
+	if p.PendingTtlBlocks < 1 || p.PendingTtlBlocks > MaxPendingTTLBlocksAbsolute {
+		return fmt.Errorf("pending_ttl_blocks must be within [1, %d]", MaxPendingTTLBlocksAbsolute)
+	}
+	if p.MaxPendingExecsPerBlock == 0 || p.MaxPendingExecsPerBlock > MaxPendingExecsPerBlockAbsolute {
+		return fmt.Errorf("max_pending_execs_per_block must be within [1, %d]", MaxPendingExecsPerBlockAbsolute)
+	}
+	if p.MaxAutoReturnsPerEpoch == 0 || p.MaxAutoReturnsPerEpoch > MaxAutoReturnsPerEpochAbsolute {
+		return fmt.Errorf("max_auto_returns_per_epoch must be within [1, %d]", MaxAutoReturnsPerEpochAbsolute)
 	}
 	return nil
 }

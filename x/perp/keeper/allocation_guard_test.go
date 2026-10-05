@@ -18,7 +18,7 @@ import (
 
 // lunaUsdSpotMarket is the LUNC/USD spot market id the perp keeper tests
 // register for the buyback and the stLUNC tranche sales.
-const lunaUsdSpotMarket = "uluna/uusd"
+const lunaUsdSpotMarket = "uluna/uusdc.lf"
 
 // buybackSetup registers the LUNC/USD spot market used by the buyback and
 // enables the buyback (the allocation epoch stays long so it does not run).
@@ -26,7 +26,7 @@ func (f *fixture) buybackSetup(t *testing.T) {
 	t.Helper()
 	f.app.OracleKeeper.SetLunaExchangeRate(f.ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 	require.NoError(t, f.bk.CreateMarket(f.ctx, batchtypes.Market{
-		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusd", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	p := f.params
@@ -53,7 +53,7 @@ func (f *fixture) setLedger(t *testing.T, insurance, burnBudget math.Int) {
 	l.Insurance, l.BurnBudget = insurance, burnBudget
 	require.NoError(t, f.k.Ledger.Set(f.ctx, l))
 	if add.IsPositive() {
-		f.mintToModule(t, sdk.NewCoins(sdk.NewCoin("uusd", add)))
+		f.mintToModule(t, sdk.NewCoins(sdk.NewCoin("uusdc.lf", add)))
 	}
 }
 
@@ -138,7 +138,7 @@ func TestBuybackSkippedWhileInsuranceBelowTarget(t *testing.T) {
 	require.Equal(t, burnBefore.String(), f.burned(t).String())
 
 	// the fund is refilled: the held uluna is burned at the next EndBlock
-	require.NoError(t, f.k.FundInsurance(f.ctx, f.long, sdk.NewCoin("uusd", math.NewInt(70_000))))
+	require.NoError(t, f.k.FundInsurance(f.ctx, f.long, sdk.NewCoin("uusdc.lf", math.NewInt(70_000))))
 	f.perpEndBlock(t)
 	require.Equal(t, burnBefore.AddRaw(5_000_000).String(), f.burned(t).String())
 	require.True(t, f.moduleUluna(t).IsZero())
@@ -160,7 +160,7 @@ func TestBuybackRoutesOnlyTheGapThenBuysBack(t *testing.T) {
 	require.NotZero(t, l.BuybackIntentId, "surplus bought back")
 	in, err := f.bk.GetIntent(f.ctx, l.BuybackIntentId)
 	require.NoError(t, err)
-	require.Equal(t, "16500uusd", in.AmountIn.String())
+	require.Equal(t, "16500uusdc.lf", in.AmountIn.String())
 	ev := f.skippedEvents()
 	require.Len(t, ev, 1)
 	require.Equal(t, `"4000"`, attr(ev[0], "routed_to_insurance"))

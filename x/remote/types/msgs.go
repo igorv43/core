@@ -51,8 +51,23 @@ func (m MsgWithdraw) ValidateBasic() error {
 	if err := validAddr("controller", m.Controller); err != nil {
 		return err
 	}
-	if m.Amount.IsNil() || !m.Amount.IsPositive() {
-		return errorsmod.Wrap(ErrInvalidWithdraw, "amount must be positive")
+	switch m.AmountFrom {
+	case AMOUNT_FROM_LITERAL:
+		if m.Amount.IsNil() || !m.Amount.IsPositive() {
+			return errorsmod.Wrap(ErrInvalidWithdraw, "amount must be positive")
+		}
+		if m.MinAmount != nil {
+			return errorsmod.Wrap(ErrInvalidReference, "min_amount is allowed only with amount_from")
+		}
+	case AMOUNT_FROM_PREVIOUS_RESULT:
+		if !m.Amount.IsNil() && !m.Amount.IsZero() {
+			return errorsmod.Wrap(ErrInvalidReference, "amount must be empty with amount_from")
+		}
+		if m.MinAmount != nil && (m.MinAmount.IsNil() || m.MinAmount.IsNegative()) {
+			return errorsmod.Wrap(ErrInvalidReference, "min_amount must be non-negative")
+		}
+	default:
+		return errorsmod.Wrapf(ErrInvalidReference, "unknown amount_from %d", m.AmountFrom)
 	}
 	if m.TokenOut != "" {
 		if _, err := util.DecodeHexAddress(m.TokenOut); err != nil {
@@ -61,6 +76,28 @@ func (m MsgWithdraw) ValidateBasic() error {
 		if m.MinAccepted == nil || m.MinAccepted.IsNil() || m.MinAccepted.IsNegative() {
 			return errorsmod.Wrap(ErrInvalidWithdraw, "min_accepted must be set with token_out")
 		}
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgSetAutoReturn) ValidateBasic() error {
+	if err := validAddr("controller", m.Controller); err != nil {
+		return err
+	}
+	if m.Enabled && m.TokenId.IsZeroAddress() {
+		return errorsmod.Wrap(ErrInvalidParams, "token_id must be set to enable the auto-return")
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
+func (m AfterDeposit) ValidateBasic() error {
+	if m.TokenId.IsZeroAddress() {
+		return errorsmod.Wrap(ErrInvalidPayload, "after_deposit.token_id must be set")
+	}
+	if m.Amount.IsNil() || !m.Amount.IsPositive() {
+		return errorsmod.Wrap(ErrInvalidPayload, "after_deposit.amount must be positive")
 	}
 	return nil
 }

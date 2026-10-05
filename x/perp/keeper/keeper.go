@@ -166,6 +166,7 @@ func (k Keeper) GetLedger(ctx sdk.Context) (types.Ledger, error) {
 		}
 		return types.Ledger{}, err
 	}
+	l.Normalize()
 	return l, nil
 }
 

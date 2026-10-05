@@ -15,12 +15,21 @@ import (
 type MsgServer struct {
 	coretypes.MsgServer
 
-	ledger warpledgerkeeper.Keeper
+	ledger    warpledgerkeeper.Keeper
+	observers []DeliveryObserver
+}
+
+// DeliveryObserver is told about every message the core processed
+// successfully, after the ledger accounting. x/remote uses it to record the
+// warp deposits that pending payloads wait for (cross-chain liquid staking
+// §4.3). An error fails the message (store errors only).
+type DeliveryObserver interface {
+	OnWarpDelivered(ctx sdk.Context, message util.HyperlaneMessage) error
 }
 
 // NewMsgServer returns a hyperlane core MsgServer that delegates to upstream.
-func NewMsgServer(upstream coretypes.MsgServer, ledger warpledgerkeeper.Keeper) coretypes.MsgServer {
-	return &MsgServer{MsgServer: upstream, ledger: ledger}
+func NewMsgServer(upstream coretypes.MsgServer, ledger warpledgerkeeper.Keeper, observers ...DeliveryObserver) coretypes.MsgServer {
+	return &MsgServer{MsgServer: upstream, ledger: ledger, observers: observers}
 }
 
 // ProcessMessage handles MsgProcessMessage with inbound ledger accounting:
@@ -54,6 +63,11 @@ func (s *MsgServer) ProcessMessage(goCtx context.Context, msg *coretypes.MsgProc
 	}
 	if err := s.ledger.RecordInboundMessage(ctx, message); err != nil {
 		return nil, err
+	}
+	for _, o := range s.observers {
+		if err := o.OnWarpDelivered(ctx, message); err != nil {
+			return nil, err
+		}
 	}
 	return res, nil
 }

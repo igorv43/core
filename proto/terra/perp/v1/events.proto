@@ -98,6 +98,8 @@ message EventAllocationExecuted {
   string to_oracle_pool    = 5;
   string to_community_pool = 6;
   string to_burn_budget    = 7;
+  // luna_price is the oracle LUNC price used for the epoch (see AllocationRecord.luna_price).
+  string luna_price        = 8;
 }
 message EventBuyback {
   uint64 intent_id = 1;
@@ -122,4 +124,20 @@ message EventFeePaidInLuna {
   string account        = 1;
   string settlement_fee = 2;
   string luna_burned    = 3;
+}
+
+// EventRevenueInKind reports protocol revenue received in uluna (spot fees
+// or the x/liquidstake fee remainder) and held for conversion (spec §23.1, §24.6).
+message EventRevenueInKind {
+  string from   = 1;
+  string amount = 2;
+}
+
+// EventRevenueSale reports a sale of revenue held in kind in the internal
+// spot market: placed (intent_id, offered) or settled (sold, proceeds).
+message EventRevenueSale {
+  uint64 intent_id = 1;
+  string offered   = 2;
+  string sold      = 3;
+  string proceeds  = 4;
 }

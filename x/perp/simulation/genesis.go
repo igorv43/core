@@ -50,6 +50,7 @@ func RandomizedParams(r *rand.Rand) types.Params {
 	p.StGlobalCapIfRatio = math.LegacyNewDec(int64(r.Intn(5)))
 	p.StHaircutQueueSlope = math.LegacyNewDecWithPrec(int64(r.Intn(100)), 2)
 	p.LunaFeeDiscount = math.LegacyNewDecWithPrec(int64(r.Intn(50)), 2)
+	p.RevenueSellCap = math.NewInt(int64(r.Intn(1_000_000_000_000)))
 	if err := p.Validate(); err != nil {
 		panic(err)
 	}

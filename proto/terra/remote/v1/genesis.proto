@@ -19,4 +19,8 @@ message GenesisState {
   repeated ConversionReceipt receipts = 9 [(gogoproto.nullable) = false];
   repeated Executor executors = 10 [(gogoproto.nullable) = false];
   repeated Port ports = 11 [(gogoproto.nullable) = false];
+  repeated PendingPayload pending_payloads = 12 [(gogoproto.nullable) = false];
+  repeated DepositCredit deposit_credits = 13 [(gogoproto.nullable) = false];
+  repeated AutoReturn auto_returns = 14 [(gogoproto.nullable) = false];
+  uint64 next_pending_id = 15;
 }

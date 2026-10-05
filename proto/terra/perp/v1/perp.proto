@@ -94,6 +94,11 @@ message Params {
   // account pays it in LUNC (spec §23.3, N1 option; zero disables). The LUNC
   // is burned; available only while the insurance fund is at its target.
   string luna_fee_discount = 36 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // revenue_sell_cap caps the uluna of protocol revenue held in kind (spot
+  // fees charged in uluna, the x/liquidstake fee remainder) that is sold for
+  // settlement in the internal spot market per allocation epoch (spec §23.1,
+  // §24.6; same gradual discipline as §18.3). Zero keeps the revenue in kind.
+  string revenue_sell_cap = 37 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }
 
 // Market is a perpetual market (spec §19–§22). Governance sets the risk
@@ -198,6 +203,18 @@ message AllocationRecord {
   string to_burn_budget = 8 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   // burned_uluna is the uluna bought back and sent to the burn account during the epoch.
   string burned_uluna = 9 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // luna_price is the x/oracle LUNC price (luna_price_denom per uluna) at the
+  // allocation height, so reports can express every step in LUNC as well.
+  // The settlement denom is a USDC synthetic and the oracle reference is USD
+  // (USDC ~ USD, spec §21.6). Zero when the oracle had no price.
+  string luna_price = 10 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
+  // revenue_uluna_received is the protocol revenue received in kind (uluna)
+  // during the epoch: spot fees charged in uluna and the x/liquidstake fee
+  // remainder (spec §23.1, §24.6).
+  string revenue_uluna_received = 11 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // revenue_uluna_sold is the uluna of that revenue sold for settlement in
+  // the internal spot market during the epoch (the proceeds joined the revenue path).
+  string revenue_uluna_sold = 12 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }
 
 // CollateralEntry is an account's free collateral (genesis / queries).
@@ -239,4 +256,21 @@ message Ledger {
   string tranche_sold_epoch = 13 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   // tranche_advanced is the settlement the core advanced against seized stLUNC and not yet repaid.
   string tranche_advanced = 14 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // Protocol revenue held in kind (spec §23.1, §24.6): uluna received as spot
+  // fees or as the x/liquidstake fee remainder, waiting to be sold for
+  // settlement in the internal spot market. Never burned, never part of IF.
+  // revenue_uluna is the uluna waiting for a sale; revenue_sell_intent_id the
+  // open sell intent (0 = none); revenue_sold_epoch what was sold in the
+  // current allocation epoch; revenue_uluna_epoch what was received in it;
+  // revenue_uluna_mark the module uluna not accounted for by the tranche or
+  // the revenue when the open sale was placed (the unfilled part of the sale
+  // is what comes back above it); revenue_sell_offered the uluna the open
+  // sale offered.
+  string revenue_uluna = 15 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  uint64 revenue_sell_intent_id = 16;
+  string revenue_sold_epoch = 17 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string revenue_uluna_epoch = 18 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  string revenue_uluna_mark = 19 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // revenue_sell_offered is the uluna offered by the open sale.
+  string revenue_sell_offered = 20 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }

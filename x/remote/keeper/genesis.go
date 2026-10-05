@@ -57,6 +57,35 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 			return err
 		}
 	}
+	for _, p := range gs.PendingPayloads {
+		if err := k.Pending.Set(ctx, p.Id, p); err != nil {
+			return err
+		}
+		if err := k.PendingByAccount.Set(ctx, collections.Join(p.Account, p.Id)); err != nil {
+			return err
+		}
+		// re-check every pending payload against the credits after import
+		if err := k.PendingReady.Set(ctx, p.Id); err != nil {
+			return err
+		}
+	}
+	if err := k.PendingSeq.Set(ctx, gs.NextPendingId); err != nil {
+		return err
+	}
+	for _, c := range gs.DepositCredits {
+		key := creditKey(c.Account, c.TokenId, c.Origin)
+		if err := k.Credits.Set(ctx, key, c); err != nil {
+			return err
+		}
+		if err := k.CreditExpiry.Set(ctx, collections.Join(c.Height, key)); err != nil {
+			return err
+		}
+	}
+	for _, ar := range gs.AutoReturns {
+		if err := k.AutoReturns.Set(ctx, ar.Account, ar); err != nil {
+			return err
+		}
+	}
 	for _, w := range gs.Withdrawals {
 		if err := k.Withdrawals.Set(ctx, collections.Join(w.Account, w.Seq), w); err != nil {
 			return err
@@ -121,6 +150,27 @@ func (k Keeper) ExportGenesis(ctx sdk.Context) (*types.GenesisState, error) {
 	}
 	if err := k.Withdrawals.Walk(ctx, nil, func(_ collections.Pair[string, uint64], w types.Withdrawal) (bool, error) {
 		gs.Withdrawals = append(gs.Withdrawals, w)
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	if err := k.Pending.Walk(ctx, nil, func(_ uint64, p types.PendingPayload) (bool, error) {
+		gs.PendingPayloads = append(gs.PendingPayloads, p)
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	if gs.NextPendingId, err = k.PendingSeq.Peek(ctx); err != nil {
+		return nil, err
+	}
+	if err := k.Credits.Walk(ctx, nil, func(_ string, c types.DepositCredit) (bool, error) {
+		gs.DepositCredits = append(gs.DepositCredits, c)
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	if err := k.AutoReturns.Walk(ctx, nil, func(_ string, ar types.AutoReturn) (bool, error) {
+		gs.AutoReturns = append(gs.AutoReturns, ar)
 		return false, nil
 	}); err != nil {
 		return nil, err

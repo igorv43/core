@@ -39,11 +39,23 @@ func (ms msgServer) RevokeOwnSessionKey(goCtx context.Context, msg *types.MsgRev
 }
 
 func (ms msgServer) Withdraw(goCtx context.Context, msg *types.MsgWithdraw) (*types.MsgWithdrawResponse, error) {
+	// a result reference is resolved by the payload executor (§4.2); it never
+	// reaches the handler unresolved
+	if msg.AmountFrom != types.AMOUNT_FROM_LITERAL || msg.MinAmount != nil {
+		return nil, errorsmod.Wrap(types.ErrInvalidReference, "amount_from is resolved only inside a remote payload")
+	}
 	id, err := ms.k.Withdraw(sdk.UnwrapSDKContext(goCtx), msg.Controller, msg.TokenId, msg.Amount, msg.TokenOut, msg.MinAccepted)
 	if err != nil {
 		return nil, err
 	}
 	return &types.MsgWithdrawResponse{MessageId: id}, nil
+}
+
+func (ms msgServer) SetAutoReturn(goCtx context.Context, msg *types.MsgSetAutoReturn) (*types.MsgSetAutoReturnResponse, error) {
+	if err := ms.k.SetAutoReturn(sdk.UnwrapSDKContext(goCtx), msg.Controller, msg.Enabled, msg.TokenId); err != nil {
+		return nil, err
+	}
+	return &types.MsgSetAutoReturnResponse{}, nil
 }
 
 func (ms msgServer) FundPaymaster(goCtx context.Context, msg *types.MsgFundPaymaster) (*types.MsgFundPaymasterResponse, error) {

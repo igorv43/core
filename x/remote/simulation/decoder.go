@@ -73,6 +73,32 @@ func NewDecodeStore(cdc codec.Codec) func(kvA, kvB kv.Pair) string {
 			return fmt.Sprintf("%v\n%v", a, b)
 		case hasPrefix(kvA.Key, types.ReceiptSeqKey), hasPrefix(kvA.Key, types.ReceiptByMsgKey):
 			return fmt.Sprintf("%d\n%d", decodeUint64(kvA.Value), decodeUint64(kvB.Value))
+		case hasPrefix(kvA.Key, types.PendingKey):
+			var a, b types.PendingPayload
+			cdc.MustUnmarshal(kvA.Value, &a)
+			cdc.MustUnmarshal(kvB.Value, &b)
+			return fmt.Sprintf("%v\n%v", a, b)
+		case hasPrefix(kvA.Key, types.CreditsKey):
+			var a, b types.DepositCredit
+			cdc.MustUnmarshal(kvA.Value, &a)
+			cdc.MustUnmarshal(kvB.Value, &b)
+			return fmt.Sprintf("%v\n%v", a, b)
+		case hasPrefix(kvA.Key, types.AutoReturnsKey):
+			var a, b types.AutoReturn
+			cdc.MustUnmarshal(kvA.Value, &a)
+			cdc.MustUnmarshal(kvB.Value, &b)
+			return fmt.Sprintf("%v\n%v", a, b)
+		case hasPrefix(kvA.Key, types.AutoReturnBudgetKey):
+			var a, b types.AutoReturnBudget
+			cdc.MustUnmarshal(kvA.Value, &a)
+			cdc.MustUnmarshal(kvB.Value, &b)
+			return fmt.Sprintf("%v\n%v", a, b)
+		case hasPrefix(kvA.Key, types.PendingSeqKey), hasPrefix(kvA.Key, types.AutoReturnEpochKey):
+			return fmt.Sprintf("%d\n%d", decodeUint64(kvA.Value), decodeUint64(kvB.Value))
+		case hasPrefix(kvA.Key, types.PendingByAccountKey), hasPrefix(kvA.Key, types.PendingReadyKey),
+			hasPrefix(kvA.Key, types.CreditExpiryKey), hasPrefix(kvA.Key, types.AutoReturnCursorKey):
+			// index keys and the cursor carry no value worth decoding
+			return fmt.Sprintf("%X\n%X", kvA.Key, kvB.Key)
 		default:
 			panic(fmt.Sprintf("invalid remote key prefix %X", kvA.Key[:1]))
 		}

@@ -247,10 +247,40 @@ func TestRewardsRaiseTheRateAndFeeIsBurned(t *testing.T) {
 
 	burnAddr := f.app.AccountKeeper.GetModuleAddress("burn")
 	burnBefore := f.app.BankKeeper.GetBalance(f.ctx, burnAddr, "uluna").Amount
+	feePool, err := f.app.DistrKeeper.FeePool.Get(f.ctx)
+	require.NoError(t, err)
+	cpBefore := feePool.CommunityPool.AmountOf("uluna")
+	ledgerBefore, err := f.app.PerpKeeper.GetLedger(f.ctx)
+	require.NoError(t, err)
 	f.advance(t, testEpochBlocks, time.Minute)
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
 	require.NoError(t, k.EndBlocker(f.ctx))
 	burnAfter := f.app.BankKeeper.GetBalance(f.ctx, burnAddr, "uluna").Amount
 	require.True(t, burnAfter.GT(burnBefore), "20% of the 5% fee reaches the burn account")
+
+	// spec §24.6: the rest of the fee goes to the insurance fund and operations
+	// through the allocation cascade of §23.1 (x/perp, held in kind until the
+	// internal spot market converts it) — not to the community pool
+	ev := f.event("terra.liquidstake.v1.EventEpochProcessed")
+	require.NotNil(t, ev)
+	fee, burned := math.ZeroInt(), math.ZeroInt()
+	for _, a := range ev.Attributes {
+		switch a.Key {
+		case "fee":
+			fee, _ = math.NewIntFromString(strings.Trim(a.Value, `"`))
+		case "burned":
+			burned, _ = math.NewIntFromString(strings.Trim(a.Value, `"`))
+		}
+	}
+	require.True(t, fee.IsPositive() && burned.IsPositive(), "fee %s burned %s", fee, burned)
+	require.Equal(t, burned.String(), burnAfter.Sub(burnBefore).String())
+	ledgerAfter, err := f.app.PerpKeeper.GetLedger(f.ctx)
+	require.NoError(t, err)
+	require.Equal(t, fee.Sub(burned).String(), ledgerAfter.RevenueUluna.Sub(ledgerBefore.RevenueUluna).String(), "fee remainder is protocol revenue of the cascade")
+	feePool, err = f.app.DistrKeeper.FeePool.Get(f.ctx)
+	require.NoError(t, err)
+	// only x/distribution's own sub-unit rounding dust may reach the pool
+	require.True(t, feePool.CommunityPool.AmountOf("uluna").Sub(cpBefore).LT(math.LegacyOneDec()), "no longer sent to the community pool")
 
 	rateAfter, totals, err := k.ExchangeRate(f.ctx)
 	require.NoError(t, err)

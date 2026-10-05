@@ -208,10 +208,12 @@ func (k Keeper) ProcessEpoch(ctx sdk.Context) (EpochReport, error) {
 				return EpochReport{}, err
 			}
 		}
-		// the remainder of the fee funds the community pool until the
-		// insurance fund / allocation cascade of spec §23.1 exists
+		// spec §24.6: the remainder of the fee is divided between the
+		// insurance fund and operations per §23.1 — it enters the allocation
+		// cascade of x/perp as protocol revenue (held in kind and converted
+		// to settlement in the internal spot market, see x/perp revenue.go)
 		if rest := rep.Fee.Sub(rep.Burned); rest.IsPositive() {
-			if err := k.distrKeeper.FundCommunityPool(ctx, sdk.NewCoins(sdk.NewCoin(denom, rest)), k.ModuleAddress()); err != nil {
+			if err := k.feeSink.sink.Deposit(ctx, types.ModuleName, sdk.NewCoins(sdk.NewCoin(denom, rest))); err != nil {
 				return EpochReport{}, err
 			}
 		}

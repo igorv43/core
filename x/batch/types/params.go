@@ -7,9 +7,16 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// DefaultSettlementDenom is the settlement denom of the initial parameters;
-// governance sets the real bridged settlement denom (spec §11).
-const DefaultSettlementDenom = "uusd"
+// DefaultSettlementDenom is the settlement denom of the initial parameters:
+// the multi-origin USDC basket synthetic `uusdc.lf` (spec §11.4, D-29). The
+// solver bond and its slashes are denominated in it (§16.1, §21.5 rule 1:
+// solver bonds only in the settlement asset, always).
+const DefaultSettlementDenom = "uusdc.lf"
+
+// ForbiddenBondDenom is USTC (`uusd`). Spec §11.3 (D-18), hard rule outside
+// governance: USTC never denominates the insurance fund nor the bonds, in any
+// phase. Changing this requires a software upgrade (§26.3 style limit in code).
+const ForbiddenBondDenom = "uusd"
 
 // DefaultParams returns the initial parameters of spec Annex B.
 func DefaultParams() Params {
@@ -77,6 +84,9 @@ func (p Params) Validate() error {
 	}
 	if p.SlashNoReveal.Denom != p.SolverBondMin.Denom {
 		return fmt.Errorf("slash_no_reveal must be denominated like solver_bond_min")
+	}
+	if p.SolverBondMin.Denom == ForbiddenBondDenom {
+		return fmt.Errorf("solver_bond_min must not be denominated in %s (USTC): bonds are in the settlement denom and USTC never denominates them (spec §11.3, D-18)", ForbiddenBondDenom)
 	}
 	if p.SolverUnbondBlocks < 1 || p.SolverSuspensionBlocks < 1 || p.PruneDelayBlocks < 1 {
 		return fmt.Errorf("solver_unbond_blocks, solver_suspension_blocks and prune_delay_blocks must be positive")

@@ -21,22 +21,22 @@ func TestBenchmarkLiquidationSweep(t *testing.T) {
 	}
 	f := setup(t)
 	const n = 2_000
-	require.NoError(t, f.k.FundInsurance(f.ctx, f.short, sdk.NewCoin("uusd", math.NewInt(900_000_000))))
+	require.NoError(t, f.k.FundInsurance(f.ctx, f.short, sdk.NewCoin("uusdc.lf", math.NewInt(900_000_000))))
 	// n longs opened directly through the fill path at increasing leverage-independent prices
 	// (the auction is benchmarked in x/batch); the short is the counterparty of all
 	longs := make([]sdk.AccAddress, n)
 	batch := f.ctx.BlockHeight()
 	for i := range longs {
 		longs[i] = sdk.AccAddress([]byte(fmt.Sprintf("perp-bench-long-%05d", i)))
-		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusd", math.NewInt(30_000_000)))
+		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(30_000_000)))
 		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
 		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", longs[i], coins))
-		require.NoError(t, f.k.Deposit(f.ctx, longs[i], sdk.NewCoin("uusd", math.NewInt(30_000_000))))
+		require.NoError(t, f.k.Deposit(f.ctx, longs[i], sdk.NewCoin("uusdc.lf", math.NewInt(30_000_000))))
 	}
-	shortCoins := sdk.NewCoins(sdk.NewCoin("uusd", math.NewInt(100_000_000_000)))
+	shortCoins := sdk.NewCoins(sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000_000)))
 	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", shortCoins))
 	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", f.short, shortCoins))
-	require.NoError(t, f.k.Deposit(f.ctx, f.short, sdk.NewCoin("uusd", math.NewInt(100_000_000_000))))
+	require.NoError(t, f.k.Deposit(f.ctx, f.short, sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000_000))))
 	m := f.market(t)
 	m.OiCap, m.EffectiveOiCap = math.NewInt(100_000_000), math.NewInt(100_000_000)
 	require.NoError(t, f.k.Markets.Set(f.ctx, m.Id, m))

@@ -678,7 +678,11 @@ type QueryClient interface {
 	Params(ctx context.Context, in *QueryParamsRequest, opts ...grpc.CallOption) (*QueryParamsResponse, error)
 	// ExchangeRate returns the stLUNC exchange rate and its components.
 	ExchangeRate(ctx context.Context, in *QueryExchangeRateRequest, opts ...grpc.CallOption) (*QueryExchangeRateResponse, error)
-	// Delegations returns the module's delegations per validator and the eligibility set.
+	// Delegations returns the module's delegations per validator and the eligibility set:
+	// one entry per module delegation, then one zero-token entry per validator evaluated at
+	// the last epoch that holds no module delegation (e.g. above max_commission). A validator
+	// that left the bonded set while holding module delegations is reported with its reason
+	// ("jailed", "not bonded").
 	Delegations(ctx context.Context, in *QueryDelegationsRequest, opts ...grpc.CallOption) (*QueryDelegationsResponse, error)
 	// UnstakeQueue returns queued and matured redemptions, optionally filtered by address.
 	UnstakeQueue(ctx context.Context, in *QueryUnstakeQueueRequest, opts ...grpc.CallOption) (*QueryUnstakeQueueResponse, error)
@@ -743,7 +747,11 @@ type QueryServer interface {
 	Params(context.Context, *QueryParamsRequest) (*QueryParamsResponse, error)
 	// ExchangeRate returns the stLUNC exchange rate and its components.
 	ExchangeRate(context.Context, *QueryExchangeRateRequest) (*QueryExchangeRateResponse, error)
-	// Delegations returns the module's delegations per validator and the eligibility set.
+	// Delegations returns the module's delegations per validator and the eligibility set:
+	// one entry per module delegation, then one zero-token entry per validator evaluated at
+	// the last epoch that holds no module delegation (e.g. above max_commission). A validator
+	// that left the bonded set while holding module delegations is reported with its reason
+	// ("jailed", "not bonded").
 	Delegations(context.Context, *QueryDelegationsRequest) (*QueryDelegationsResponse, error)
 	// UnstakeQueue returns queued and matured redemptions, optionally filtered by address.
 	UnstakeQueue(context.Context, *QueryUnstakeQueueRequest) (*QueryUnstakeQueueResponse, error)

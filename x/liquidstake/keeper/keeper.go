@@ -12,6 +12,7 @@ import (
 	"github.com/classic-terra/core/v4/x/liquidstake/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 // Keeper implements native liquid staking (spec §24, D-15): a non-rebasing
@@ -30,6 +31,10 @@ type Keeper struct {
 	// burnModuleName is the module account whose balance the treasury burns
 	// every block (x/treasury "burn"); the burn share of the fee goes there.
 	burnModuleName string
+	// feeSink receives the fee remainder after the burn share (spec §24.6).
+	// It is a shared holder so that every copy of the keeper sees the sink
+	// registered by the app after x/perp exists (SetFeeSink).
+	feeSink *feeSinkHolder
 
 	Schema     collections.Schema
 	Params     collections.Item[types.Params]
@@ -84,6 +89,7 @@ func NewKeeper(
 		distrKeeper:    distrKeeper,
 		slashingKeeper: slashingKeeper,
 		burnModuleName: burnModuleName,
+		feeSink:        &feeSinkHolder{sink: communityPoolSink{distr: distrKeeper}},
 		Params:         collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
 		Epoch:          collections.NewItem(sb, types.EpochKey, "epoch", codec.CollValue[types.Epoch](cdc)),
 		Requests:       collections.NewMap(sb, types.RequestsKey, "requests", collections.Uint64Key, codec.CollValue[types.UnstakeRequest](cdc)),
@@ -101,6 +107,27 @@ func NewKeeper(
 	k.Schema = schema
 	return k
 }
+
+// feeSinkHolder is shared by every copy of the keeper.
+type feeSinkHolder struct{ sink types.FeeSink }
+
+// communityPoolSink is the fallback sink when no allocation cascade is
+// registered (a keeper built without x/perp): the fee remainder funds the
+// community pool.
+type communityPoolSink struct{ distr types.DistributionKeeper }
+
+// Deposit implements types.FeeSink.
+func (s communityPoolSink) Deposit(ctx sdk.Context, fromModule string, coins sdk.Coins) error {
+	if coins.IsZero() {
+		return nil
+	}
+	return s.distr.FundCommunityPool(ctx, coins, authtypes.NewModuleAddress(fromModule))
+}
+
+// SetFeeSink registers the destination of the fee remainder: the app wires
+// the x/perp sink, which feeds the insurance fund and operations through the
+// allocation cascade of spec §23.1 (§24.6).
+func (k Keeper) SetFeeSink(s types.FeeSink) { k.feeSink.sink = s }
 
 // GetAuthority returns the module authority.
 func (k Keeper) GetAuthority() string { return k.authority }

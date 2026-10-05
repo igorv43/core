@@ -56,12 +56,12 @@ func TestScenarioCascadeWithFundBelowTarget(t *testing.T) {
 	longs := make([]sdk.AccAddress, 4)
 	for i := range longs {
 		longs[i] = sdk.AccAddress([]byte("perp-cascade-long-" + string(rune('a'+i)) + "-"))
-		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusd", math.NewInt(100_000_000)))
+		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000)))
 		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
 		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", longs[i], coins))
-		require.NoError(t, f.k.Deposit(f.ctx, longs[i], sdk.NewCoin("uusd", math.NewInt(100_000_000))))
+		require.NoError(t, f.k.Deposit(f.ctx, longs[i], sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000))))
 	}
-	require.NoError(t, f.k.Deposit(f.ctx, f.short, sdk.NewCoin("uusd", math.NewInt(900_000_000))))
+	require.NoError(t, f.k.Deposit(f.ctx, f.short, sdk.NewCoin("uusdc.lf", math.NewInt(900_000_000))))
 	batch := f.ctx.BlockHeight()
 	for _, l := range longs {
 		f.submit(t, l, batchtypes.SIDE_BUY, 1_000, math.LegacyNewDec(60_000), false)
@@ -108,12 +108,12 @@ func TestScenarioTriggerStormIsBounded(t *testing.T) {
 	accounts := make([]sdk.AccAddress, 5)
 	for i := range accounts {
 		accounts[i] = sdk.AccAddress([]byte("perp-storm-long-" + string(rune('a'+i)) + "---"))
-		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusd", math.NewInt(100_000_000)))
+		coins := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000)))
 		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
 		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", accounts[i], coins))
-		require.NoError(t, f.k.Deposit(f.ctx, accounts[i], sdk.NewCoin("uusd", math.NewInt(100_000_000))))
+		require.NoError(t, f.k.Deposit(f.ctx, accounts[i], sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000))))
 	}
-	require.NoError(t, f.k.Deposit(f.ctx, f.short, sdk.NewCoin("uusd", math.NewInt(900_000_000))))
+	require.NoError(t, f.k.Deposit(f.ctx, f.short, sdk.NewCoin("uusdc.lf", math.NewInt(900_000_000))))
 	batch := f.ctx.BlockHeight()
 	for _, a := range accounts {
 		f.submit(t, a, batchtypes.SIDE_BUY, 1_000, math.LegacyNewDec(60_000), false)

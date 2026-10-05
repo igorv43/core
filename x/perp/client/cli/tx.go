@@ -73,7 +73,7 @@ func newSubmitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "submit [market-id] [buy|sell] [qty] [limit-price]",
 		Short:   "Submit a perpetual order to the auction (margin reserved unless --reduce-only)",
-		Example: "terrad tx perp submit ubtc-perp/uusd buy 1000000 65000 --expiry-height 1200 --from mykey",
+		Example: "terrad tx perp submit ubtc-perp/uusdc.lf buy 1000000 65000 --expiry-height 1200 --from mykey",
 		Args:    cobra.ExactArgs(4),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -116,7 +116,7 @@ func newTriggerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "trigger [market-id] [trigger-price] [above|below]",
 		Short:   "Register a resident reduce-only trigger (stop-loss / take-profit) on your position",
-		Example: "terrad tx perp trigger ubtc-perp/uusd 60000 below --qty 500000 --slippage 0.01 --from mykey",
+		Example: "terrad tx perp trigger ubtc-perp/uusdc.lf 60000 below --qty 500000 --slippage 0.01 --from mykey",
 		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)

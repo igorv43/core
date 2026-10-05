@@ -101,6 +101,13 @@ func (k *Keeper) Handle(goCtx context.Context, mailboxId util.HexAddress, messag
 	if len(payload.Msgs) == 0 && (payload.Conversion != nil || payload.Update != nil) {
 		return nil
 	}
+	if payload.AfterDeposit != nil {
+		// deposit-then-execute (cross-chain liquid staking §4.3)
+		if !fromGateway {
+			return k.reject(ctx, message.Origin, controller, derived.String(), errorsmod.Wrap(types.ErrInvalidPayload, "after_deposit allowed only from the enrolled gateway"))
+		}
+		return k.handleAfterDeposit(ctx, message, domain, controller, derived, payload)
+	}
 	if err := k.execute(ctx, domain, controller, derived, payload.Msgs); err != nil {
 		return k.reject(ctx, message.Origin, controller, derived.String(), err)
 	}
@@ -114,36 +121,61 @@ func (k *Keeper) execute(ctx sdk.Context, domain uint32, controller util.HexAddr
 	if err != nil {
 		return err
 	}
+	msgs, err := k.prepare(params, derived, anys)
+	if err != nil {
+		return err
+	}
+	return k.run(ctx, params, domain, controller, derived, msgs)
+}
+
+// prepare applies the static checks of a payload: count, whitelist, signer,
+// ValidateBasic and the closed list of result references (§4.2: only a
+// MsgWithdraw, only the immediately preceding message, only MsgStake,
+// MsgUnstake or MsgClaim). It runs on arrival, so a payload stored as
+// pending is already known to be well formed.
+func (k *Keeper) prepare(params types.Params, derived sdk.AccAddress, anys []*codectypes.Any) ([]sdk.Msg, error) {
 	if len(anys) == 0 || len(anys) > int(params.MaxMsgsPerPayload) {
-		return errorsmod.Wrapf(types.ErrInvalidPayload, "payload must carry 1 to %d messages", params.MaxMsgsPerPayload)
+		return nil, errorsmod.Wrapf(types.ErrInvalidPayload, "payload must carry 1 to %d messages", params.MaxMsgsPerPayload)
 	}
 	whitelist := types.PayloadMsgTypeURLs()
+	results := types.ResultMsgTypeURLs()
 	msgs := make([]sdk.Msg, 0, len(anys))
-	for _, a := range anys {
+	for i, a := range anys {
 		if !whitelist[a.TypeUrl] {
-			return errorsmod.Wrap(types.ErrMsgNotWhitelisted, a.TypeUrl)
+			return nil, errorsmod.Wrap(types.ErrMsgNotWhitelisted, a.TypeUrl)
 		}
 		var msg sdk.Msg
 		if err := k.cdc.UnpackAny(a, &msg); err != nil {
-			return errorsmod.Wrap(types.ErrInvalidPayload, err.Error())
+			return nil, errorsmod.Wrap(types.ErrInvalidPayload, err.Error())
 		}
 		signers, _, err := k.cdc.GetMsgV1Signers(msg)
 		if err != nil {
-			return errorsmod.Wrap(types.ErrInvalidPayload, err.Error())
+			return nil, errorsmod.Wrap(types.ErrInvalidPayload, err.Error())
 		}
 		for _, s := range signers {
 			if !sdk.AccAddress(s).Equals(derived) {
-				return errorsmod.Wrapf(types.ErrInvalidSigner, "%s signed by %s", a.TypeUrl, sdk.AccAddress(s))
+				return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "%s signed by %s", a.TypeUrl, sdk.AccAddress(s))
 			}
 		}
 		if v, ok := msg.(sdk.HasValidateBasic); ok {
 			if err := v.ValidateBasic(); err != nil {
-				return errorsmod.Wrap(types.ErrInvalidPayload, err.Error())
+				return nil, errorsmod.Wrap(types.ErrInvalidPayload, err.Error())
+			}
+		}
+		if w, ok := msg.(*types.MsgWithdraw); ok && w.AmountFrom == types.AMOUNT_FROM_PREVIOUS_RESULT {
+			if i == 0 || !results[anys[i-1].TypeUrl] {
+				return nil, errorsmod.Wrap(types.ErrInvalidReference, "a result reference must follow MsgStake, MsgUnstake or MsgClaim")
 			}
 		}
 		msgs = append(msgs, msg)
 	}
+	return msgs, nil
+}
 
+// run charges the message fee and executes the prepared messages in one
+// cache context, resolving result references (§4.2) and writing the
+// liquid-staking receipts.
+func (k *Keeper) run(ctx sdk.Context, params types.Params, domain uint32, controller util.HexAddress, derived sdk.AccAddress, msgs []sdk.Msg) error {
 	cacheCtx, write := ctx.CacheContext()
 	// account record
 	account, err := k.GetAccount(cacheCtx, derived.String())
@@ -161,7 +193,38 @@ func (k *Keeper) execute(ctx sdk.Context, domain uint32, controller util.HexAddr
 			return err
 		}
 	}
-	for _, msg := range msgs {
+	rc := receipts{account: derived.String(), controller: controller.String(), domain: domain}
+	var prevURL string
+	var prevRes *sdk.Result
+	for i, msg := range msgs {
+		w, isRef := msg.(*types.MsgWithdraw)
+		isRef = isRef && w.AmountFrom == types.AMOUNT_FROM_PREVIOUS_RESULT
+		if !isRef {
+			if err := rc.flush(cacheCtx); err != nil {
+				return err
+			}
+		}
+		if isRef {
+			resolved, skip, err := k.resolveWithdraw(cacheCtx, w, prevURL, prevRes)
+			if err != nil {
+				return err
+			}
+			if skip {
+				// a zero result (queued unstake) skips the withdrawal (§4.2)
+				if err := cacheCtx.EventManager().EmitTypedEvent(&types.EventRemoteSkipped{
+					Account: derived.String(), Domain: domain, Controller: controller.String(), Index: uint32(i),
+					MsgType: sdk.MsgTypeURL(msg), Reason: "referenced result is zero",
+				}); err != nil {
+					return err
+				}
+				if err := rc.flush(cacheCtx); err != nil {
+					return err
+				}
+				prevURL, prevRes = sdk.MsgTypeURL(msg), nil
+				continue
+			}
+			msg = resolved
+		}
 		handler := k.router.Handler(msg)
 		if handler == nil {
 			return errorsmod.Wrap(types.ErrMsgNotWhitelisted, sdk.MsgTypeURL(msg))
@@ -176,6 +239,13 @@ func (k *Keeper) execute(ctx sdk.Context, domain uint32, controller util.HexAddr
 		// the Hyperlane dispatch events of a MsgWithdraw never reach the tx
 		// and the agents (which index by events) never see the message
 		cacheCtx.EventManager().EmitEvents(res.GetEvents())
+		if err := rc.observe(k.cdc, msg, res, isRef); err != nil {
+			return err
+		}
+		prevURL, prevRes = sdk.MsgTypeURL(msg), res
+	}
+	if err := rc.flush(cacheCtx); err != nil {
+		return err
 	}
 	write()
 	return ctx.EventManager().EmitTypedEvent(&types.EventRemoteExecuted{Account: derived.String(), Domain: domain, Controller: controller.String(), Msgs: uint32(len(msgs))})

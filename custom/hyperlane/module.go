@@ -24,16 +24,18 @@ var (
 type AppModule struct {
 	hyperlanecore.AppModule
 
-	keeper *corekeeper.Keeper
-	ledger warpledgerkeeper.Keeper
+	keeper    *corekeeper.Keeper
+	ledger    warpledgerkeeper.Keeper
+	observers []DeliveryObserver
 }
 
 // NewAppModule creates a new wrapped hyperlane core AppModule.
-func NewAppModule(cdc codec.Codec, keeper *corekeeper.Keeper, ledger warpledgerkeeper.Keeper) AppModule {
+func NewAppModule(cdc codec.Codec, keeper *corekeeper.Keeper, ledger warpledgerkeeper.Keeper, observers ...DeliveryObserver) AppModule {
 	return AppModule{
 		AppModule: hyperlanecore.NewAppModule(cdc, keeper),
 		keeper:    keeper,
 		ledger:    ledger,
+		observers: observers,
 	}
 }
 
@@ -42,7 +44,7 @@ func NewAppModule(cdc codec.Codec, keeper *corekeeper.Keeper, ledger warpledgerk
 // for x/warpledger inbound accounting (received_d, spec §9.5).
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	upstream := corekeeper.NewMsgServerImpl(am.keeper)
-	coretypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServer(upstream, am.ledger))
+	coretypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServer(upstream, am.ledger, am.observers...))
 	coretypes.RegisterQueryServer(cfg.QueryServer(), corekeeper.NewQueryServerImpl(am.keeper))
 
 	ismmodule.RegisterMsgServer(cfg.MsgServer(), ismkeeper.NewMsgServerImpl(&am.keeper.IsmKeeper))

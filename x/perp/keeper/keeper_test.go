@@ -18,7 +18,7 @@ import (
 
 const (
 	chainID  = "perp-test"
-	marketID = "ubtc-perp/uusd"
+	marketID = "ubtc-perp/uusdc.lf"
 	asset    = "ubtc"
 )
 
@@ -59,8 +59,8 @@ func setup(t *testing.T) *fixture {
 	f.long = sdk.AccAddress([]byte("perp-long------------"))
 	f.short = sdk.AccAddress([]byte("perp-short-----------"))
 	for _, a := range []sdk.AccAddress{f.long, f.short} {
-		h.FundAcc(a, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusd", math.NewInt(1_000_000_000))))
-		require.NoError(t, f.k.Deposit(f.ctx, a, sdk.NewCoin("uusd", math.NewInt(100_000_000)))) // 100 USD
+		h.FundAcc(a, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(1_000_000_000))))
+		require.NoError(t, f.k.Deposit(f.ctx, a, sdk.NewCoin("uusdc.lf", math.NewInt(100_000_000)))) // 100 USD
 	}
 	return f
 }
@@ -508,7 +508,7 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 	// spot market LUNC/USD for the buyback, priced by the oracle uusd rate
 	f.app.OracleKeeper.SetLunaExchangeRate(f.ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 	require.NoError(t, f.bk.CreateMarket(f.ctx, batchtypes.Market{
-		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusd", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	p := f.params
@@ -524,7 +524,7 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 	l.Insurance = target
 	require.NoError(t, f.k.Ledger.Set(f.ctx, l))
 	// mint the fund's settlement into the module so the ledger matches the bank
-	coins := sdk.NewCoins(sdk.NewCoin("uusd", target))
+	coins := sdk.NewCoins(sdk.NewCoin("uusdc.lf", target))
 	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
 	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToModule(f.ctx, "mint", types.ModuleName, coins))
 
@@ -540,7 +540,7 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 	require.Equal(t, "27500", rec.ToOraclePool.String())
 	require.Equal(t, "11000", rec.ToCommunityPool.String())
 	require.Equal(t, "16500", rec.ToBurnBudget.String())
-	oraclePool := f.app.BankKeeper.GetBalance(f.ctx, f.app.AccountKeeper.GetModuleAddress("oracle"), "uusd")
+	oraclePool := f.app.BankKeeper.GetBalance(f.ctx, f.app.AccountKeeper.GetModuleAddress("oracle"), "uusdc.lf")
 	require.Equal(t, "27500", oraclePool.Amount.String())
 
 	// the buyback placed a buy intent of the budget in the spot market
@@ -549,7 +549,7 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 	require.True(t, l.BurnBudget.IsZero())
 	in, err := f.bk.GetIntent(f.ctx, l.BuybackIntentId)
 	require.NoError(t, err)
-	require.Equal(t, "16500uusd", in.AmountIn.String())
+	require.Equal(t, "16500uusdc.lf", in.AmountIn.String())
 
 	// a seller of LUNC meets it; the uluna received is burned at the next EndBlock
 	seller := sdk.AccAddress([]byte("perp-luna-seller-----"))
@@ -573,7 +573,7 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 func TestFundInsuranceAndLeverageFloor(t *testing.T) {
 	f := setup(t)
 	before, _ := f.k.GetLedger(f.ctx)
-	require.NoError(t, f.k.FundInsurance(f.ctx, f.long, sdk.NewCoin("uusd", math.NewInt(1_000_000))))
+	require.NoError(t, f.k.FundInsurance(f.ctx, f.long, sdk.NewCoin("uusdc.lf", math.NewInt(1_000_000))))
 	after, _ := f.k.GetLedger(f.ctx)
 	require.Equal(t, before.Insurance.AddRaw(1_000_000).String(), after.Insurance.String())
 	require.Error(t, f.k.FundInsurance(f.ctx, f.long, sdk.NewCoin("uluna", math.NewInt(1))))

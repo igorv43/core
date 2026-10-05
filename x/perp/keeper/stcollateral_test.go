@@ -43,7 +43,7 @@ func (f *fixture) stSetup(t *testing.T) {
 	require.NoError(t, f.app.LiquidStakeKeeper.SetParams(f.ctx, lp))
 	f.app.OracleKeeper.SetLunaExchangeRate(f.ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 	require.NoError(t, f.bk.CreateMarket(f.ctx, batchtypes.Market{
-		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusd", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	p := f.params
@@ -64,7 +64,7 @@ func (f *fixture) stSetup(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "1000000000000", minted.Amount.String())
 	// the fund core is seeded so the value cap and the advances have room
-	require.NoError(t, f.k.FundInsurance(f.ctx, f.short, sdk.NewCoin("uusd", math.NewInt(200_000_000))))
+	require.NoError(t, f.k.FundInsurance(f.ctx, f.short, sdk.NewCoin("uusdc.lf", math.NewInt(200_000_000))))
 }
 
 func (f *fixture) stFree(t *testing.T, acc sdk.AccAddress) math.Int {
@@ -100,7 +100,7 @@ func TestStDepositValuationAndRules(t *testing.T) {
 
 	// rule 3: a LUNC-priced market can never allow stLUNC
 	err = f.k.CreateMarket(f.ctx, types.Market{
-		Id: "uluna-perp/uusd", OracleAsset: "uusd", MaxLeverage: math.LegacyNewDec(2), OiCap: math.NewInt(1_000_000), Alpha: math.LegacyNewDecWithPrec(10, 2),
+		Id: "uluna-perp/uusdc.lf", OracleAsset: "uusd", MaxLeverage: math.LegacyNewDec(2), OiCap: math.NewInt(1_000_000), Alpha: math.LegacyNewDecWithPrec(10, 2),
 		Stress: math.LegacyOneDec(), MinQty: math.NewInt(1_000), TickSize: math.LegacyOneDec(), StCollateralAllowed: true,
 	})
 	require.ErrorIs(t, err, types.ErrInvalidMarket)
@@ -116,7 +116,7 @@ func TestStMarginAllocationWithinShareCap(t *testing.T) {
 	f.stSetup(t)
 	require.NoError(t, f.k.Deposit(f.ctx, f.long, sdk.NewCoin("stluna", math.NewInt(1_000_000_000_000))))
 	// leave the long with exactly 10 USD of settlement: IM at 3x on 60 USD is 20 USD → 10 settlement + 10 stLUNC
-	require.NoError(t, f.k.Withdraw(f.ctx, f.long, sdk.NewCoin("uusd", math.NewInt(90_000_000))))
+	require.NoError(t, f.k.Withdraw(f.ctx, f.long, sdk.NewCoin("uusdc.lf", math.NewInt(90_000_000))))
 
 	f.trade(t, 1_000, math.LegacyNewDec(60_000))
 	long, ok, _ := f.k.GetPosition(f.ctx, f.long.String(), marketID)
@@ -141,13 +141,13 @@ func TestStMarginAllocationWithinShareCap(t *testing.T) {
 
 	// a second account with only 5 USD of settlement cannot open: settlement must cover 50% of the margin
 	poor := sdk.AccAddress([]byte("perp-poor-st---------"))
-	stake := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)), sdk.NewCoin("uusd", math.NewInt(5_000_000)))
+	stake := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)), sdk.NewCoin("uusdc.lf", math.NewInt(5_000_000)))
 	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", stake))
 	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", poor, stake))
 	_, _, err = f.app.LiquidStakeKeeper.Stake(f.ctx, poor, sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)))
 	require.NoError(t, err)
 	require.NoError(t, f.k.Deposit(f.ctx, poor, sdk.NewCoin("stluna", math.NewInt(1_000_000_000_000))))
-	require.NoError(t, f.k.Deposit(f.ctx, poor, sdk.NewCoin("uusd", math.NewInt(5_000_000))))
+	require.NoError(t, f.k.Deposit(f.ctx, poor, sdk.NewCoin("uusdc.lf", math.NewInt(5_000_000))))
 	// the reservation already applies rule 5: 5 settlement + at most 5 of stLUNC capacity < 20 needed
 	_, _, err = f.bk.SubmitPerpIntent(f.ctx, batchkeeper.PerpOrder{
 		Sender: poor.String(), MarketID: marketID, Side: batchtypes.SIDE_BUY,
@@ -160,7 +160,7 @@ func TestStLiquidationSeizesToTrancheAndConverts(t *testing.T) {
 	f := setup(t)
 	f.stSetup(t)
 	require.NoError(t, f.k.Deposit(f.ctx, f.long, sdk.NewCoin("stluna", math.NewInt(1_000_000_000_000))))
-	require.NoError(t, f.k.Withdraw(f.ctx, f.long, sdk.NewCoin("uusd", math.NewInt(89_000_000)))) // 11 USD settlement: fee comes from it
+	require.NoError(t, f.k.Withdraw(f.ctx, f.long, sdk.NewCoin("uusdc.lf", math.NewInt(89_000_000)))) // 11 USD settlement: fee comes from it
 	f.trade(t, 1_000, math.LegacyNewDec(60_000))
 	long, ok, _ := f.k.GetPosition(f.ctx, f.long.String(), marketID)
 	require.True(t, ok)
@@ -189,7 +189,7 @@ func TestStLiquidationSeizesToTrancheAndConverts(t *testing.T) {
 	batch := f.ctx.BlockHeight()
 	_, _, err = f.bk.SubmitIntent(f.ctx, &batchtypes.MsgSubmitIntent{
 		Sender: f.short.String(), MarketId: lunaUsdSpotMarket, Side: batchtypes.SIDE_BUY,
-		AmountIn: sdk.NewCoin("uusd", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50,
+		AmountIn: sdk.NewCoin("uusdc.lf", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50,
 	})
 	require.NoError(t, err)
 	f.endBlocks(t, batch+f.bp.CommitWindow+1)
@@ -208,7 +208,7 @@ func TestStAutoTopUpUsesStLunc(t *testing.T) {
 	require.NoError(t, f.k.Deposit(f.ctx, f.long, sdk.NewCoin("stluna", math.NewInt(1_000_000_000_000))))
 	require.NoError(t, f.k.AutoTopUp.Set(f.ctx, f.long.String()))
 	// 21 USD of settlement: 20 goes into the position, 1 stays free (not enough to top up alone)
-	require.NoError(t, f.k.Withdraw(f.ctx, f.long, sdk.NewCoin("uusd", math.NewInt(79_000_000))))
+	require.NoError(t, f.k.Withdraw(f.ctx, f.long, sdk.NewCoin("uusdc.lf", math.NewInt(79_000_000))))
 	f.trade(t, 1_000, math.LegacyNewDec(60_000))
 	stBefore := f.stFree(t, f.long)
 	f.at(f.ctx.BlockHeight() + 1)
@@ -235,7 +235,7 @@ func TestFeeInLunaAtDiscountBurns(t *testing.T) {
 	target, _ := f.k.InsuranceTarget(f.ctx)
 	l, _ := f.k.GetLedger(f.ctx)
 	if gap := target.Sub(l.Insurance); gap.IsPositive() {
-		coins := sdk.NewCoins(sdk.NewCoin("uusd", gap))
+		coins := sdk.NewCoins(sdk.NewCoin("uusdc.lf", gap))
 		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", coins))
 		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToModule(f.ctx, "mint", types.ModuleName, coins))
 		l.Insurance = target
@@ -251,7 +251,7 @@ func TestFeeInLunaAtDiscountBurns(t *testing.T) {
 
 	f.trade(t, 1_000, math.LegacyNewDec(60_000))
 
-	// fee 30,000 uusd → 24,000 uusd worth of LUNC at 0.0001 = 240,000,000 uluna burned; no settlement fee charged
+	// fee 30,000 uusdc.lf → 24,000 uusdc.lf worth of LUNC at 0.0001 = 240,000,000 uluna burned; no settlement fee charged
 	burnAfter := f.app.BankKeeper.GetBalance(f.ctx, f.app.AccountKeeper.GetModuleAddress("burn"), "uluna").Amount
 	require.Equal(t, "240000000", burnAfter.Sub(burnBefore).String())
 	lunaAfter := f.app.BankKeeper.GetBalance(f.ctx, f.long, "uluna").Amount

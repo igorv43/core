@@ -54,7 +54,7 @@ func newSubmitIntentCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "submit-intent [market-id] [buy|sell] [amount-in] [limit-price]",
 		Short:   "Submit a limit order (amount-in is escrowed: quote for buy, base for sell)",
-		Example: "terrad tx batch submit-intent uluna/uusd buy 1000000uusd 0.00005 --min-out 19000000000 --expiry-height 1200 --from mykey",
+		Example: "terrad tx batch submit-intent uluna/uusdc.lf buy 1000000uusdc.lf 0.00005 --min-out 19000000000 --expiry-height 1200 --from mykey",
 		Args:    cobra.ExactArgs(4),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)

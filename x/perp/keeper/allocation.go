@@ -20,13 +20,17 @@ import (
 // and burned. Nothing is burned or passed on while the fund is below target
 // or the budget uncovered (§26.3).
 
-// FeeSink routes the spot fees of x/batch (spec §23): settlement fees join
-// the perp revenue path; other denoms fund the community pool.
+// FeeSink routes protocol revenue into the cascade of spec §23.1: the spot
+// fees and solver slashes of x/batch and the fee remainder of x/liquidstake
+// (§24.6). Settlement joins the revenue path at once (routeFee); uluna is
+// protocol revenue held in kind until the internal spot market converts it
+// to settlement (see revenue.go). Any other denom has no conversion venue in
+// the spec and funds the community pool.
 type FeeSink struct{ k Keeper }
 
 var _ batchtypes.FeeSink = FeeSink{}
 
-// NewFeeSink returns the sink to register in x/batch.
+// NewFeeSink returns the sink to register in x/batch and x/liquidstake.
 func NewFeeSink(k Keeper) FeeSink { return FeeSink{k: k} }
 
 // Deposit implements batchtypes.FeeSink.
@@ -40,6 +44,15 @@ func (s FeeSink) Deposit(ctx sdk.Context, fromModule string, coins sdk.Coins) er
 	}
 	var other sdk.Coins
 	for _, c := range coins {
+		if c.Denom == lunaDenom && c.Denom != params.SettlementDenom {
+			if err := s.k.bankKeeper.SendCoinsFromModuleToModule(ctx, fromModule, types.ModuleName, sdk.NewCoins(c)); err != nil {
+				return err
+			}
+			if err := s.k.creditRevenueInKind(ctx, fromModule, c.Amount); err != nil {
+				return err
+			}
+			continue
+		}
 		if c.Denom != params.SettlementDenom {
 			other = other.Add(c)
 			continue
@@ -53,6 +66,36 @@ func (s FeeSink) Deposit(ctx sdk.Context, fromModule string, coins sdk.Coins) er
 	}
 	if !other.IsZero() {
 		return s.k.distrKeeper.FundCommunityPool(ctx, other, authtypes.NewModuleAddress(fromModule))
+	}
+	return nil
+}
+
+// DepositInsurance implements batchtypes.FeeSink: solver slashes go 100% to
+// the insurance fund (spec §16.2, §18.5). Bonds are in the settlement asset
+// (x/batch Params forbid uusd); anything else falls back to Deposit.
+func (s FeeSink) DepositInsurance(ctx sdk.Context, fromModule string, coins sdk.Coins) error {
+	if coins.IsZero() {
+		return nil
+	}
+	params, err := s.k.GetParams(ctx)
+	if err != nil {
+		return err
+	}
+	var rest sdk.Coins
+	for _, c := range coins {
+		if c.Denom != params.SettlementDenom {
+			rest = rest.Add(c)
+			continue
+		}
+		if err := s.k.bankKeeper.SendCoinsFromModuleToModule(ctx, fromModule, types.ModuleName, sdk.NewCoins(c)); err != nil {
+			return err
+		}
+		if err := s.k.routeFee(ctx, c.Amount, true); err != nil {
+			return err
+		}
+	}
+	if !rest.IsZero() {
+		return s.Deposit(ctx, fromModule, rest)
 	}
 	return nil
 }
@@ -74,6 +117,11 @@ func (k Keeper) runAllocation(ctx sdk.Context, params types.Params) error {
 	rec := types.AllocationRecord{
 		Epoch: l.Epoch, Height: ctx.BlockHeight(), Revenue: revenue, ToInsurance: math.ZeroInt(),
 		ToOpex: math.ZeroInt(), ToOraclePool: math.ZeroInt(), ToCommunityPool: math.ZeroInt(), ToBurnBudget: math.ZeroInt(), BurnedUluna: l.BurnedEpoch,
+		LunaPrice: math.LegacyZeroDec(), RevenueUlunaReceived: l.RevenueUlunaEpoch, RevenueUlunaSold: l.RevenueSoldEpoch,
+	}
+	// the oracle LUNC price of the epoch, for reports in LUNC (zero when missing)
+	if price, err := k.oracleKeeper.GetPrice(ctx, params.LunaPriceDenom); err == nil && price.IsPositive() {
+		rec.LunaPrice = price
 	}
 	remaining := revenue
 	denom := params.SettlementDenom
@@ -123,6 +171,7 @@ func (k Keeper) runAllocation(ctx sdk.Context, params types.Params) error {
 	l.Epoch++
 	l.EpochStartHeight = ctx.BlockHeight()
 	l.BurnSpentEpoch, l.BurnedEpoch, l.TrancheSoldEpoch = math.ZeroInt(), math.ZeroInt(), math.ZeroInt()
+	l.RevenueSoldEpoch, l.RevenueUlunaEpoch = math.ZeroInt(), math.ZeroInt()
 	if err := k.Ledger.Set(ctx, l); err != nil {
 		return err
 	}
@@ -135,6 +184,7 @@ func (k Keeper) runAllocation(ctx sdk.Context, params types.Params) error {
 	return ctx.EventManager().EmitTypedEvent(&types.EventAllocationExecuted{
 		Epoch: rec.Epoch, Revenue: revenue.String(), ToInsurance: rec.ToInsurance.String(),
 		ToOpex: rec.ToOpex.String(), ToOraclePool: rec.ToOraclePool.String(), ToCommunityPool: rec.ToCommunityPool.String(), ToBurnBudget: rec.ToBurnBudget.String(),
+		LunaPrice: rec.LunaPrice.String(),
 	})
 }
 
@@ -216,9 +266,9 @@ func (k Keeper) runBuyback(ctx sdk.Context, params types.Params) error {
 		}
 		return k.emitBuybackSkipped(ctx, l, target, routed, math.ZeroInt(), cancelled, below)
 	}
-	// burn what was bought (never the tranche's claimed uluna), only at target
-	uluna := k.bankKeeper.GetBalance(ctx, k.ModuleAddress(), "uluna")
-	uluna.Amount = uluna.Amount.Sub(l.TrancheUluna)
+	// burn what was bought (never the tranche's claimed uluna nor the revenue
+	// held in kind), only at target
+	uluna := sdk.NewCoin(lunaDenom, k.untrackedUluna(ctx, l))
 	held := math.ZeroInt()
 	if below {
 		if uluna.IsPositive() {
@@ -229,6 +279,10 @@ func (k Keeper) runBuyback(ctx sdk.Context, params types.Params) error {
 			return err
 		}
 		l.BurnedEpoch = l.BurnedEpoch.Add(uluna.Amount)
+		if l.RevenueSellIntentId != 0 {
+			// the burned uluna was part of the baseline of the open revenue sale
+			l.RevenueUlunaMark = math.MaxInt(math.ZeroInt(), l.RevenueUlunaMark.Sub(uluna.Amount))
+		}
 		if err := ctx.EventManager().EmitTypedEvent(&types.EventBuyback{IntentId: l.BuybackIntentId, Spent: "0", Burned: uluna.Amount.String()}); err != nil {
 			return err
 		}
@@ -241,7 +295,9 @@ func (k Keeper) runBuyback(ctx sdk.Context, params types.Params) error {
 			return err
 		}
 	}
-	if below || l.BuybackIntentId != 0 || params.SpotMarketId == "" || !l.BurnBudget.IsPositive() || !params.BurnBuyCap.IsPositive() {
+	// one sale of the module's balance at a time: a revenue sale owns the
+	// refund and the proceeds while open (see revenue.go)
+	if below || l.BuybackIntentId != 0 || l.RevenueSellIntentId != 0 || params.SpotMarketId == "" || !l.BurnBudget.IsPositive() || !params.BurnBuyCap.IsPositive() {
 		return nil
 	}
 	room := params.BurnBuyCap.Sub(l.BurnSpentEpoch)

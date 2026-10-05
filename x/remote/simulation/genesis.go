@@ -36,6 +36,10 @@ func RandomizedParams(r *rand.Rand) types.Params {
 	p.DynamicFeeBandBps = uint32(r.Intn(1_001))
 	p.ControlFeeCap = sdk.NewCoin("uluna", math.NewInt(int64(r.Intn(1_000_000_000))))
 	p.MaxControlMsgsPerBlock = uint32(1 + r.Intn(50))
+	p.MaxPendingPerAccount = uint32(1 + r.Intn(types.MaxPendingPerAccountAbsolute))
+	p.PendingTtlBlocks = int64(1 + r.Intn(types.MaxPendingTTLBlocksAbsolute))
+	p.MaxPendingExecsPerBlock = uint32(1 + r.Intn(types.MaxPendingExecsPerBlockAbsolute))
+	p.MaxAutoReturnsPerEpoch = uint32(1 + r.Intn(types.MaxAutoReturnsPerEpochAbsolute))
 	if err := p.Validate(); err != nil {
 		panic(err)
 	}

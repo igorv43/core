@@ -218,7 +218,8 @@ func (k Keeper) slashSolver(ctx sdk.Context, addr string, amount sdk.Coin, reaso
 	if err := k.Solvers.Set(ctx, addr, s); err != nil {
 		return err
 	}
-	if err := k.feeSink.Deposit(ctx, types.ModuleName, sdk.NewCoins(sdk.NewCoin(amount.Denom, take))); err != nil {
+	// spec §16.2: the slash goes to the insurance fund (100%, not through the cascade)
+	if err := k.feeSink.DepositInsurance(ctx, types.ModuleName, sdk.NewCoins(sdk.NewCoin(amount.Denom, take))); err != nil {
 		return err
 	}
 	return ctx.EventManager().EmitTypedEvent(&types.EventSolverSlashed{Solver: addr, Amount: sdk.NewCoin(amount.Denom, take).String(), Reason: reason})

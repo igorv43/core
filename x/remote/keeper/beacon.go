@@ -167,6 +167,15 @@ func (k Keeper) EndBlocker(ctx sdk.Context) error {
 			continue
 		}
 	}
+	// payloads waiting for their deposit (cross-chain liquid staking §4.3) and
+	// the auto-return of matured claims (§4.4): failures are logged, never
+	// halt the chain, and are retried next block / next epoch
+	if err := k.processPending(ctx, params); err != nil {
+		k.Logger(ctx).Error("pending payloads not processed", "err", err)
+	}
+	if err := k.autoReturns(ctx, params); err != nil {
+		k.Logger(ctx).Error("auto-returns not processed", "err", err)
+	}
 	// consensus rebalancing epoch (spec §11.5.2)
 	if params.RebalanceEpochBlocks > 0 && ctx.BlockHeight()%params.RebalanceEpochBlocks == 0 {
 		return k.rebalanceEpoch(ctx, params)

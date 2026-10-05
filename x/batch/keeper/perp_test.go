@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const perpMarketID = "ubtc-perp/uusd"
+const perpMarketID = "ubtc-perp/uusdc.lf"
 
 // fakeHook is a margin hook for tests: a reservation ledger kept in the
 // batch KV store (so that cache contexts roll it back like x/perp's state),
@@ -77,7 +77,7 @@ func (f *fixture) perpSetup(t *testing.T) *fakeHook {
 	hook := newFakeHook(f.app.GetKey(types.StoreKey))
 	f.k.SetMarginHook(hook)
 	require.NoError(t, f.k.CreateMarket(f.ctx, types.Market{
-		Id: perpMarketID, BaseDenom: "ubtc-perp", QuoteDenom: "uusd", Type: types.MARKET_TYPE_PERP, OracleDenom: "uusd",
+		Id: perpMarketID, BaseDenom: "ubtc-perp", QuoteDenom: "uusdc.lf", Type: types.MARKET_TYPE_PERP, OracleDenom: "uusd",
 		Enabled: false, MinQty: math.NewInt(1_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	// the fixture allows two active markets; the spot one is already enabled
@@ -108,7 +108,7 @@ func TestPerpIntentReservesAndReleases(t *testing.T) {
 	require.Equal(t, "10000", in.Remaining.String())
 
 	// no escrow left the account
-	require.Equal(t, "100000000", f.balance(f.user, "uusd").String())
+	require.Equal(t, "100000000", f.balance(f.user, "uusdc.lf").String())
 
 	_, err = f.k.CancelIntent(f.ctx, f.user.String(), id)
 	require.NoError(t, err)

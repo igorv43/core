@@ -22,6 +22,8 @@ const (
 	CodeGatewayNotFound   // 13
 	CodeInvalidSession    // 14
 	CodeInvalidConversion // 15
+	CodeInvalidReference  // 16
+	CodePendingFull       // 17
 )
 
 // Uint32 returns the numeric code for the SDK error registry.
@@ -45,3 +47,11 @@ var (
 
 // ErrInvalidConversion covers conversion data and receipts (spec §14.7).
 var ErrInvalidConversion = errorsmod.Register(ModuleName, CodeInvalidConversion.Uint32(), "invalid conversion data")
+
+// ErrInvalidReference covers result references inside a payload (cross-chain
+// liquid staking §4.2); ErrPendingFull is returned when an account already
+// has max_pending_per_account payloads waiting for their deposit (§4.3).
+var (
+	ErrInvalidReference = errorsmod.Register(ModuleName, CodeInvalidReference.Uint32(), "invalid result reference")
+	ErrPendingFull      = errorsmod.Register(ModuleName, CodePendingFull.Uint32(), "too many pending payloads")
+)

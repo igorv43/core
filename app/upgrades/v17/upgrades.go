@@ -13,8 +13,10 @@ import (
 
 // CreateV17UpgradeHandler adds the x/batch module and the oracle stage 2 parameter. RunMigrations initialises
 // it from its default genesis: Annex B parameters and no markets, so no
-// auction runs until governance registers a market with MsgSetMarket and
-// sets the bridged settlement denom (spec §11, §12).
+// auction runs until governance registers a market with MsgSetMarket (spec
+// §12). The solver bond and its slashes default to the settlement basket
+// `uusdc.lf` (spec §11.4 D-29, §16.1); USTC is refused by Params.Validate
+// (§11.3 D-18).
 func CreateV17UpgradeHandler(
 	mm *module.Manager,
 	cfg module.Configurator,

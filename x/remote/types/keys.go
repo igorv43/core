@@ -6,6 +6,7 @@ import (
 	"cosmossdk.io/collections"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
+	lstypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/address"
@@ -30,6 +31,19 @@ const (
 	// coin as token_out of a withdrawal (spec §14.7.2).
 	NativeTokenSentinel = "0x000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 
+	// MaxPendingPerAccountAbsolute, MaxPendingTTLBlocksAbsolute,
+	// MaxPendingExecsPerBlockAbsolute and MaxAutoReturnsPerEpochAbsolute are
+	// the code maxima of the deposit-then-execute and auto-return params
+	// (cross-chain liquid staking §4.3/§4.4, spec §12).
+	MaxPendingPerAccountAbsolute    = 10
+	MaxPendingTTLBlocksAbsolute     = 100_800 // ~7 days at 6 s
+	MaxPendingExecsPerBlockAbsolute = 50
+	MaxAutoReturnsPerEpochAbsolute  = 200
+	// AutoReturnScanFactor bounds the opted-in accounts examined per epoch
+	// to this multiple of max_auto_returns_per_epoch (accounts with nothing
+	// matured cost a read, not a return).
+	AutoReturnScanFactor = 4
+
 	// PaymasterName derives the paymaster account that pays the gas of session keys.
 	PaymasterName = "paymaster"
 )
@@ -53,6 +67,22 @@ var (
 	// port-of-entry chains (spec §11.6), both by hyperlane domain.
 	ExecutorsKey = collections.NewPrefix(12)
 	PortsKey     = collections.NewPrefix(13)
+	// Deposit-then-execute (cross-chain liquid staking §4.3): pending payloads
+	// by id, their per-account index, the id sequence, the ids whose deposit
+	// arrived, the deposit credits by (account, token, origin) and their
+	// expiry index by height.
+	PendingKey          = collections.NewPrefix(14)
+	PendingByAccountKey = collections.NewPrefix(15)
+	PendingSeqKey       = collections.NewPrefix(16)
+	PendingReadyKey     = collections.NewPrefix(17)
+	CreditsKey          = collections.NewPrefix(18)
+	CreditExpiryKey     = collections.NewPrefix(19)
+	// Auto-return (§4.4): the opted-in accounts, the round-robin cursor, the
+	// last liquid-staking epoch processed and the paymaster budget.
+	AutoReturnsKey      = collections.NewPrefix(20)
+	AutoReturnCursorKey = collections.NewPrefix(21)
+	AutoReturnEpochKey  = collections.NewPrefix(22)
+	AutoReturnBudgetKey = collections.NewPrefix(23)
 )
 
 // PaymasterAddress is the account that grants fee allowances to session keys.
@@ -93,9 +123,26 @@ func PayloadMsgTypeURLs() map[string]bool {
 		sdk.MsgTypeURL(&MsgGrantSessionKey{}):              true,
 		sdk.MsgTypeURL(&MsgRevokeSessionKey{}):             true,
 		sdk.MsgTypeURL(&MsgWithdraw{}):                     true,
+		// cross-chain liquid staking (§4.1): principal moves, never in the
+		// session-key scope
+		sdk.MsgTypeURL(&lstypes.MsgStake{}):   true,
+		sdk.MsgTypeURL(&lstypes.MsgUnstake{}): true,
+		sdk.MsgTypeURL(&lstypes.MsgClaim{}):   true,
+		sdk.MsgTypeURL(&MsgSetAutoReturn{}):   true,
 	}
 	for _, u := range SessionMsgTypeURLs() {
 		urls[u] = true
 	}
 	return urls
+}
+
+// ResultMsgTypeURLs is the closed list of messages whose typed response a
+// following MsgWithdraw may reference with AMOUNT_FROM_PREVIOUS_RESULT
+// (cross-chain liquid staking §4.2).
+func ResultMsgTypeURLs() map[string]bool {
+	return map[string]bool{
+		sdk.MsgTypeURL(&lstypes.MsgStake{}):   true,
+		sdk.MsgTypeURL(&lstypes.MsgUnstake{}): true,
+		sdk.MsgTypeURL(&lstypes.MsgClaim{}):   true,
+	}
 }

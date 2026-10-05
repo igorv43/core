@@ -7,9 +7,25 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// DefaultSettlementDenom is the settlement denom of the initial parameters;
-// governance sets the bridged settlement denom (spec §11).
-const DefaultSettlementDenom = "uusd"
+// DefaultSettlementDenom is the settlement denom of the initial parameters:
+// the multi-origin USDC basket synthetic `uusdc.lf` (spec §11.4, D-29), in
+// which margin, PnL, the insurance fund and fees are accounted. Governance
+// may change it (§11.1), never to USTC (ForbiddenSettlementDenom).
+const DefaultSettlementDenom = "uusdc.lf"
+
+// ForbiddenSettlementDenom is USTC (`uusd`). Spec §11.3 (D-18), hard rule
+// outside governance: USTC never denominates the insurance fund nor the
+// bonds, in any phase. The fund is always in the settlement denom, so the
+// settlement denom can never be USTC. Changing this requires a software
+// upgrade (§26.3 style limit in code).
+const ForbiddenSettlementDenom = "uusd"
+
+// DefaultLunaPriceDenom is the x/oracle denom whose LUNC exchange rate is
+// the USD price of LUNC. It is only a price reference: no balance is ever
+// held in it. The LUNC/settlement P_ref (stLUNC valuation, buyback, revenue
+// sales) uses it on the assumption USDC ~ USD (spec §21.6 stage 1: P_ref is
+// the LUNC/USD rate the oracle already produces).
+const DefaultLunaPriceDenom = "uusd"
 
 // DefaultStDenom is the liquid staking denom accepted as collateral (spec §21.5).
 const DefaultStDenom = "stluna"
@@ -45,7 +61,7 @@ func DefaultParams() Params {
 		MaxLiquidationsPerBlock:    MaxLiquidationsPerBlockDefault,
 		MaxTriggersPerBlock:        MaxTriggersPerBlockDefault,
 		StDenom:                    DefaultStDenom,
-		LunaPriceDenom:             "uusd",
+		LunaPriceDenom:             DefaultLunaPriceDenom,
 		StHaircut:                  math.LegacyNewDecWithPrec(35, 2), // 35% (D-16)
 		StShareCap:                 math.LegacyNewDecWithPrec(50, 2), // 50% of a position's collateral value
 		StGlobalCap:                math.ZeroInt(),                   // governance opens it; zero = stLUNC refused
@@ -53,6 +69,7 @@ func DefaultParams() Params {
 		StHaircutQueueSlope:        math.LegacyNewDecWithPrec(50, 2), // +50% of haircut per 100% of assets queued
 		StUnwindCapPerEpoch:        math.NewInt(100_000_000_000),     // 100,000 LUNC sold per epoch
 		LunaFeeDiscount:            math.LegacyZeroDec(),             // §23.3 option, disabled
+		RevenueSellCap:             math.NewInt(100_000_000_000),     // 100,000 LUNC of revenue sold per epoch
 	}
 }
 
@@ -67,6 +84,9 @@ func fraction(name string, d math.LegacyDec) error {
 func (p Params) Validate() error {
 	if err := sdk.ValidateDenom(p.SettlementDenom); err != nil {
 		return fmt.Errorf("settlement_denom: %w", err)
+	}
+	if p.SettlementDenom == ForbiddenSettlementDenom {
+		return fmt.Errorf("settlement_denom must not be %s (USTC): the insurance fund is in the settlement denom and USTC never denominates it (spec §11.3, D-18)", ForbiddenSettlementDenom)
 	}
 	for name, d := range map[string]math.LegacyDec{
 		"liq_penalty": p.LiqPenalty, "if_unwind_per_batch": p.IfUnwindPerBatch, "if_max_inventory": p.IfMaxInventory,
@@ -148,6 +168,9 @@ func (p Params) Validate() error {
 	}
 	if p.LunaFeeDiscount.Equal(math.LegacyOneDec()) {
 		return fmt.Errorf("luna_fee_discount must be below 1")
+	}
+	if p.RevenueSellCap.IsNil() || p.RevenueSellCap.IsNegative() {
+		return fmt.Errorf("revenue_sell_cap must be non-negative")
 	}
 	return nil
 }

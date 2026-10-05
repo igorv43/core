@@ -14,6 +14,7 @@ func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgRevokeOwnSessionKey{}, "terra/remote/MsgRevokeOwnSessionKey", nil)
 	cdc.RegisterConcrete(&MsgWithdraw{}, "terra/remote/MsgWithdraw", nil)
 	cdc.RegisterConcrete(&MsgFundPaymaster{}, "terra/remote/MsgFundPaymaster", nil)
+	cdc.RegisterConcrete(&MsgSetAutoReturn{}, "terra/remote/MsgSetAutoReturn", nil)
 	cdc.RegisterConcrete(&MsgCreateRemoteApp{}, "terra/remote/MsgCreateRemoteApp", nil)
 	cdc.RegisterConcrete(&MsgSetGateway{}, "terra/remote/MsgSetGateway", nil)
 	cdc.RegisterConcrete(&MsgSetBeacon{}, "terra/remote/MsgSetBeacon", nil)
@@ -32,6 +33,7 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		&MsgRevokeOwnSessionKey{},
 		&MsgWithdraw{},
 		&MsgFundPaymaster{},
+		&MsgSetAutoReturn{},
 		&MsgCreateRemoteApp{},
 		&MsgSetGateway{},
 		&MsgSetBeacon{},
