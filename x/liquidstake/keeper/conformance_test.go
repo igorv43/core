@@ -473,3 +473,58 @@ func TestEpochUndelegateThenDelegateKeepsValidatorConsistent(t *testing.T) {
 	}
 	require.NoError(t, k.CheckInvariants(f.ctx))
 }
+
+// A validator jailed for downtime leaves the bonded set: the epoch must still
+// record why it is ineligible (reason "jailed", not "not in the evaluated
+// set"), redelegate its share away, and the delegations query must list the
+// evaluated validators that hold no module delegation with zero tokens.
+func TestJailedValidatorVerdictAndDelegationsQuery(t *testing.T) {
+	f := setup(t)
+	k := f.app.LiquidStakeKeeper
+	p, err := k.GetParams(f.ctx)
+	require.NoError(t, err)
+	p.ValidatorCap = math.LegacyNewDecWithPrec(5, 1)
+	require.NoError(t, k.SetParams(f.ctx, p))
+	val2 := f.addValidator(t)
+	val3 := f.addValidator(t)
+
+	_, _, err = k.Stake(f.ctx, f.user, sdk.NewCoin("uluna", math.NewInt(300_000_000)))
+	require.NoError(t, err)
+	f.advance(t, testEpochBlocks, time.Minute)
+	require.NoError(t, k.EndBlocker(f.ctx))
+	_, err = f.app.StakingKeeper.ApplyAndReturnValidatorSetUpdates(f.ctx)
+	require.NoError(t, err)
+	_, err = f.app.StakingKeeper.GetDelegation(f.ctx, k.ModuleAddress(), val3)
+	require.NoError(t, err, "val3 holds a module delegation after the first epoch")
+
+	// jail val3: it leaves the bonded set at the next validator-set update
+	v3, err := f.app.StakingKeeper.GetValidator(f.ctx, val3)
+	require.NoError(t, err)
+	cons, err := v3.GetConsAddr()
+	require.NoError(t, err)
+	require.NoError(t, f.app.StakingKeeper.Jail(f.ctx, sdk.ConsAddress(cons)))
+	_, err = f.app.StakingKeeper.ApplyAndReturnValidatorSetUpdates(f.ctx)
+	require.NoError(t, err)
+
+	f.advance(t, testEpochBlocks, time.Minute)
+	require.NoError(t, k.EndBlocker(f.ctx))
+	st, err := k.Validators.Get(f.ctx, val3.String())
+	require.NoError(t, err)
+	require.False(t, st.Eligible)
+	require.Equal(t, "jailed", st.Reason)
+
+	q, err := keeper.NewQueryServerImpl(k).Delegations(f.ctx, &types.QueryDelegationsRequest{})
+	require.NoError(t, err)
+	byOp := map[string]types.DelegationEntry{}
+	for _, e := range q.Delegations {
+		byOp[e.OperatorAddress] = e
+	}
+	require.Contains(t, byOp, f.valAddr.String())
+	require.Contains(t, byOp, val2.String())
+	e3, ok := byOp[val3.String()]
+	require.True(t, ok, "the jailed validator is listed")
+	require.False(t, e3.Eligible)
+	require.Equal(t, "jailed", e3.Reason)
+	require.True(t, e3.Tokens.IsZero(), "its share was redelegated away: %s", e3.Tokens)
+	require.NoError(t, k.CheckInvariants(f.ctx))
+}

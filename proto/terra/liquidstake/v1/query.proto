@@ -18,7 +18,11 @@ service Query {
   rpc ExchangeRate(QueryExchangeRateRequest) returns (QueryExchangeRateResponse) {
     option (google.api.http).get = "/terra/liquidstake/v1/exchange_rate";
   }
-  // Delegations returns the module's delegations per validator and the eligibility set.
+  // Delegations returns the module's delegations per validator and the eligibility set:
+  // one entry per module delegation, then one zero-token entry per validator evaluated at
+  // the last epoch that holds no module delegation (e.g. above max_commission). A validator
+  // that left the bonded set while holding module delegations is reported with its reason
+  // ("jailed", "not bonded").
   rpc Delegations(QueryDelegationsRequest) returns (QueryDelegationsResponse) {
     option (google.api.http).get = "/terra/liquidstake/v1/delegations";
   }

@@ -84,6 +84,33 @@ func (k Keeper) Eligibility(ctx sdk.Context) ([]eligibleValidator, error) {
 			eligible = append(eligible, eligibleValidator{Validator: val, Address: valAddr})
 		}
 	}
+
+	// A validator that still holds module delegations but left the evaluated
+	// set (jailed for downtime, unbonding, or beyond max_validators) gets a
+	// verdict too, so the redelegation event and the delegations query report
+	// the real reason instead of "not in the evaluated set".
+	dels, err := k.delegations(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range dels {
+		op := d.Delegation.ValidatorAddress
+		if has, err := k.Validators.Has(ctx, op); err != nil {
+			return nil, err
+		} else if has {
+			continue
+		}
+		reason := "outside the max_validators bonded set"
+		switch {
+		case d.Validator.IsJailed():
+			reason = "jailed"
+		case !d.Validator.IsBonded():
+			reason = "not bonded"
+		}
+		if err := k.Validators.Set(ctx, op, types.ValidatorState{OperatorAddress: op, Eligible: false, Reason: reason}); err != nil {
+			return nil, err
+		}
+	}
 	return eligible, nil
 }
 

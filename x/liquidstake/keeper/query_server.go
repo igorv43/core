@@ -79,7 +79,9 @@ func (qs queryServer) Delegations(goCtx context.Context, _ *types.QueryDelegatio
 		total = total.Add(d.Tokens)
 	}
 	entries := make([]types.DelegationEntry, 0, len(dels))
+	listed := make(map[string]struct{}, len(dels))
 	for _, d := range dels {
+		listed[d.Delegation.ValidatorAddress] = struct{}{}
 		share := math.LegacyZeroDec()
 		if total.IsPositive() {
 			share = math.LegacyNewDecFromInt(d.Tokens).Quo(math.LegacyNewDecFromInt(total))
@@ -92,6 +94,19 @@ func (qs queryServer) Delegations(goCtx context.Context, _ *types.QueryDelegatio
 		entries = append(entries, types.DelegationEntry{
 			OperatorAddress: d.Delegation.ValidatorAddress, Tokens: d.Tokens, Share: share, Eligible: eligible, Reason: reason,
 		})
+	}
+	// validators evaluated at the last epoch that hold no module delegation
+	// (ineligible ones, or eligible ones the cap left empty) are listed with
+	// zero tokens, so a client sees the whole whitelist verdict in one query
+	if err := qs.k.Validators.Walk(ctx, nil, func(op string, st types.ValidatorState) (bool, error) {
+		if _, ok := listed[op]; !ok {
+			entries = append(entries, types.DelegationEntry{
+				OperatorAddress: op, Tokens: math.ZeroInt(), Share: math.LegacyZeroDec(), Eligible: st.Eligible, Reason: st.Reason,
+			})
+		}
+		return false, nil
+	}); err != nil {
+		return nil, err
 	}
 	bonded, err := qs.k.stakingKeeper.TotalBondedTokens(ctx)
 	if err != nil {
