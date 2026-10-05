@@ -22,7 +22,11 @@ const paramsKey = "liquidstake_params"
 // governance-only knobs (accounts, caps that default to zero) at their default.
 func RandomizedParams(r *rand.Rand) types.Params {
 	p := types.DefaultParams()
-	p.EpochBlocks = int64(1 + r.Intn(10_000))
+	// epochs of ≥ 3.5 days at 6 s blocks keep the sizing rule of spec §24.4
+	// (epoch × block time ≥ UnbondingTime / MaxEntries) with the default
+	// x/staking params (21 d / 7)
+	p.EpochBlocks = int64(types.DefaultEpochBlocks + r.Intn(50_000))
+	p.ExpectedBlockTime = types.DefaultExpectedBlockTime
 	p.FeeRate = math.LegacyNewDecWithPrec(int64(r.Intn(30)), 2)
 	p.BurnShare = math.LegacyNewDecWithPrec(int64(r.Intn(100)), 2)
 	p.MaxShare = math.LegacyNewDecWithPrec(int64(5+r.Intn(50)), 2)

@@ -104,6 +104,20 @@ message EventBuyback {
   string spent     = 2;
   string burned    = 3;
 }
+// EventBuybackSkipped reports a buyback step that did not burn or buy
+// because the insurance fund is below IF_target (spec §23.1 rule 1, §26.3).
+// routed_to_insurance is the burn budget (or returned buyback escrow) moved
+// to the fund; held_uluna is the bought uluna kept unburned until the fund
+// is back at its target; cancelled_intent_id is the open buyback intent
+// withdrawn from the auction (0 when none).
+message EventBuybackSkipped {
+  string reason              = 1;
+  string insurance           = 2;
+  string target              = 3;
+  string routed_to_insurance = 4;
+  string held_uluna          = 5;
+  uint64 cancelled_intent_id = 6;
+}
 message EventFeePaidInLuna {
   string account        = 1;
   string settlement_fee = 2;

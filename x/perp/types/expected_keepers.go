@@ -40,6 +40,9 @@ type BatchKeeper interface {
 	SubmitIntentInternal(ctx sdk.Context, msg *batchtypes.MsgSubmitIntent) (uint64, uint64, error)
 	GetIntent(ctx sdk.Context, id uint64) (batchtypes.Intent, error)
 	HasOpenIntent(ctx sdk.Context, account, marketID string) (bool, error)
+	// CancelIntent withdraws an open intent of the module (the buyback while
+	// the insurance fund is below target) and refunds its remaining escrow.
+	CancelIntent(ctx sdk.Context, sender string, id uint64) (sdk.Coin, error)
 	GetParams(ctx sdk.Context) (batchtypes.Params, error)
 }
 

@@ -17,7 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const chainID = "liquidstake-test"
+const (
+	chainID         = "liquidstake-test"
+	testUnbonding   = 300 * time.Second
+	testEpochBlocks = 45
+)
 
 type fixture struct {
 	app     *terraapp.TerraApp
@@ -66,6 +70,12 @@ func setup(t *testing.T) *fixture {
 	user := sdk.AccAddress([]byte("liquid-staker--------"))
 	fund(user, 1_000_000_000)
 
+	// the testenv staking params: 300 s unbonding, 7 entries (1 s blocks)
+	sp, err := app.StakingKeeper.GetParams(ctx)
+	require.NoError(t, err)
+	sp.UnbondingTime, sp.MaxEntries = testUnbonding, 7
+	require.NoError(t, app.StakingKeeper.SetParams(ctx, sp))
+
 	// the helper does not run InitGenesis: initialise the module like the upgrade does
 	require.NoError(t, app.LiquidStakeKeeper.InitGenesis(ctx, types.DefaultGenesisState()))
 
@@ -75,9 +85,11 @@ func setup(t *testing.T) *fixture {
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), e.Number)
 
-	// short epochs; a single validator may hold the whole module in this devnet
+	// short epochs (45 × 1 s ≥ 300 s / 7); a single validator may hold the
+	// whole module in this devnet
 	p := types.DefaultParams()
-	p.EpochBlocks = 10
+	p.EpochBlocks = testEpochBlocks
+	p.ExpectedBlockTime = time.Second
 	p.ValidatorCap = math.LegacyOneDec()
 	require.NoError(t, app.LiquidStakeKeeper.SetParams(ctx, p))
 
@@ -113,7 +125,7 @@ func TestStakeMintsAtRateOneThenDelegatesAtEpoch(t *testing.T) {
 	require.True(t, totals.Delegated.IsZero())
 
 	// epoch boundary: everything above the 2% buffer is delegated
-	f.advance(t, 10, time.Minute)
+	f.advance(t, testEpochBlocks, time.Minute)
 	require.NoError(t, k.EndBlocker(f.ctx))
 	_, totals, err = k.ExchangeRate(f.ctx)
 	require.NoError(t, err)
@@ -131,7 +143,7 @@ func TestUnstakeInstantFromBufferAndQueued(t *testing.T) {
 	k := f.app.LiquidStakeKeeper
 	_, _, err := k.Stake(f.ctx, f.user, sdk.NewCoin("uluna", math.NewInt(100_000_000)))
 	require.NoError(t, err)
-	f.advance(t, 10, time.Minute)
+	f.advance(t, testEpochBlocks, time.Minute)
 	require.NoError(t, k.EndBlocker(f.ctx)) // delegates 98M, buffer 2M
 
 	before := f.balance("uluna")
@@ -161,7 +173,7 @@ func TestUnstakeInstantFromBufferAndQueued(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrNothingToClaim)
 
 	// epoch: one undelegation batch for the queue
-	f.advance(t, 10, time.Minute)
+	f.advance(t, testEpochBlocks, time.Minute)
 	require.NoError(t, k.EndBlocker(f.ctx))
 	req, err := k.Requests.Get(f.ctx, 1)
 	require.NoError(t, err)
@@ -215,7 +227,7 @@ func TestRewardsRaiseTheRateAndFeeIsBurned(t *testing.T) {
 	k := f.app.LiquidStakeKeeper
 	_, _, err := k.Stake(f.ctx, f.user, sdk.NewCoin("uluna", math.NewInt(100_000_000)))
 	require.NoError(t, err)
-	f.advance(t, 10, time.Minute)
+	f.advance(t, testEpochBlocks, time.Minute)
 	require.NoError(t, k.EndBlocker(f.ctx))
 
 	// an epoch of rewards: 10M uluna allocated to the validator one block later
@@ -235,7 +247,7 @@ func TestRewardsRaiseTheRateAndFeeIsBurned(t *testing.T) {
 
 	burnAddr := f.app.AccountKeeper.GetModuleAddress("burn")
 	burnBefore := f.app.BankKeeper.GetBalance(f.ctx, burnAddr, "uluna").Amount
-	f.advance(t, 10, time.Minute)
+	f.advance(t, testEpochBlocks, time.Minute)
 	require.NoError(t, k.EndBlocker(f.ctx))
 	burnAfter := f.app.BankKeeper.GetBalance(f.ctx, burnAddr, "uluna").Amount
 	require.True(t, burnAfter.GT(burnBefore), "20% of the 5% fee reaches the burn account")
@@ -245,9 +257,9 @@ func TestRewardsRaiseTheRateAndFeeIsBurned(t *testing.T) {
 	require.True(t, rateAfter.GT(math.LegacyOneDec()))
 	require.True(t, totals.PendingRewards.IsZero(), "rewards were withdrawn at the epoch")
 	require.NoError(t, k.CheckInvariants(f.ctx))
-	// the fee lowers the rate that had the pending rewards priced in: a normal
-	// epoch, not a slash
-	require.True(t, rateAfter.LT(rateBefore), "the 5% fee leaves at the epoch")
+	// pending rewards are priced net of the 5% fee, so the fee leaving at the
+	// epoch does not lower the rate (spec §24.1, conformance row L-03)
+	require.True(t, rateAfter.GTE(rateBefore), "rate fell at the epoch: %s -> %s", rateBefore, rateAfter)
 	require.Nil(t, f.event("terra.liquidstake.v1.EventSlashAbsorbed"), "the epoch fee is not reported as a slash")
 }
 
@@ -275,7 +287,7 @@ func TestSlashIsReportedByTheStakingHook(t *testing.T) {
 	k := f.app.LiquidStakeKeeper
 	_, _, err := k.Stake(f.ctx, f.user, sdk.NewCoin("uluna", math.NewInt(100_000_000)))
 	require.NoError(t, err)
-	f.advance(t, 10, time.Minute)
+	f.advance(t, testEpochBlocks, time.Minute)
 	require.NoError(t, k.EndBlocker(f.ctx))
 	del, err := f.app.StakingKeeper.GetDelegation(f.ctx, k.ModuleAddress(), f.valAddr)
 	require.NoError(t, err)
@@ -323,7 +335,7 @@ func TestGenesisRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	_, err = k.Unstake(f.ctx, f.user, sdk.NewCoin(types.StDenom, math.NewInt(9_000_000)))
 	require.NoError(t, err) // instant: everything is still in the buffer before the first epoch
-	f.advance(t, 10, time.Minute)
+	f.advance(t, testEpochBlocks, time.Minute)
 	require.NoError(t, k.EndBlocker(f.ctx)) // delegates the rest
 	res, err := k.Unstake(f.ctx, f.user, sdk.NewCoin(types.StDenom, math.NewInt(1_000_000)))
 	require.NoError(t, err)

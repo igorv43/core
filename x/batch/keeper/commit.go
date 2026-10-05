@@ -100,11 +100,7 @@ func (k Keeper) RevealBid(ctx sdk.Context, msg *types.MsgRevealBid) error {
 		return err
 	}
 	if !bytes.Equal(expected, c.Commitment) {
-		// an inconsistent reveal is worth twice the no-reveal penalty (spec §16.2)
-		if err := k.slashSolver(ctx, msg.Solver, sdk.NewCoin(params.SlashNoReveal.Denom, params.SlashNoReveal.Amount.MulRaw(2)), "reveal inconsistent with commitment"); err != nil {
-			return err
-		}
-		return types.ErrRevealMismatch.Wrap(msg.Solver)
+		return k.consumeMismatchedReveal(ctx, params, key, c, msg.Solver)
 	}
 	market, err := k.GetMarket(ctx, msg.Bid.MarketId)
 	if err != nil {
@@ -164,6 +160,27 @@ func (k Keeper) RevealBid(ctx sdk.Context, msg *types.MsgRevealBid) error {
 	}
 	return k.finishReveal(ctx, params, key, c, msg, kept, discarded)
 }
+
+// consumeMismatchedReveal applies the 2 × slash_no_reveal penalty for a reveal
+// that does not open its commitment (spec §16.2) and consumes the commitment.
+// The message must succeed: returning an error would revert the whole tx and
+// with it the slash, leaving only the EndBlock "commit not revealed" penalty.
+// The commitment is marked revealed with no bid, so it cannot be revealed
+// again, contributes no levels to resolution or escrow reservation, and is
+// not slashed a second time by finishCommits. The solver's reveal counter is
+// not incremented: an inconsistent reveal is not a reveal for the §16.2 rate.
+func (k Keeper) consumeMismatchedReveal(ctx sdk.Context, params types.Params, key collections.Triple[uint64, string, string], c types.Commit, solver string) error {
+	penalty := sdk.NewCoin(params.SlashNoReveal.Denom, params.SlashNoReveal.Amount.MulRaw(2))
+	if err := k.slashSolver(ctx, solver, penalty, ReasonRevealMismatch); err != nil {
+		return err
+	}
+	c.Revealed = true
+	c.Bid = nil
+	return k.Commits.Set(ctx, key, c)
+}
+
+// ReasonRevealMismatch is the EventSolverSlashed reason of an inconsistent reveal.
+const ReasonRevealMismatch = "reveal inconsistent with commitment"
 
 // reservePerpLevels reserves margin for each valid level through the hook;
 // levels the account cannot cover are discarded.

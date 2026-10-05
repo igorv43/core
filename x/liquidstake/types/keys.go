@@ -32,4 +32,6 @@ var (
 	OwedKey          = collections.NewPrefix(4)
 	ValidatorsKey    = collections.NewPrefix(5)
 	RequestsByAddrIx = collections.NewPrefix(6)
+	OwedQueuedKey    = collections.NewPrefix(7)
+	OwedUnbondingKey = collections.NewPrefix(8)
 )

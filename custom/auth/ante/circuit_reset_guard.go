@@ -3,6 +3,7 @@ package ante
 import (
 	errorsmod "cosmossdk.io/errors"
 	circuittypes "cosmossdk.io/x/circuit/types"
+	customcircuittypes "github.com/classic-terra/core/v4/custom/circuit/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
@@ -13,29 +14,22 @@ import (
 // permissions in x/circuit may trip a breaker, but only the governance
 // authority may reset one. x/circuit itself lets a super-admin reset, so the
 // restriction is applied here, in the ante handler, before execution.
+//
+// The protected user-exit messages (spec §24.5) are also refused here for an
+// early CheckTx rejection. The authoritative check is the x/circuit MsgServer
+// wrapper in custom/circuit, which also covers messages executed by x/gov
+// proposals (they never pass through the ante handler); both use the single
+// list in custom/circuit/types.
 type CircuitResetGuardDecorator struct {
 	authority string
-	// protected lists message type URLs that can never be tripped: the user
-	// exit of liquid staking (spec §24.5) must not be pausable by the same
-	// group that pauses the rest.
-	protected map[string]struct{}
-}
-
-// ProtectedMsgTypeURLs are the messages no circuit breaker trip may disable.
-var ProtectedMsgTypeURLs = []string{
-	"/terra.liquidstake.v1.MsgUnstake",
-	"/terra.liquidstake.v1.MsgClaim",
 }
 
 // NewCircuitResetGuardDecorator returns a decorator that rejects
-// MsgResetCircuitBreaker unless signed by the given authority and rejects
-// MsgTripCircuitBreaker that targets a protected message type.
+// MsgResetCircuitBreaker unless signed by the given authority, and rejects
+// MsgTripCircuitBreaker / MsgAuthorizeCircuitBreaker that name a protected
+// message type.
 func NewCircuitResetGuardDecorator(authority string) CircuitResetGuardDecorator {
-	protected := make(map[string]struct{}, len(ProtectedMsgTypeURLs))
-	for _, u := range ProtectedMsgTypeURLs {
-		protected[u] = struct{}{}
-	}
-	return CircuitResetGuardDecorator{authority: authority, protected: protected}
+	return CircuitResetGuardDecorator{authority: authority}
 }
 
 // AnteHandle implements sdk.AnteDecorator.
@@ -55,13 +49,17 @@ func (d CircuitResetGuardDecorator) checkMsgs(msgs []sdk.Msg) error {
 					"circuit breaker reset is restricted to the governance authority %s", d.authority)
 			}
 		case *circuittypes.MsgTripCircuitBreaker:
-			for _, u := range m.MsgTypeUrls {
-				if _, ok := d.protected[u]; ok {
-					return errorsmod.Wrapf(sdkerrors.ErrUnauthorized, "%s can never be disabled by the circuit breaker", u)
-				}
+			if err := customcircuittypes.CheckNoProtected(m.MsgTypeUrls); err != nil {
+				return err
 			}
 			if len(m.MsgTypeUrls) == 0 {
 				return errorsmod.Wrap(sdkerrors.ErrUnauthorized, "tripping all messages is not allowed: protected user exits would be disabled")
+			}
+		case *circuittypes.MsgAuthorizeCircuitBreaker:
+			if m.Permissions != nil {
+				if err := customcircuittypes.CheckNoProtected(m.Permissions.LimitTypeUrls); err != nil {
+					return err
+				}
 			}
 		case *authz.MsgExec:
 			inner, err := m.GetMessages()

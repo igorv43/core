@@ -43,11 +43,11 @@ func (f *fixture) stSetup(t *testing.T) {
 	require.NoError(t, f.app.LiquidStakeKeeper.SetParams(f.ctx, lp))
 	f.app.OracleKeeper.SetLunaExchangeRate(f.ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 	require.NoError(t, f.bk.CreateMarket(f.ctx, batchtypes.Market{
-		Id: "uluna/uusd", BaseDenom: "uluna", QuoteDenom: "uusd", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusd", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	p := f.params
-	p.SpotMarketId = "uluna/uusd"
+	p.SpotMarketId = lunaUsdSpotMarket
 	p.StGlobalCap = math.NewInt(10_000_000_000_000)
 	p.StGlobalCapIfRatio = math.LegacyNewDec(100)
 	p.StUnwindCapPerEpoch = math.NewInt(1_000_000_000_000)
@@ -188,7 +188,7 @@ func TestStLiquidationSeizesToTrancheAndConverts(t *testing.T) {
 	require.Equal(t, batchtypes.SIDE_SELL, sale.Side)
 	batch := f.ctx.BlockHeight()
 	_, _, err = f.bk.SubmitIntent(f.ctx, &batchtypes.MsgSubmitIntent{
-		Sender: f.short.String(), MarketId: "uluna/uusd", Side: batchtypes.SIDE_BUY,
+		Sender: f.short.String(), MarketId: lunaUsdSpotMarket, Side: batchtypes.SIDE_BUY,
 		AmountIn: sdk.NewCoin("uusd", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50,
 	})
 	require.NoError(t, err)

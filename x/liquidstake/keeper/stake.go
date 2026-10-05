@@ -73,9 +73,9 @@ type UnstakeResult struct {
 }
 
 // Unstake burns stLUNC at the current exchange rate. The uluna is paid
-// immediately from the buffer when it covers the amount; otherwise the
-// request is queued and undelegated in a single batch at the end of the
-// epoch (spec §24.4).
+// immediately from the buffer (balance − owed to matured requests) when it
+// covers the amount; otherwise the request is queued and undelegated in a
+// single batch at the end of the epoch (spec §24.4).
 func (k Keeper) Unstake(ctx sdk.Context, sender sdk.AccAddress, stAmount sdk.Coin) (UnstakeResult, error) {
 	if stAmount.Denom != types.StDenom {
 		return UnstakeResult{}, errorsmod.Wrapf(types.ErrInvalidDenom, "expected %s, got %s", types.StDenom, stAmount.Denom)
@@ -140,6 +140,9 @@ func (k Keeper) Unstake(ctx sdk.Context, sender sdk.AccAddress, stAmount sdk.Coi
 		return UnstakeResult{}, err
 	}
 	if err := k.addOwed(ctx, amount); err != nil {
+		return UnstakeResult{}, err
+	}
+	if err := k.addOwedQueued(ctx, amount); err != nil {
 		return UnstakeResult{}, err
 	}
 

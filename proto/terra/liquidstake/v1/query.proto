@@ -41,14 +41,35 @@ message QueryExchangeRateResponse {
   string exchange_rate = 1 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
   string delegated = 2 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   string unbonding = 3 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // buffer is max(0, balance - owed_liquid): the uluna instant redemptions may use.
   string buffer = 4 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   string pending_rewards = 5 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
-  // owed is the uluna reserved for matured/undelegated requests; it is not part of the rate.
+  // owed is the uluna committed to every unfilled request (queued, unbonding
+  // or matured); it is not part of the rate.
   string owed = 6 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   cosmos.base.v1beta1.Coin st_supply = 7 [(gogoproto.nullable) = false];
   // reward_buffer holds rewards received in denoms other than uluna (spec §24.8, D-23).
   repeated cosmos.base.v1beta1.Coin reward_buffer = 8 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
   int64 height = 9;
+  // The fields below reproduce the rate exactly:
+  //   exchange_rate = assets / st_supply
+  //   assets = delegated + unbonding + balance + pending_rewards_net - owed
+  //   owed   = owed_queued + owed_unbonding + owed_liquid
+  // and buffer = max(0, balance - owed_liquid) is what instant redemptions
+  // and the epoch delegation may use.
+  //
+  // balance is the uluna held by the module account.
+  string balance = 10 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // owed_queued is owed to requests not yet undelegated (backed by delegations).
+  string owed_queued = 11 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // owed_unbonding is owed to requests whose uluna is still in x/staking unbonding.
+  string owed_unbonding = 12 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // owed_liquid is owed to matured requests, paid from the module balance.
+  string owed_liquid = 13 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // pending_rewards_net is pending_rewards minus the fee_rate share taken at the epoch.
+  string pending_rewards_net = 14 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // assets is the uluna backing the stLUNC supply (numerator of the rate).
+  string assets = 15 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }
 
 message QueryDelegationsRequest {}

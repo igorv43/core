@@ -33,6 +33,7 @@ func GetQueryCmd() *cobra.Command {
 		GetCmdQueryTobinTaxes(),
 		GetCmdQueryAssetPrices(),
 		GetCmdQueryAssetTargets(),
+		GetCmdQueryPendingWhitelist(),
 	)
 
 	return oracleQueryCmd
@@ -471,6 +472,31 @@ func GetCmdQueryAssetTargets() *cobra.Command {
 			queryClient := types.NewQueryClient(clientCtx)
 
 			res, err := queryClient.AssetTargets(context.Background(), &types.QueryAssetTargetsRequest{})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+// GetCmdQueryPendingWhitelist implements the query pending whitelist command.
+func GetCmdQueryPendingWhitelist() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "pending-whitelist",
+		Args:  cobra.NoArgs,
+		Short: "Query the active oracle whitelist and the approved change waiting for activation (spec §26.3)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			queryClient := types.NewQueryClient(clientCtx)
+
+			res, err := queryClient.PendingWhitelist(context.Background(), &types.QueryPendingWhitelistRequest{})
 			if err != nil {
 				return err
 			}

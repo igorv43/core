@@ -7,6 +7,7 @@ import (
 	txsigning "cosmossdk.io/x/tx/signing"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	customcircuittypes "github.com/classic-terra/core/v4/custom/circuit/types"
 	dyncommante "github.com/classic-terra/core/v4/x/dyncomm/ante"
 	dyncommkeeper "github.com/classic-terra/core/v4/x/dyncomm/keeper"
 	taxkeeper "github.com/classic-terra/core/v4/x/tax/keeper"
@@ -102,8 +103,9 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 		ante.NewExtensionOptionsDecorator(options.ExtensionOptionChecker),
 		ante.NewValidateBasicDecorator(),
 		// x/circuit: reject messages whose type is currently tripped (same position as simapp);
-		// reset is restricted to governance (spec §6.3, D-03)
-		circuitante.NewCircuitBreakerDecorator(options.CircuitKeeper),
+		// reset is restricted to governance (spec §6.3, D-03); protected user exits
+		// (spec §24.5) are always allowed, even if present in the disabled list
+		circuitante.NewCircuitBreakerDecorator(customcircuittypes.NewProtectedCircuitBreaker(options.CircuitKeeper)),
 		NewCircuitResetGuardDecorator(options.GovAuthority),
 		ante.NewTxTimeoutHeightDecorator(),
 		ante.NewValidateMemoDecorator(options.AccountKeeper),

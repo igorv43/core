@@ -96,12 +96,23 @@ func (ms msgServer) AggregateExchangeRateVote(goCtx context.Context, msg *types.
 	}
 
 	// check all denoms are in the vote target (denoms of the LUNC-centric
-	// whitelist or assets priced in USD, spec §21.6 stage 2)
+	// whitelist or assets priced in USD, spec §21.6 stage 2). A tuple for a
+	// denom or asset of the approved whitelist change still waiting for its
+	// §26.3 activation is accepted and dropped: a feeder that follows the
+	// parameters must not lose the whole vote for 7 days.
+	pending, hasPending := ms.GetPendingWhitelist(ctx)
+	accepted := make(types.ExchangeRateTuples, 0, len(exchangeRateTuples))
 	for _, tuple := range exchangeRateTuples {
-		if !ms.IsVoteTarget(ctx, tuple.Denom) && !ms.IsAssetTarget(ctx, tuple.Denom) {
-			return nil, errorsmod.Wrap(types.ErrUnknownDenom, tuple.Denom)
+		if ms.IsVoteTarget(ctx, tuple.Denom) || ms.IsAssetTarget(ctx, tuple.Denom) {
+			accepted = append(accepted, tuple)
+			continue
 		}
+		if hasPending && pending.Lists(tuple.Denom) {
+			continue
+		}
+		return nil, errorsmod.Wrap(types.ErrUnknownDenom, tuple.Denom)
 	}
+	exchangeRateTuples = accepted
 
 	// Verify a exchange rate with aggregate prevote hash
 	hash := types.GetAggregateVoteHash(msg.Salt, msg.ExchangeRates, valAddr)

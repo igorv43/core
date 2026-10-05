@@ -30,7 +30,19 @@ func (k Keeper) EpochDue(ctx sdk.Context) (bool, error) {
 		// first block after genesis/upgrade: open epoch 1 without processing
 		return false, k.Epoch.Set(ctx, types.Epoch{Number: 1, StartHeight: ctx.BlockHeight(), StartTime: ctx.BlockTime()})
 	}
-	return ctx.BlockHeight()-epoch.StartHeight >= params.EpochBlocks, nil
+	if ctx.BlockHeight()-epoch.StartHeight < params.EpochBlocks {
+		return false, nil
+	}
+	// time floor (spec §24.4): an epoch never closes before UnbondingTime /
+	// MaxEntries of block time, so one batch per epoch never needs more than
+	// MaxEntries unbonding entries per validator even when blocks are faster
+	// than expected_block_time or x/staking params changed after the
+	// liquidstake params were validated
+	unbonding, maxEntries, err := k.stakingLimits(ctx)
+	if err != nil {
+		return false, err
+	}
+	return !ctx.BlockTime().Before(epoch.StartTime.Add(types.MinEpochDuration(unbonding, maxEntries))), nil
 }
 
 // Eligibility evaluates the objective whitelist (spec §24.2) over the bonded
@@ -129,6 +141,10 @@ func (k Keeper) ProcessEpoch(ctx sdk.Context) (EpochReport, error) {
 		return EpochReport{}, err
 	}
 	rep := EpochReport{Rewards: math.ZeroInt(), Fee: math.ZeroInt(), Burned: math.ZeroInt(), Delegated: math.ZeroInt(), Undelegated: math.ZeroInt(), Redelegated: math.ZeroInt()}
+	// batches that matured are back in the balance: forget them
+	if err := k.pruneOwedUnbonding(ctx); err != nil {
+		return EpochReport{}, err
+	}
 	rep.RateBefore, _, err = k.ExchangeRate(ctx)
 	if err != nil {
 		return EpochReport{}, err
@@ -218,10 +234,11 @@ func (k Keeper) ProcessEpoch(ctx sdk.Context) (EpochReport, error) {
 	if err != nil {
 		return EpochReport{}, err
 	}
-	// RateAfter may be below RateBefore on a normal epoch: the pending rewards
-	// were priced in before and the fee leaves at the epoch. That dip is not a
-	// slash; EventSlashAbsorbed is emitted by the staking hook (hooks.go) when
-	// a validator holding module delegations is actually slashed.
+	// Pending rewards are priced net of the fee, so the fee leaving here does
+	// not lower the rate; only rounding of share conversions can (by at most
+	// one uluna per delegation operation on a validator whose token/share
+	// ratio is not 1). EventSlashAbsorbed is emitted by the staking hook
+	// (hooks.go) when a validator holding module delegations is slashed.
 	return rep, ctx.EventManager().EmitTypedEvent(&types.EventEpochProcessed{
 		Epoch: epoch.Number - 1, Height: ctx.BlockHeight(),
 		Rewards: rep.Rewards.String(), Fee: rep.Fee.String(), Burned: rep.Burned.String(),
@@ -313,6 +330,23 @@ func (k Keeper) delegateSurplus(ctx sdk.Context, eligible []eligibleValidator, p
 	if !available.IsPositive() || len(eligible) == 0 {
 		return math.ZeroInt(), nil
 	}
+	// The eligible set was snapshotted before undelegateBatch ran in this
+	// epoch. x/staking Delegate rewrites the validator from the struct it is
+	// given (AddValidatorTokensAndShares deletes the power-index key of that
+	// struct and stores its tokens plus the new delegation), so a stale struct
+	// would erase the undelegation from validator.tokens and leave a second
+	// power-index entry, i.e. a duplicate validator update and a chain halt.
+	// Re-read every validator from the store before delegating to it.
+	fresh := make([]eligibleValidator, len(eligible))
+	for i, e := range eligible {
+		v, err := k.stakingKeeper.GetValidator(ctx, e.Address)
+		if err != nil {
+			return math.ZeroInt(), err
+		}
+		e.Validator = v
+		fresh[i] = e
+	}
+	eligible = fresh
 	cap := capPerValidator(params, totals.Delegated.Add(available))
 	room, err := k.room(ctx, eligible, cap)
 	if err != nil {
@@ -371,6 +405,10 @@ func (k Keeper) redelegateOut(ctx sdk.Context, d delegation, eligible []eligible
 
 // undelegateBatch undelegates the sum of queued requests up to the given
 // epoch, pro-rata over the module's delegations, and marks the requests.
+// Validators that already hold MaxEntries unbonding entries for the module
+// are left out of the batch before the pro-rata split, so the batch never
+// asks x/staking for an entry beyond MaxEntries and the share of a full
+// validator is carried by the others instead of waiting for the next epoch.
 func (k Keeper) undelegateBatch(ctx sdk.Context, epoch uint64) (math.Int, error) {
 	var queued []types.UnstakeRequest
 	total := math.ZeroInt()
@@ -387,9 +425,25 @@ func (k Keeper) undelegateBatch(ctx sdk.Context, epoch uint64) (math.Int, error)
 		return math.ZeroInt(), nil
 	}
 
-	dels, err := k.delegations(ctx)
+	all, err := k.delegations(ctx)
 	if err != nil {
 		return math.ZeroInt(), err
+	}
+	// one entry per validator per batch: keep only validators with a free slot
+	dels := make([]delegation, 0, len(all))
+	for _, d := range all {
+		if !d.Tokens.IsPositive() {
+			continue
+		}
+		full, err := k.stakingKeeper.HasMaxUnbondingDelegationEntries(ctx, k.ModuleAddress(), mustValAddr(d.Delegation.ValidatorAddress))
+		if err != nil {
+			return math.ZeroInt(), err
+		}
+		if full {
+			k.Logger(ctx).Info("validator at MaxEntries left out of the undelegation batch", "validator", d.Delegation.ValidatorAddress)
+			continue
+		}
+		dels = append(dels, d)
 	}
 	sort.Slice(dels, func(i, j int) bool { return dels[i].Tokens.GT(dels[j].Tokens) })
 	delegated := math.ZeroInt()
@@ -414,14 +468,13 @@ func (k Keeper) undelegateBatch(ctx sdk.Context, epoch uint64) (math.Int, error)
 		if i == len(dels)-1 || part.GT(remaining) {
 			part = remaining
 		}
+		if part.GT(d.Tokens) {
+			part = d.Tokens
+		}
 		if !part.IsPositive() {
 			continue
 		}
 		valAddr := mustValAddr(d.Delegation.ValidatorAddress)
-		if full, err := k.stakingKeeper.HasMaxUnbondingDelegationEntries(ctx, k.ModuleAddress(), valAddr); err != nil || full {
-			// entry limit reached (MaxEntries): leave this validator for the next epoch
-			continue
-		}
 		shares, err := k.stakingKeeper.ValidateUnbondAmount(ctx, k.ModuleAddress(), valAddr, part)
 		if err != nil {
 			k.Logger(ctx).Error("validate unbond failed", "validator", d.Delegation.ValidatorAddress, "err", err)
@@ -442,6 +495,7 @@ func (k Keeper) undelegateBatch(ctx sdk.Context, epoch uint64) (math.Int, error)
 	// mark requests covered by what was actually undelegated (oldest first)
 	sort.Slice(queued, func(i, j int) bool { return queued[i].Id < queued[j].Id })
 	covered := undelegated
+	marked := math.ZeroInt()
 	for _, r := range queued {
 		if covered.LT(r.Amount) {
 			break
@@ -452,6 +506,18 @@ func (k Keeper) undelegateBatch(ctx sdk.Context, epoch uint64) (math.Int, error)
 			return math.ZeroInt(), err
 		}
 		covered = covered.Sub(r.Amount)
+		marked = marked.Add(r.Amount)
+	}
+	if marked.IsPositive() {
+		// the marked requests move from the queued to the unbonding part of owed
+		if err := k.addOwedQueued(ctx, marked.Neg()); err != nil {
+			return math.ZeroInt(), err
+		}
+		if completion.After(ctx.BlockTime()) {
+			if err := k.addOwedUnbonding(ctx, completion, marked); err != nil {
+				return math.ZeroInt(), err
+			}
+		}
 	}
 	return undelegated, nil
 }

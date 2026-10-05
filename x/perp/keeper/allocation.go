@@ -158,28 +158,73 @@ func (k Keeper) pruneAllocations(ctx sdk.Context) error {
 // runBuyback keeps one buy intent of settlement for uluna open in the
 // internal spot market while there is burn budget and epoch cap left, and
 // sends every uluna the module holds to the burn account.
+//
+// Rule 1 of spec §23.1 (non-governable, §26.3): nothing is bought back or
+// burned while IF < IF_target. In that state, every step of the buyback
+// gives way to the fund, in the cascade's own order (the fund first): the
+// burn budget and the escrow returned by a closed or withdrawn buyback go to
+// the fund up to the gap, an open buyback intent is withdrawn from the
+// auction, and uluna already bought stays in the module unburned until the
+// fund is back at its target. EventBuybackSkipped reports each such step.
 func (k Keeper) runBuyback(ctx sdk.Context, params types.Params) error {
 	l, err := k.GetLedger(ctx)
 	if err != nil {
 		return err
 	}
-	// returned escrow of a closed intent (unfilled part) comes back to the budget
+	target, err := k.InsuranceTarget(ctx)
+	if err != nil {
+		return err
+	}
+	routed := math.ZeroInt()
+	closed, cancelled := false, uint64(0)
+	// returned escrow of a closed intent (unfilled part) comes back: to the
+	// fund up to its gap, the rest to the budget
 	if l.BuybackIntentId != 0 {
 		if _, err := k.batchKeeper.GetIntent(ctx, l.BuybackIntentId); err != nil {
-			l.BuybackIntentId = 0
-			if err := k.reconcileBudget(ctx, params, &l); err != nil {
-				return err
+			l.BuybackIntentId, closed = 0, true
+		} else if l.Insurance.LT(target) {
+			// the fund fell below its target while the order was open: withdraw it
+			// (atomic: a failed withdrawal leaves the order and the escrow untouched)
+			cacheCtx, write := ctx.CacheContext()
+			if _, err := k.batchKeeper.CancelIntent(cacheCtx, k.ModuleAddress().String(), l.BuybackIntentId); err != nil {
+				k.Logger(ctx).Error("buyback order withdrawal failed", "intent", l.BuybackIntentId, "err", err)
+			} else {
+				write()
+				cancelled, l.BuybackIntentId, closed = l.BuybackIntentId, 0, true
 			}
 		}
+		if closed {
+			r, err := k.reconcileBudget(ctx, params, &l, target)
+			if err != nil {
+				return err
+			}
+			routed = routed.Add(r)
+		}
 	}
+	// the burn budget is surplus only while the fund is at its target
+	if gap := target.Sub(l.Insurance); gap.IsPositive() && l.BurnBudget.IsPositive() {
+		move := math.MinInt(gap, l.BurnBudget)
+		l.BurnBudget = l.BurnBudget.Sub(move)
+		l.Insurance = l.Insurance.Add(move)
+		routed = routed.Add(move)
+	}
+	below := l.Insurance.LT(target)
 	// a tranche sale owns the module's uluna and settlement surplus while open
 	if l.TrancheSellIntentId != 0 {
-		return k.Ledger.Set(ctx, l)
+		if err := k.Ledger.Set(ctx, l); err != nil {
+			return err
+		}
+		return k.emitBuybackSkipped(ctx, l, target, routed, math.ZeroInt(), cancelled, below)
 	}
-	// burn what was bought (never the tranche's claimed uluna)
+	// burn what was bought (never the tranche's claimed uluna), only at target
 	uluna := k.bankKeeper.GetBalance(ctx, k.ModuleAddress(), "uluna")
 	uluna.Amount = uluna.Amount.Sub(l.TrancheUluna)
-	if uluna.IsPositive() {
+	held := math.ZeroInt()
+	if below {
+		if uluna.IsPositive() {
+			held = uluna.Amount
+		}
+	} else if uluna.IsPositive() {
 		if err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, types.ModuleName, k.burnAccount, sdk.NewCoins(uluna)); err != nil {
 			return err
 		}
@@ -191,7 +236,12 @@ func (k Keeper) runBuyback(ctx sdk.Context, params types.Params) error {
 	if err := k.Ledger.Set(ctx, l); err != nil {
 		return err
 	}
-	if l.BuybackIntentId != 0 || params.SpotMarketId == "" || !l.BurnBudget.IsPositive() || !params.BurnBuyCap.IsPositive() {
+	if routed.IsPositive() || cancelled != 0 || (below && closed) {
+		if err := k.emitBuybackSkipped(ctx, l, target, routed, held, cancelled, below); err != nil {
+			return err
+		}
+	}
+	if below || l.BuybackIntentId != 0 || params.SpotMarketId == "" || !l.BurnBudget.IsPositive() || !params.BurnBuyCap.IsPositive() {
 		return nil
 	}
 	room := params.BurnBuyCap.Sub(l.BurnSpentEpoch)
@@ -233,18 +283,44 @@ func (k Keeper) runBuyback(ctx sdk.Context, params types.Params) error {
 	return ctx.EventManager().EmitTypedEvent(&types.EventBuyback{IntentId: id, Spent: amount.String(), Burned: "0"})
 }
 
-// reconcileBudget returns unexplained settlement in the module account (the
-// refund of an unfilled buyback, or donations) to the burn budget.
-func (k Keeper) reconcileBudget(ctx sdk.Context, params types.Params, l *types.Ledger) error {
+// emitBuybackSkipped reports a buyback step that gave way to the fund. It
+// stays silent on quiet blocks (nothing routed, withdrawn or received).
+func (k Keeper) emitBuybackSkipped(ctx sdk.Context, l types.Ledger, target, routed, held math.Int, cancelled uint64, below bool) error {
+	if !routed.IsPositive() && cancelled == 0 && !held.IsPositive() {
+		return nil
+	}
+	reason := "insurance fund below target: no buyback or burn (spec §23.1 rule 1)"
+	if !below {
+		reason = "insurance fund below target: burn budget routed to the fund up to the target"
+	}
+	return ctx.EventManager().EmitTypedEvent(&types.EventBuybackSkipped{
+		Reason: reason, Insurance: l.Insurance.String(), Target: target.String(),
+		RoutedToInsurance: routed.String(), HeldUluna: held.String(), CancelledIntentId: cancelled,
+	})
+}
+
+// reconcileBudget books unexplained settlement in the module account (the
+// refund of an unfilled or withdrawn buyback, or donations): to the
+// insurance fund up to IF_target first (spec §23.1: the fund has absolute
+// priority), the rest to the burn budget. It returns the part sent to the
+// fund.
+func (k Keeper) reconcileBudget(ctx sdk.Context, params types.Params, l *types.Ledger, target math.Int) (math.Int, error) {
 	expected, err := k.ledgerTotal(ctx, *l)
 	if err != nil {
-		return err
+		return math.Int{}, err
 	}
 	actual := k.bankKeeper.GetBalance(ctx, k.ModuleAddress(), params.SettlementDenom).Amount
-	if diff := actual.Sub(expected); diff.IsPositive() {
-		l.BurnBudget = l.BurnBudget.Add(diff)
+	diff := actual.Sub(expected)
+	if !diff.IsPositive() {
+		return math.ZeroInt(), nil
 	}
-	return nil
+	toFund := math.ZeroInt()
+	if gap := target.Sub(l.Insurance); gap.IsPositive() {
+		toFund = math.MinInt(gap, diff)
+		l.Insurance = l.Insurance.Add(toFund)
+	}
+	l.BurnBudget = l.BurnBudget.Add(diff.Sub(toFund))
+	return toFund, nil
 }
 
 // ledgerTotal sums every settlement balance the ledger accounts for: free

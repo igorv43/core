@@ -12,23 +12,69 @@ type Totals struct {
 	Delegated      math.Int // tokens behind the module's delegation shares
 	Unbonding      math.Int // tokens in unbonding entries of the module
 	Balance        math.Int // uluna held by the module account
-	PendingRewards math.Int // uluna rewards accrued and not yet withdrawn
+	PendingRewards math.Int // uluna rewards accrued and not yet withdrawn (gross)
 	Owed           math.Int // uluna committed to unfilled requests (excluded)
 	StSupply       math.Int
+	// OwedQueued is the part of Owed not undelegated yet (still delegated).
+	OwedQueued math.Int
+	// OwedUnbonding is the part of Owed still in x/staking unbonding.
+	OwedUnbonding math.Int
+	// FeeRate is params.FeeRate: the share of the pending rewards that leaves
+	// at the epoch and therefore never backs stLUNC.
+	FeeRate math.LegacyDec
 }
 
-// Assets returns the uluna backing the stLUNC supply.
+// PendingFee returns the fee the epoch will take from the pending rewards,
+// computed exactly as ProcessEpoch does (fee_rate × rewards, truncated).
+func (t Totals) PendingFee() math.Int {
+	if t.FeeRate.IsNil() || t.PendingRewards.IsNil() {
+		return math.ZeroInt()
+	}
+	return t.FeeRate.MulInt(t.PendingRewards).TruncateInt()
+}
+
+// PendingRewardsNet returns the pending rewards net of the epoch fee: the
+// part that will join the assets. Pricing the gross amount made the rate
+// fall at every epoch when the fee left (spec §24.1: the rate only falls
+// by slashing).
+func (t Totals) PendingRewardsNet() math.Int {
+	return t.PendingRewards.Sub(t.PendingFee())
+}
+
+// GrossAssets returns every uluna the module controls before the
+// liabilities: delegated + unbonding + balance + net pending rewards.
+func (t Totals) GrossAssets() math.Int {
+	return t.Delegated.Add(t.Unbonding).Add(t.Balance).Add(t.PendingRewardsNet())
+}
+
+// Assets returns the uluna backing the stLUNC supply (gross assets − owed).
+// It is clamped at zero; CheckInvariants reports gross assets below owed.
 func (t Totals) Assets() math.Int {
-	a := t.Delegated.Add(t.Unbonding).Add(t.Balance).Add(t.PendingRewards).Sub(t.Owed)
+	a := t.GrossAssets().Sub(t.Owed)
 	if a.IsNegative() {
 		return math.ZeroInt()
 	}
 	return a
 }
 
-// Buffer returns the uluna available for instant redemptions and delegation.
+// OwedLiquid returns the part of Owed that the module balance must cover:
+// matured requests whose uluna is back from x/staking. Queued requests are
+// backed by delegations and unbonding ones by unbonding entries.
+func (t Totals) OwedLiquid() math.Int {
+	l := t.Owed.Sub(t.OwedQueued).Sub(t.OwedUnbonding)
+	if l.IsNegative() {
+		return math.ZeroInt()
+	}
+	return l
+}
+
+// Buffer returns the uluna available for instant redemptions and for the
+// epoch delegation: the module balance minus what matured requests are
+// owed. Uluna still in x/staking unbonding is not subtracted from the
+// balance (it is not in it), so a queue in flight no longer blocks the
+// buffer (spec §24.4).
 func (t Totals) Buffer() math.Int {
-	b := t.Balance.Sub(t.Owed)
+	b := t.Balance.Sub(t.OwedLiquid())
 	if b.IsNegative() {
 		return math.ZeroInt()
 	}
@@ -114,6 +160,19 @@ func (k Keeper) GetTotals(ctx sdk.Context) (Totals, error) {
 	if err != nil {
 		return Totals{}, err
 	}
+	t.OwedQueued, err = k.GetOwedQueued(ctx)
+	if err != nil {
+		return Totals{}, err
+	}
+	t.OwedUnbonding, err = k.GetOwedUnbonding(ctx)
+	if err != nil {
+		return Totals{}, err
+	}
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return Totals{}, err
+	}
+	t.FeeRate = params.FeeRate
 	t.StSupply = k.bankKeeper.GetSupply(ctx, types.StDenom).Amount
 	return t, nil
 }

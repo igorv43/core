@@ -53,6 +53,22 @@ func TestCircuitResetGuardDecorator(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "authorize listing a protected user-exit message is rejected",
+			msgs: []sdk.Msg{&circuittypes.MsgAuthorizeCircuitBreaker{Granter: govAuthority, Grantee: other, Permissions: &circuittypes.Permissions{
+				Level:         circuittypes.Permissions_LEVEL_SOME_MSGS,
+				LimitTypeUrls: []string{"/terra.liquidstake.v1.MsgStake", "/terra.liquidstake.v1.MsgClaim"},
+			}}},
+			wantErr: true,
+		},
+		{
+			name: "authorize of pausable messages is not restricted here",
+			msgs: []sdk.Msg{&circuittypes.MsgAuthorizeCircuitBreaker{Granter: govAuthority, Grantee: other, Permissions: &circuittypes.Permissions{
+				Level:         circuittypes.Permissions_LEVEL_SOME_MSGS,
+				LimitTypeUrls: []string{"/terra.liquidstake.v1.MsgStake"},
+			}}},
+			wantErr: false,
+		},
+		{
 			name:    "trip of all messages is rejected",
 			msgs:    []sdk.Msg{&circuittypes.MsgTripCircuitBreaker{Authority: other}},
 			wantErr: true,

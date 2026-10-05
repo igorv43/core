@@ -633,9 +633,10 @@ func TestVoteTargets(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, types.DefaultTobinTax, sdrTobinTax)
 
-	// delete SDR
+	// delete SDR (activated after the spec §26.3 delay)
 	params.Whitelist = types.DenomList{{Name: core.MicroKRWDenom, TobinTax: types.DefaultTobinTax}}
 	input.OracleKeeper.SetParams(input.Ctx, params)
+	activateApprovedWhitelist(t, input)
 
 	// KRW, missing
 	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroKRWDenom, Amount: randomExchangeRate}}, 0)
@@ -654,9 +655,10 @@ func TestVoteTargets(t *testing.T) {
 	_, err = input.OracleKeeper.GetTobinTax(input.Ctx, core.MicroSDRDenom)
 	require.Error(t, err)
 
-	// change KRW tobin tax
+	// change KRW tobin tax (a whitelist change too: activated after the delay)
 	params.Whitelist = types.DenomList{{Name: core.MicroKRWDenom, TobinTax: sdkmath.LegacyZeroDec()}}
 	input.OracleKeeper.SetParams(input.Ctx, params)
+	activateApprovedWhitelist(t, input)
 
 	// KRW, no missing
 	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroKRWDenom, Amount: randomExchangeRate}}, 0)
@@ -817,12 +819,18 @@ func TestAssetWhitelistApplyAndGenesis(t *testing.T) {
 	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}
 	input.OracleKeeper.SetParams(input.Ctx, params)
 
-	// applied at the end of the period, like the denom whitelist
+	// state without a schedule (no InitGenesis in the test input): the first
+	// EndBlock records the parameters as the active whitelist and syncs the
+	// targets at the end of the period, like the denom whitelist
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
 	require.Equal(t, types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
 
+	// a later change waits for the spec §26.3 delay
 	params.AssetWhitelist = types.AssetList{{Name: "ueth"}}
 	input.OracleKeeper.SetParams(input.Ctx, params)
+	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
+	require.Equal(t, types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
+	activateApprovedWhitelist(t, input)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
 	require.Equal(t, types.AssetList{{Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
 

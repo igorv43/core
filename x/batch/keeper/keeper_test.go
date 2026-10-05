@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"fmt"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -174,9 +175,39 @@ func TestUnrevealedCommitIsSlashed(t *testing.T) {
 	require.False(t, res.Executed)
 }
 
+// deliverTx runs a message handler the way baseapp does: on a branched
+// context whose writes (and events) are kept only when the handler succeeds.
+func (f *fixture) deliverTx(handler func(ctx sdk.Context) error) (sdk.Events, error) {
+	cacheCtx, write := f.ctx.CacheContext()
+	cacheCtx = cacheCtx.WithEventManager(sdk.NewEventManager())
+	if err := handler(cacheCtx); err != nil {
+		return nil, err
+	}
+	write()
+	return cacheCtx.EventManager().Events(), nil
+}
+
+func hasSlashEvent(events sdk.Events, reason string) bool {
+	for _, e := range events {
+		if e.Type != "terra.batch.v1.EventSolverSlashed" {
+			continue
+		}
+		for _, a := range e.Attributes {
+			if a.Key == "reason" && a.Value == fmt.Sprintf("%q", reason) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// TestRevealMismatchIsSlashedTwice covers spec §16.2 at tx level: the
+// inconsistent reveal must not fail, otherwise the tx revert undoes the
+// 2 x slash_no_reveal penalty (SPEC-CONFORMANCE-2026-10-04 row A-02).
 func TestRevealMismatchIsSlashedTwice(t *testing.T) {
 	f := setup(t)
 	f.registerSolver(t)
+	ms := keeper.NewMsgServerImpl(f.k)
 	pref := math.LegacyNewDecWithPrec(1, 4)
 	_, batch := f.submitBuy(t, 1_000_000, pref)
 
@@ -184,14 +215,132 @@ func TestRevealMismatchIsSlashedTwice(t *testing.T) {
 	commitment, err := types.Commitment(bid, []byte("salt"), f.solver.String(), batch)
 	require.NoError(t, err)
 	f.at(int64(batch) + 1)
-	require.NoError(t, f.k.CommitBid(f.ctx, &types.MsgCommitBid{Solver: f.solver.String(), BatchId: batch, MarketId: marketID, Commitment: commitment}))
-	f.at(int64(batch) + f.params.CommitWindow + 1)
-	err = f.k.RevealBid(f.ctx, &types.MsgRevealBid{Solver: f.solver.String(), BatchId: batch, Bid: bid, Salt: []byte("other")})
-	require.ErrorIs(t, err, types.ErrRevealMismatch)
+	_, err = f.deliverTx(func(ctx sdk.Context) error {
+		_, err := ms.CommitBid(ctx, &types.MsgCommitBid{Solver: f.solver.String(), BatchId: batch, MarketId: marketID, Commitment: commitment})
+		return err
+	})
+	require.NoError(t, err)
+	moduleBefore := f.balance(f.k.ModuleAddress(), f.params.SlashNoReveal.Denom)
 
+	f.at(int64(batch) + f.params.CommitWindow + 1)
+	events, err := f.deliverTx(func(ctx sdk.Context) error {
+		_, err := ms.RevealBid(ctx, &types.MsgRevealBid{Solver: f.solver.String(), BatchId: batch, Bid: bid, Salt: []byte("other")})
+		return err
+	})
+	require.NoError(t, err, "an inconsistent reveal must succeed so the slash is committed")
+	require.True(t, hasSlashEvent(events, keeper.ReasonRevealMismatch), "EventSolverSlashed missing from the reveal tx: %v", events)
+
+	twice := f.params.SlashNoReveal.Amount.MulRaw(2)
 	s, err := f.k.GetSolver(f.ctx, f.solver.String())
 	require.NoError(t, err)
-	require.Equal(t, f.params.SolverBondMin.Amount.Sub(f.params.SlashNoReveal.Amount.MulRaw(2)).String(), s.Bond.Amount.String())
+	require.Equal(t, f.params.SolverBondMin.Amount.Sub(twice).String(), s.Bond.Amount.String())
+	require.Equal(t, uint64(0), s.Reveals, "an inconsistent reveal does not count for the reveal rate")
+	// the penalty left the module (bond custody) for the fee sink
+	require.Equal(t, moduleBefore.Sub(twice).String(), f.balance(f.k.ModuleAddress(), f.params.SlashNoReveal.Denom).String())
+
+	// the commitment is consumed: the correct opening is now rejected
+	_, err = f.deliverTx(func(ctx sdk.Context) error {
+		_, err := ms.RevealBid(ctx, &types.MsgRevealBid{Solver: f.solver.String(), BatchId: batch, Bid: bid, Salt: []byte("salt")})
+		return err
+	})
+	require.ErrorIs(t, err, types.ErrCommitExists)
+	c, err := f.k.Commits.Get(f.ctx, collectionsJoin3(batch, marketID, f.solver.String()))
+	require.NoError(t, err)
+	require.True(t, c.Revealed)
+	require.Nil(t, c.Bid)
+
+	// EndBlock does not add the no-reveal slash on top, and the consumed
+	// commitment contributes no level: the intent stays open
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	s, err = f.k.GetSolver(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Equal(t, f.params.SolverBondMin.Amount.Sub(twice).String(), s.Bond.Amount.String())
+	res, err := f.k.Results.Get(f.ctx, collectionsJoin(batch, marketID))
+	require.NoError(t, err)
+	require.False(t, res.Executed)
+	esc, err := f.k.SolverEscrowBalances(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Equal(t, "50000000000", esc.AmountOf("uluna").String())
+}
+
+// TestRevealRateBelowThresholdSuspendsSolver covers spec §16.2: a reveal
+// rate below 90% over RevealRateWindowBlocks suspends the solver for
+// solver_suspension_blocks, and a suspended solver cannot commit.
+func TestRevealRateBelowThresholdSuspendsSolver(t *testing.T) {
+	f := setup(t)
+	f.registerSolver(t) // window starts at height 10
+	start := f.ctx.BlockHeight()
+
+	// three commits, none revealed (each batch is resolved and slashed at b+W+1)
+	for _, b := range []uint64{20, 40, 60} {
+		f.commitAndReveal(t, b, []types.Level{{Side: types.SIDE_SELL, Price: math.LegacyNewDecWithPrec(1, 4), Qty: math.NewInt(1_000_000)}}, false)
+		require.NoError(t, f.k.EndBlocker(f.ctx))
+	}
+	s, err := f.k.GetSolver(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Equal(t, uint64(3), s.Commits)
+	require.Equal(t, uint64(0), s.Reveals)
+	require.Zero(t, s.SuspendedUntil)
+
+	// one block before the window elapses: nothing happens
+	f.at(start + types.RevealRateWindowBlocks - 1)
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	s, err = f.k.GetSolver(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Zero(t, s.SuspendedUntil)
+
+	end := start + types.RevealRateWindowBlocks
+	f.at(end)
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	suspended := false
+	for _, e := range f.ctx.EventManager().Events() {
+		if e.Type == "terra.batch.v1.EventSolverSuspended" {
+			suspended = true
+		}
+	}
+	require.True(t, suspended, "EventSolverSuspended not emitted")
+	s, err = f.k.GetSolver(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Equal(t, end+f.params.SolverSuspensionBlocks, s.SuspendedUntil)
+	require.Equal(t, uint64(0), s.Commits)
+	require.Equal(t, uint64(0), s.Reveals)
+	require.Equal(t, end, s.WindowStart)
+
+	// a suspended solver cannot commit until the suspension ends
+	batch := uint64(end)
+	f.at(end + 1)
+	err = f.k.CommitBid(f.ctx, &types.MsgCommitBid{Solver: f.solver.String(), BatchId: batch, MarketId: marketID, Commitment: make([]byte, 32)})
+	require.ErrorIs(t, err, types.ErrSolverSuspended)
+	batch = uint64(s.SuspendedUntil)
+	f.at(s.SuspendedUntil + 1)
+	require.NoError(t, f.k.CommitBid(f.ctx, &types.MsgCommitBid{Solver: f.solver.String(), BatchId: batch, MarketId: marketID, Commitment: make([]byte, 32)}))
+}
+
+// TestRevealRateAtThresholdKeepsSolverActive: a solver revealing at least
+// 90% of its commits in the window is not suspended.
+func TestRevealRateAtThresholdKeepsSolverActive(t *testing.T) {
+	f := setup(t)
+	f.registerSolver(t)
+	start := f.ctx.BlockHeight()
+	pref := math.LegacyNewDecWithPrec(1, 4)
+	for _, b := range []uint64{20, 40, 60} {
+		f.commitAndReveal(t, b, []types.Level{{Side: types.SIDE_SELL, Price: pref, Qty: math.NewInt(1_000_000)}}, true)
+		require.NoError(t, f.k.EndBlocker(f.ctx))
+	}
+	s, err := f.k.GetSolver(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Equal(t, uint64(3), s.Commits)
+	require.Equal(t, uint64(3), s.Reveals)
+
+	end := start + types.RevealRateWindowBlocks
+	f.at(end)
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	s, err = f.k.GetSolver(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Zero(t, s.SuspendedUntil)
+	require.Equal(t, end, s.WindowStart)
+	require.Equal(t, uint64(0), s.Commits)
 }
 
 func TestCommitOutsideWindowRejected(t *testing.T) {

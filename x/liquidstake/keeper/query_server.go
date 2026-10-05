@@ -42,16 +42,24 @@ func (qs queryServer) ExchangeRate(goCtx context.Context, _ *types.QueryExchange
 	if err != nil {
 		return nil, err
 	}
+	// exchange_rate = (delegated + unbonding + balance + pending_rewards_net
+	// − owed) / st_supply, owed = owed_queued + owed_unbonding + owed_liquid
 	return &types.QueryExchangeRateResponse{
-		ExchangeRate:   rate,
-		Delegated:      t.Delegated,
-		Unbonding:      t.Unbonding,
-		Buffer:         t.Buffer(),
-		PendingRewards: t.PendingRewards,
-		Owed:           t.Owed,
-		StSupply:       sdk.NewCoin(types.StDenom, t.StSupply),
-		RewardBuffer:   buffer,
-		Height:         ctx.BlockHeight(),
+		ExchangeRate:      rate,
+		Delegated:         t.Delegated,
+		Unbonding:         t.Unbonding,
+		Buffer:            t.Buffer(),
+		PendingRewards:    t.PendingRewards,
+		Owed:              t.Owed,
+		StSupply:          sdk.NewCoin(types.StDenom, t.StSupply),
+		RewardBuffer:      buffer,
+		Height:            ctx.BlockHeight(),
+		Balance:           t.Balance,
+		OwedQueued:        t.OwedQueued,
+		OwedUnbonding:     t.OwedUnbonding,
+		OwedLiquid:        t.OwedLiquid(),
+		PendingRewardsNet: t.PendingRewardsNet(),
+		Assets:            t.Assets(),
 	}, nil
 }
 

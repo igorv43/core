@@ -38,7 +38,12 @@ func (k Keeper) unwindInsurance(ctx sdk.Context, params types.Params, m types.Ma
 	if qty.LT(m.MinQty) {
 		qty = math.MinInt(m.MinQty, pos.Qty)
 	}
-	if qty.LT(m.MinQty) {
+	// a residual below min_qty (left by a partial fill, an unwind of min_qty
+	// or a small seized position) is unwound in full by one final order that
+	// x/batch accepts below the minimum: no order of min_qty could reduce it
+	// and the inventory (and the counterparty's position) would stay forever
+	finalUnwind := qty.LT(m.MinQty)
+	if !qty.IsPositive() {
 		return nil
 	}
 	bp, err := k.batchKeeper.GetParams(ctx)
@@ -52,7 +57,7 @@ func (k Keeper) unwindInsurance(ctx sdk.Context, params types.Params, m types.Ma
 	limit = roundToTick(limit, m.TickSize, side == batchtypes.SIDE_SELL)
 	id, _, err := k.batchKeeper.SubmitPerpIntent(ctx, batchkeeper.PerpOrder{
 		Sender: fund, MarketID: m.Id, Side: side, Qty: qty, LimitPrice: limit,
-		ExpiryHeight: ctx.BlockHeight() + bp.CommitWindow + 3, ReduceOnly: true,
+		ExpiryHeight: ctx.BlockHeight() + bp.CommitWindow + 3, ReduceOnly: true, FinalUnwind: finalUnwind,
 	})
 	if err != nil {
 		k.Logger(ctx).Error("insurance unwind order rejected", "market", m.Id, "err", err)

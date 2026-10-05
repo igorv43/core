@@ -22,6 +22,13 @@ message GenesisState {
   // asset_prices are the current USD prices (and depth) of the assets.
   repeated ExchangeRateTuple asset_prices = 9
       [(gogoproto.castrepeated) = "ExchangeRateTuples", (gogoproto.nullable) = false];
+  // active_whitelist is the whitelist the vote targets are synced to (spec
+  // §26.3). When absent, InitGenesis activates params.whitelist and
+  // params.asset_whitelist immediately: genesis is not a change.
+  WhitelistSnapshot active_whitelist = 10;
+  // pending_whitelist is an approved whitelist change waiting for its
+  // activation height and time (spec §26.3); absent when there is none.
+  WhitelistSnapshot pending_whitelist = 11;
 }
 
 // FeederDelegation is the address for where oracle feeder authority are

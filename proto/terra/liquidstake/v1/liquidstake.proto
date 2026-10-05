@@ -5,6 +5,7 @@ import "gogoproto/gogo.proto";
 import "cosmos_proto/cosmos.proto";
 import "amino/amino.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 
 option go_package = "github.com/classic-terra/core/v4/x/liquidstake/types";
 
@@ -14,7 +15,10 @@ message Params {
   option (gogoproto.equal) = true;
 
   // epoch_blocks is the length of an epoch in blocks. It MUST satisfy
-  // epoch_blocks * block_time >= UnbondingTime / MaxEntries (spec §24.4).
+  // epoch_blocks * expected_block_time >= UnbondingTime / MaxEntries
+  // (spec §24.4), checked against the live x/staking params in
+  // MsgUpdateParams and InitGenesis. At runtime an epoch also never closes
+  // before UnbondingTime / MaxEntries of block time has elapsed.
   int64 epoch_blocks = 1;
   // fee_rate is the share of each epoch's uluna rewards taken as protocol fee (initial 5%).
   string fee_rate = 2 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
@@ -32,6 +36,10 @@ message Params {
   string min_uptime = 8 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
   // max_validators bounds the number of validators the module delegates to per epoch.
   uint32 max_validators = 9;
+  // expected_block_time is the block time assumed when checking the epoch
+  // sizing rule (6s on mainnet). Bounded by MinExpectedBlockTime and
+  // MaxExpectedBlockTime (non-governable constants).
+  google.protobuf.Duration expected_block_time = 10 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
 }
 
 // Epoch is the current epoch of the module.

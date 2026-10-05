@@ -57,12 +57,16 @@ func InitGenesis(ctx sdk.Context, keeper keeper.Keeper, data *types.GenesisState
 		keeper.SetAggregateExchangeRateVote(ctx, valAddr, av)
 	}
 
+	// Spec §26.3: genesis is not a change, so the genesis whitelist is active
+	// at once (unless the genesis carries an exported schedule).
+	active := keeper.InitWhitelistSchedule(ctx, data.Params, data.ActiveWhitelist, data.PendingWhitelist)
+
 	if len(data.TobinTaxes) > 0 {
 		for _, tt := range data.TobinTaxes {
 			keeper.SetTobinTax(ctx, tt.Denom, tt.TobinTax)
 		}
 	} else {
-		for _, item := range data.Params.Whitelist {
+		for _, item := range active.Whitelist {
 			keeper.SetTobinTax(ctx, item.Name, item.TobinTax)
 		}
 	}
@@ -72,7 +76,7 @@ func InitGenesis(ctx sdk.Context, keeper keeper.Keeper, data *types.GenesisState
 			keeper.SetAssetTarget(ctx, a)
 		}
 	} else {
-		for _, a := range data.Params.AssetWhitelist {
+		for _, a := range active.AssetWhitelist {
 			keeper.SetAssetTarget(ctx, a)
 		}
 	}
@@ -155,5 +159,16 @@ func ExportGenesis(ctx sdk.Context, keeper keeper.Keeper) *types.GenesisState {
 		gs.AssetTargets = types.AssetList{}
 	}
 	gs.AssetPrices = assetPrices
+	// Spec §26.3 schedule. State written before the schedule existed has no
+	// active snapshot yet: the lists in force are the parameters, exactly what
+	// the next EndBlock would record.
+	active, ok := keeper.GetActiveWhitelist(ctx)
+	if !ok {
+		active = types.NewImmediateWhitelistSnapshot(params.Whitelist, params.AssetWhitelist, ctx.BlockHeight(), ctx.BlockTime())
+	}
+	gs.ActiveWhitelist = &active
+	if pending, ok := keeper.GetPendingWhitelist(ctx); ok {
+		gs.PendingWhitelist = &pending
+	}
 	return gs
 }

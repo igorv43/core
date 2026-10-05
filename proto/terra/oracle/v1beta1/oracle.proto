@@ -164,3 +164,32 @@ message RateSample {
     (gogoproto.nullable)   = false
   ];
 }
+
+// WhitelistSnapshot is one version of the oracle whitelists (the LUNC-centric
+// denom whitelist and the USD asset whitelist) with its activation schedule
+// (Liquidity Fabric spec §26.3: a whitelist change approved by governance
+// activates no earlier than 7 days after the approval).
+message WhitelistSnapshot {
+  option (gogoproto.equal)           = false;
+  option (gogoproto.goproto_getters) = false;
+
+  repeated Denom whitelist = 1 [
+    (gogoproto.moretags)     = "yaml:\"whitelist\"",
+    (gogoproto.castrepeated) = "DenomList",
+    (gogoproto.nullable)     = false
+  ];
+  repeated Asset asset_whitelist = 2 [
+    (gogoproto.moretags)     = "yaml:\"asset_whitelist\"",
+    (gogoproto.castrepeated) = "AssetList",
+    (gogoproto.nullable)     = false
+  ];
+  // approved_height / approved_time: first block at which the module saw the
+  // change in its parameters (genesis height for the genesis whitelist).
+  int64                     approved_height = 3;
+  google.protobuf.Timestamp approved_time   = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+  // activation_height / activation_time: the snapshot becomes the active
+  // whitelist only once both are reached (approved + WhitelistActivationDelay
+  // blocks and approved + WhitelistActivationPeriod).
+  int64                     activation_height = 5;
+  google.protobuf.Timestamp activation_time   = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}

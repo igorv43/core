@@ -508,12 +508,12 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 	// spot market LUNC/USD for the buyback, priced by the oracle uusd rate
 	f.app.OracleKeeper.SetLunaExchangeRate(f.ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 	require.NoError(t, f.bk.CreateMarket(f.ctx, batchtypes.Market{
-		Id: "uluna/uusd", BaseDenom: "uluna", QuoteDenom: "uusd", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusd", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	p := f.params
 	p.AllocEpochBlocks = 1
-	p.SpotMarketId = "uluna/uusd"
+	p.SpotMarketId = lunaUsdSpotMarket
 	p.BurnBuyCap = math.NewInt(1_000_000_000)
 	p.OpexCap = math.NewInt(5_000)
 	require.NoError(t, f.k.SetParams(f.ctx, p))
@@ -558,7 +558,7 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", seller, lunas))
 	batch := f.ctx.BlockHeight()
 	_, _, err = f.bk.SubmitIntent(f.ctx, &batchtypes.MsgSubmitIntent{
-		Sender: seller.String(), MarketId: "uluna/uusd", Side: batchtypes.SIDE_SELL,
+		Sender: seller.String(), MarketId: lunaUsdSpotMarket, Side: batchtypes.SIDE_SELL,
 		AmountIn: sdk.NewCoin("uluna", math.NewInt(200_000_000)), LimitPrice: math.LegacyNewDecWithPrec(1, 4), MinOut: math.ZeroInt(), ExpiryHeight: batch + 50,
 	})
 	require.NoError(t, err)

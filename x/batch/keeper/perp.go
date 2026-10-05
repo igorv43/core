@@ -28,6 +28,12 @@ type PerpOrder struct {
 	// ChargeFee charges the anti-spam intent fee to the sender (user orders);
 	// protocol-originated orders (triggers, insurance fund unwinds) skip it.
 	ChargeFee bool
+	// FinalUnwind lets the quantity be below the market minimum. x/perp sets
+	// it only for the insurance fund's last reduce-only unwind of a residual
+	// inventory smaller than min_qty, which no valid order could otherwise
+	// close (spec §18.3 step 3). It is honoured only with ReduceOnly and
+	// without ChargeFee, so no user order can use it.
+	FinalUnwind bool
 }
 
 // SubmitPerpIntent records a margin-reserved order for a perp market. Called
@@ -56,7 +62,8 @@ func (k Keeper) SubmitPerpIntent(ctx sdk.Context, o PerpOrder) (uint64, uint64, 
 	if o.LimitPrice.IsNil() || !o.LimitPrice.IsPositive() || !o.LimitPrice.Quo(market.TickSize).IsInteger() {
 		return 0, 0, errorsmod.Wrapf(types.ErrInvalidIntent, "limit_price must be a positive multiple of the tick size %s", market.TickSize)
 	}
-	if o.Qty.IsNil() || o.Qty.LT(market.MinQty) {
+	finalUnwind := o.FinalUnwind && o.ReduceOnly && !o.ChargeFee
+	if o.Qty.IsNil() || !o.Qty.IsPositive() || (o.Qty.LT(market.MinQty) && !finalUnwind) {
 		return 0, 0, errorsmod.Wrapf(types.ErrInvalidIntent, "quantity below the market minimum %s", market.MinQty)
 	}
 	sender, err := sdk.AccAddressFromBech32(o.Sender)

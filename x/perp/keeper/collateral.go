@@ -284,7 +284,7 @@ func (k Keeper) routeFee(ctx sdk.Context, amount math.Int, allToInsurance bool) 
 	if err != nil {
 		return err
 	}
-	target, err := k.insuranceTargetEndBlock(ctx)
+	target, err := k.InsuranceTarget(ctx) // always fresh (see stMemo)
 	if err != nil {
 		return err
 	}

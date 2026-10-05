@@ -29,7 +29,9 @@ var (
 )
 
 // ConsensusVersion is the current consensus version of the module.
-const ConsensusVersion = 1
+// v2: owed split into queued / unbonding / liquid aggregates and
+// Params.ExpectedBlockTime (Migrate1to2).
+const ConsensusVersion = 2
 
 // AppModuleBasic implements the keeper-less part of the module.
 type AppModuleBasic struct{}
@@ -95,6 +97,11 @@ func (AppModule) ConsensusVersion() uint64 { return ConsensusVersion }
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(am.keeper))
 	types.RegisterQueryServer(cfg.QueryServer(), keeper.NewQueryServerImpl(am.keeper))
+
+	m := keeper.NewMigrator(am.keeper)
+	if err := cfg.RegisterMigration(types.ModuleName, 1, m.Migrate1to2); err != nil {
+		panic(fmt.Sprintf("failed to register %s migration 1 to 2: %v", types.ModuleName, err))
+	}
 }
 
 // InitGenesis initialises the module state from genesis.

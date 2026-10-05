@@ -11,6 +11,11 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 	if err := gs.Validate(); err != nil {
 		return err
 	}
+	// epoch sizing rule of spec §24.4 against the x/staking params (x/staking
+	// is initialised before this module in orderInitGenesis)
+	if err := k.validateEpochSizing(ctx, gs.Params); err != nil {
+		return err
+	}
 	if err := k.Params.Set(ctx, gs.Params); err != nil {
 		return err
 	}
@@ -35,6 +40,10 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs *types.GenesisState) error {
 		if err := k.Validators.Set(ctx, v.OperatorAddress, v); err != nil {
 			return err
 		}
+	}
+	// owed_queued / owed_unbonding are derived from the requests
+	if err := k.rebuildOwedAggregates(ctx); err != nil {
+		return err
 	}
 	if !k.bankKeeper.HasDenomMetaData(ctx, types.StDenom) {
 		k.bankKeeper.SetDenomMetaData(ctx, types.StDenomMetadata())

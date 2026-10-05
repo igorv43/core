@@ -16,6 +16,12 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) {
 	defer telemetry.ModuleMeasureSince(types.ModuleName, time.Now(), telemetry.MetricKeyEndBlocker)
 
 	params := k.GetParams(ctx)
+
+	// Spec §26.3: params hold the approved whitelist; the vote targets follow
+	// the active snapshot, which takes an approved change only after the
+	// code-constant activation delay.
+	activeWhitelist := k.UpdateWhitelistSchedule(ctx, params)
+
 	if core.IsPeriodLastBlock(ctx, params.VotePeriod) {
 
 		// Build claim map over all validators in active set
@@ -149,9 +155,9 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) {
 		// Clear the ballot
 		k.ClearBallots(ctx, params.VotePeriod)
 
-		// Update vote targets and tobin tax
-		k.ApplyWhitelist(ctx, params.Whitelist, voteTargets)
-		k.ApplyAssetWhitelist(ctx, params.AssetWhitelist)
+		// Update vote targets and tobin tax from the active whitelist (§26.3)
+		k.ApplyWhitelist(ctx, activeWhitelist.Whitelist, voteTargets)
+		k.ApplyAssetWhitelist(ctx, activeWhitelist.AssetWhitelist)
 	}
 
 	// Do slash who did miss voting over threshold and

@@ -16,6 +16,12 @@ import (
 // x/warpledger bonded_cap_threshold once operators have bonded. The
 // warpledger parameter set gains bonded_cap_threshold = 0 (rule disabled)
 // without migration: the stored proto decodes the new field as zero.
+//
+// RunMigrations also carries the 04/10/2026 conformance fixes that need it:
+// x/liquidstake ConsensusVersion 1 -> 2 (Migrate1to2 rebuilds the owed
+// aggregates and sets expected_block_time = 6s). The x/oracle whitelist
+// schedule needs no migration (the first EndBlock records the params in force
+// as the active snapshot) and the x/circuit protection has no store change.
 func CreateV19UpgradeHandler(
 	mm *module.Manager,
 	cfg module.Configurator,

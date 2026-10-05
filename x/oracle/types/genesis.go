@@ -40,7 +40,20 @@ func DefaultGenesisState() *GenesisState {
 
 // ValidateGenesis validates the oracle genesis state
 func ValidateGenesis(data *GenesisState) error {
-	return data.Params.Validate()
+	if err := data.Params.Validate(); err != nil {
+		return err
+	}
+	if data.ActiveWhitelist != nil {
+		if err := data.ActiveWhitelist.ValidateActive(); err != nil {
+			return err
+		}
+	}
+	if data.PendingWhitelist != nil {
+		if err := data.PendingWhitelist.ValidatePending(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GetGenesisStateFromAppState returns x/oracle GenesisState given raw application

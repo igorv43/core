@@ -305,3 +305,20 @@ func (q querier) AssetTargets(c context.Context, _ *types.QueryAssetTargetsReque
 	}
 	return &types.QueryAssetTargetsResponse{AssetTargets: targets}, nil
 }
+
+// PendingWhitelist queries the active whitelist snapshot and the approved
+// whitelist change waiting for activation (spec §26.3)
+func (q querier) PendingWhitelist(c context.Context, _ *types.QueryPendingWhitelistRequest) (*types.QueryPendingWhitelistResponse, error) {
+	ctx := sdk.UnwrapSDKContext(c)
+	res := &types.QueryPendingWhitelistResponse{
+		ActivationDelayBlocks: types.WhitelistActivationDelay,
+		ActivationPeriod:      types.WhitelistActivationPeriod,
+	}
+	if active, ok := q.GetActiveWhitelist(ctx); ok {
+		res.Active = &active
+	}
+	if pending, ok := q.GetPendingWhitelist(ctx); ok {
+		res.Pending = &pending
+	}
+	return res, nil
+}

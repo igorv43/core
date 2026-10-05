@@ -3,6 +3,7 @@ package keeper
 import (
 	"crypto/sha256"
 	"errors"
+	"sync"
 
 	"cosmossdk.io/collections"
 	errorsmod "cosmossdk.io/errors"
@@ -26,32 +27,25 @@ type StValuation struct {
 	QueueRatio math.LegacyDec // owed / assets of x/liquidstake
 }
 
-// stMemo is the per-block valuation cache (see Keeper.valMemo).
+// stMemo is the per-block valuation cache (see Keeper.valMemo). The keeper
+// is shared by EndBlock, transaction, CheckTx and gRPC query goroutines, so
+// every access holds mu, an entry is only valid for the height that computed
+// it, and a context below the cached height (a query or simulation against a
+// committed block while the next one executes) computes fresh without
+// evicting it: the valuation an EndBlock uses must not depend on the queries
+// a node happened to serve.
+//
+// IF_target is deliberately NOT memoised: an earlier memo shared the height
+// field with the valuation, so a valuation computed in a later block revived
+// a stale target and the fee split of §23 used the target of an older block
+// (a query or a restart changed which block that was, so nodes could
+// diverge). InsuranceTarget is computed fresh on every call; it walks the
+// market list, which is bounded.
 type stMemo struct {
-	height    int64
-	val       StValuation
-	set       bool
-	target    math.Int
-	targetSet bool
-}
-
-// insuranceTargetEndBlock memoizes IF_target for the block (fills route
-// their fees against it; markets do not change inside EndBlock).
-func (k Keeper) insuranceTargetEndBlock(ctx sdk.Context) (math.Int, error) {
-	if k.valMemo != nil && k.valMemo.targetSet && k.valMemo.height == ctx.BlockHeight() {
-		return k.valMemo.target, nil
-	}
-	target, err := k.InsuranceTarget(ctx)
-	if err != nil {
-		return math.Int{}, err
-	}
-	if k.valMemo != nil {
-		if k.valMemo.height != ctx.BlockHeight() {
-			k.valMemo.set = false
-		}
-		k.valMemo.height, k.valMemo.target, k.valMemo.targetSet = ctx.BlockHeight(), target, true
-	}
-	return target, nil
+	mu     sync.Mutex
+	height int64
+	val    StValuation
+	set    bool
 }
 
 // stValuationEndBlock returns the valuation of the current block, computed
@@ -61,8 +55,13 @@ func (k Keeper) stValuationEndBlock(ctx sdk.Context, params types.Params) StValu
 	if k.valMemo == nil {
 		return k.stValuation(ctx, params)
 	}
+	k.valMemo.mu.Lock()
+	defer k.valMemo.mu.Unlock()
 	if k.valMemo.set && k.valMemo.height == ctx.BlockHeight() {
 		return k.valMemo.val
+	}
+	if k.valMemo.set && ctx.BlockHeight() < k.valMemo.height {
+		return k.stValuation(ctx, params)
 	}
 	val := k.stValuation(ctx, params)
 	k.valMemo.height, k.valMemo.val, k.valMemo.set = ctx.BlockHeight(), val, true

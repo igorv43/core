@@ -4,9 +4,11 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// EndBlocker processes the epoch when its boundary is reached. All work is
-// bounded by params.MaxValidators (≤ MaxValidatorsAbsolute) and by the size
-// of the module's delegation set; nothing runs on other blocks.
+// EndBlocker processes the epoch when its boundary is reached and then
+// asserts the module invariants (EventInvariantBroken on violation, never a
+// halt). Delegation work is bounded by params.MaxValidators (≤
+// MaxValidatorsAbsolute); the undelegation batch and the invariant check
+// walk the request queue. Other blocks only read the epoch and params.
 func (k Keeper) EndBlocker(ctx sdk.Context) error {
 	due, err := k.EpochDue(ctx)
 	if err != nil {
@@ -25,5 +27,10 @@ func (k Keeper) EndBlocker(ctx sdk.Context) error {
 		"rewards", rep.Rewards, "fee", rep.Fee, "burned", rep.Burned,
 		"delegated", rep.Delegated, "undelegated", rep.Undelegated, "redelegated", rep.Redelegated,
 		"eligible", rep.Eligible, "rate", rep.RateAfter)
-	return nil
+	// spec §25.1 item 6: the module invariants are verified at every epoch
+	epoch, err := k.GetEpoch(ctx)
+	if err != nil {
+		return err
+	}
+	return k.assertInvariants(ctx, epoch.Number-1)
 }

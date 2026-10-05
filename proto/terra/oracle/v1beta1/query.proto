@@ -5,6 +5,7 @@ import "cosmos/base/v1beta1/coin.proto";
 import "cosmos_proto/cosmos.proto";
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 
 import "terra/oracle/v1beta1/oracle.proto";
 
@@ -103,6 +104,11 @@ service Query {
   // AssetTargets returns the active asset vote targets.
   rpc AssetTargets(QueryAssetTargetsRequest) returns (QueryAssetTargetsResponse) {
     option (google.api.http).get = "/terra/oracle/v1beta1/assets/targets";
+  }
+  // PendingWhitelist returns the active whitelist snapshot and the approved
+  // whitelist change waiting for activation, if any (spec §26.3).
+  rpc PendingWhitelist(QueryPendingWhitelistRequest) returns (QueryPendingWhitelistResponse) {
+    option (google.api.http).get = "/terra/oracle/v1beta1/whitelist/pending";
   }
 }
 
@@ -375,4 +381,19 @@ message QueryAssetTargetsRequest {}
 // QueryAssetTargetsResponse is the response type for the Query/AssetTargets RPC method.
 message QueryAssetTargetsResponse {
   repeated Asset asset_targets = 1 [(gogoproto.castrepeated) = "AssetList", (gogoproto.nullable) = false];
+}
+
+// QueryPendingWhitelistRequest is the request type for the Query/PendingWhitelist RPC method.
+message QueryPendingWhitelistRequest {}
+
+// QueryPendingWhitelistResponse is the response type for the Query/PendingWhitelist RPC method.
+message QueryPendingWhitelistResponse {
+  // active is the whitelist the vote targets are synced to.
+  WhitelistSnapshot active = 1;
+  // pending is the approved change waiting for activation; absent when none.
+  WhitelistSnapshot pending = 2;
+  // activation_delay_blocks and activation_period are the code constants of
+  // spec §26.3 (non-governable).
+  int64                    activation_delay_blocks = 3;
+  google.protobuf.Duration activation_period       = 4 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
 }

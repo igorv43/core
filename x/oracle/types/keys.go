@@ -43,6 +43,10 @@ const (
 // - 0x09<asset_Bytes>: sdk.Dec (USD price of an asset, spec §21.6 stage 2)
 //
 // - 0x0A<asset_Bytes>: Asset (active asset vote target)
+//
+// - 0x0B: WhitelistSnapshot (active whitelist, spec §26.3)
+//
+// - 0x0C: WhitelistSnapshot (approved whitelist change waiting for activation)
 var (
 	// Keys for store prefixes
 	ExchangeRateKey                 = []byte{0x01} // prefix for each key to a rate
@@ -55,6 +59,8 @@ var (
 	RateHistoryKey                  = []byte{0x08} // prefix for the rate sample history of a denom
 	AssetPriceKey                   = []byte{0x09} // prefix for each key to an asset USD price
 	AssetTargetKey                  = []byte{0x0A} // prefix for each key to an asset vote target
+	ActiveWhitelistKey              = []byte{0x0B} // key of the active whitelist snapshot
+	PendingWhitelistKey             = []byte{0x0C} // key of the pending whitelist change
 )
 
 // MaxRateHistory bounds the number of rate samples kept per denom: one day of

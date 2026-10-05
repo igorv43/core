@@ -43,6 +43,11 @@ func NewDecodeStore(cdc codec.Codec) func(kvA, kvB kv.Pair) string {
 			cdc.MustUnmarshal(kvA.Value, &tobinTaxA)
 			cdc.MustUnmarshal(kvB.Value, &tobinTaxB)
 			return fmt.Sprintf("%v\n%v", tobinTaxA, tobinTaxB)
+		case bytes.Equal(kvA.Key[:1], types.ActiveWhitelistKey), bytes.Equal(kvA.Key[:1], types.PendingWhitelistKey):
+			var snapshotA, snapshotB types.WhitelistSnapshot
+			cdc.MustUnmarshal(kvA.Value, &snapshotA)
+			cdc.MustUnmarshal(kvB.Value, &snapshotB)
+			return fmt.Sprintf("%v\n%v", snapshotA, snapshotB)
 		default:
 			panic(fmt.Sprintf("invalid oracle key prefix %X", kvA.Key[:1]))
 		}

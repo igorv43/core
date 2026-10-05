@@ -3,6 +3,7 @@ package keeper
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"cosmossdk.io/collections"
 	storetypes "cosmossdk.io/core/store"
@@ -42,6 +43,16 @@ type Keeper struct {
 	Validators collections.Map[string, types.ValidatorState]
 	// RequestsByAddr indexes request ids by owner for MsgClaim and queries.
 	RequestsByAddr collections.KeySet[collections.Pair[string, uint64]]
+	// OwedQueued is the part of Owed whose requests were not undelegated
+	// yet: it is still backed by delegations, not by the module balance.
+	OwedQueued collections.Item[math.Int]
+	// OwedUnbonding records, per completion time, the uluna of the requests
+	// marked by one undelegation batch (every request of a batch shares the
+	// completion time). Entries with a completion time after the block time
+	// are the part of Owed still in x/staking unbonding; matured entries are
+	// pruned at the epoch. Live entries are bounded by MaxEntries + 1
+	// because an epoch never lasts less than UnbondingTime / MaxEntries.
+	OwedUnbonding collections.Map[time.Time, math.Int]
 }
 
 // NewKeeper creates the x/liquidstake keeper.
@@ -80,6 +91,8 @@ func NewKeeper(
 		Owed:           collections.NewItem(sb, types.OwedKey, "owed", sdk.IntValue),
 		Validators:     collections.NewMap(sb, types.ValidatorsKey, "validators", collections.StringKey, codec.CollValue[types.ValidatorState](cdc)),
 		RequestsByAddr: collections.NewKeySet(sb, types.RequestsByAddrIx, "requests_by_addr", collections.PairKeyCodec(collections.StringKey, collections.Uint64Key)),
+		OwedQueued:     collections.NewItem(sb, types.OwedQueuedKey, "owed_queued", sdk.IntValue),
+		OwedUnbonding:  collections.NewMap(sb, types.OwedUnbondingKey, "owed_unbonding", sdk.TimeKey, sdk.IntValue),
 	}
 	schema, err := sb.Build()
 	if err != nil {
@@ -114,12 +127,41 @@ func (k Keeper) GetParams(ctx sdk.Context) (types.Params, error) {
 	return p, nil
 }
 
-// SetParams validates and stores the module parameters.
+// SetParams validates and stores the module parameters. Besides the
+// stateless checks it enforces the epoch sizing rule of spec §24.4 against
+// the live x/staking params (UnbondingTime, MaxEntries); MsgUpdateParams
+// goes through here.
 func (k Keeper) SetParams(ctx sdk.Context, p types.Params) error {
 	if err := p.Validate(); err != nil {
 		return err
 	}
+	if err := k.validateEpochSizing(ctx, p); err != nil {
+		return err
+	}
 	return k.Params.Set(ctx, p)
+}
+
+// validateEpochSizing checks epoch_blocks × expected_block_time ≥
+// UnbondingTime / MaxEntries with the current x/staking params.
+func (k Keeper) validateEpochSizing(ctx sdk.Context, p types.Params) error {
+	unbonding, maxEntries, err := k.stakingLimits(ctx)
+	if err != nil {
+		return err
+	}
+	return p.ValidateEpochSizing(unbonding, maxEntries)
+}
+
+// stakingLimits returns the x/staking UnbondingTime and MaxEntries.
+func (k Keeper) stakingLimits(ctx sdk.Context) (time.Duration, uint32, error) {
+	unbonding, err := k.stakingKeeper.UnbondingTime(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	maxEntries, err := k.stakingKeeper.MaxEntries(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return unbonding, maxEntries, nil
 }
 
 // GetEpoch returns the current epoch.
@@ -156,6 +198,83 @@ func (k Keeper) addOwed(ctx sdk.Context, delta math.Int) error {
 		return fmt.Errorf("owed would become negative: %s", owed)
 	}
 	return k.Owed.Set(ctx, owed)
+}
+
+// GetOwedQueued returns the part of Owed not yet undelegated.
+func (k Keeper) GetOwedQueued(ctx sdk.Context) (math.Int, error) {
+	v, err := k.OwedQueued.Get(ctx)
+	if err != nil {
+		if errors.Is(err, collections.ErrNotFound) {
+			return math.ZeroInt(), nil
+		}
+		return math.Int{}, err
+	}
+	return v, nil
+}
+
+func (k Keeper) addOwedQueued(ctx sdk.Context, delta math.Int) error {
+	v, err := k.GetOwedQueued(ctx)
+	if err != nil {
+		return err
+	}
+	v = v.Add(delta)
+	if v.IsNegative() {
+		return fmt.Errorf("owed_queued would become negative: %s", v)
+	}
+	return k.OwedQueued.Set(ctx, v)
+}
+
+// addOwedUnbonding records amount as unbonding until completion.
+func (k Keeper) addOwedUnbonding(ctx sdk.Context, completion time.Time, amount math.Int) error {
+	cur, err := k.OwedUnbonding.Get(ctx, completion)
+	if err != nil {
+		if !errors.Is(err, collections.ErrNotFound) {
+			return err
+		}
+		cur = math.ZeroInt()
+	}
+	return k.OwedUnbonding.Set(ctx, completion, cur.Add(amount))
+}
+
+// GetOwedUnbonding returns the part of Owed whose undelegation completes
+// after the block time. The walk only visits live batches (bounded by
+// MaxEntries + 1, see OwedUnbonding).
+func (k Keeper) GetOwedUnbonding(ctx sdk.Context) (math.Int, error) {
+	sum := math.ZeroInt()
+	rng := new(collections.Range[time.Time]).StartExclusive(ctx.BlockTime())
+	err := k.OwedUnbonding.Walk(ctx, rng, func(_ time.Time, v math.Int) (bool, error) {
+		sum = sum.Add(v)
+		return false, nil
+	})
+	return sum, err
+}
+
+// pruneOwedUnbonding drops the batches that matured at or before the block
+// time: their uluna is back in the module balance (x/staking completes
+// matured entries in its EndBlock, which runs before this module's).
+func (k Keeper) pruneOwedUnbonding(ctx sdk.Context) error {
+	rng := new(collections.Range[time.Time]).EndInclusive(ctx.BlockTime())
+	return k.OwedUnbonding.Clear(ctx, rng)
+}
+
+// rebuildOwedAggregates recomputes OwedQueued and OwedUnbonding from the
+// requests. Used by InitGenesis and the v1→v2 migration; it walks every
+// request, so it never runs in a block.
+func (k Keeper) rebuildOwedAggregates(ctx sdk.Context) error {
+	if err := k.OwedUnbonding.Clear(ctx, nil); err != nil {
+		return err
+	}
+	queued := math.ZeroInt()
+	if err := k.Requests.Walk(ctx, nil, func(_ uint64, r types.UnstakeRequest) (bool, error) {
+		if !r.Undelegated {
+			queued = queued.Add(r.Amount)
+			return false, nil
+		}
+		return false, k.addOwedUnbonding(ctx, r.CompletionTime, r.Amount)
+	}); err != nil {
+		return err
+	}
+	return k.OwedQueued.Set(ctx, queued)
 }
 
 // bondDenom returns the staking bond denom (uluna).
