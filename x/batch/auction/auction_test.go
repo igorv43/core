@@ -143,3 +143,44 @@ func TestDeterministicOrderIndependence(t *testing.T) {
 		require.Equal(t, ra.Fills[i], rb.Fills[i])
 	}
 }
+
+// p* on the bid limit with a single larger ask strictly below it: the ask is the
+// excess side and must be rationed to the volume, not filled in full (the
+// over-fill made perp oi_long != oi_short in the testenv trading simulator).
+func TestStrictlyBetterExcessSideIsRationedToVolume(t *testing.T) {
+	orders := []Order{
+		level("s:bid", types.SIDE_BUY, 15_000, "50944", 0),
+		sellIntent("i:ask", 20_000, "50000", 0),
+	}
+	res := Resolve(orders, dec("50944"), dec("0.05"), 3)
+	require.True(t, res.Executed, res.Reason)
+	require.Equal(t, "15000", res.Volume.String())
+	buy, sell := sums(res.Fills)
+	require.Equal(t, "15000", buy.String())
+	require.Equal(t, "15000", sell.String(), "the ask below p* is rationed to the volume")
+}
+
+// Price priority on the excess side: better levels fill in full while they fit,
+// the level that crosses the volume is rationed (intents pro-rata), worse
+// levels - including the marginal one - get nothing.
+func TestExcessSideFillsInPricePriority(t *testing.T) {
+	orders := []Order{
+		level("s:bid", types.SIDE_BUY, 10_000, "1.00", 0),
+		sellIntent("i:a", 4_000, "0.97", 0), // best ask level: full
+		sellIntent("i:b", 6_000, "0.98", 0), // crossing level: rationed with i:c
+		sellIntent("i:c", 6_000, "0.98", 0),
+		sellIntent("i:d", 5_000, "1.00", 0), // marginal level: nothing left
+	}
+	fills := allocate(orders, dec("1.00"), in(10_000))
+	got := map[string]string{}
+	for _, f := range fills {
+		got[f.Key] = f.Qty.String()
+	}
+	require.Equal(t, "10000", got["s:bid"])
+	require.Equal(t, "4000", got["i:a"])
+	require.Equal(t, "3000", got["i:b"])
+	require.Equal(t, "3000", got["i:c"])
+	require.NotContains(t, got, "i:d")
+	buy, sell := sums(fills)
+	require.True(t, buy.Equal(sell), "%s != %s", buy, sell)
+}

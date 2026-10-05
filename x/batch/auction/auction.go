@@ -227,7 +227,18 @@ func allocate(orders []Order, p math.LegacyDec, v math.Int) []Fill {
 }
 
 // sideAllocation returns the quantity per order of one side. When the side
-// is in excess, marginal orders are rationed to reach exactly v.
+// is in excess it is rationed to reach exactly v, in price priority: limit
+// levels from the best one (BUY: highest limit, SELL: lowest) towards p are
+// filled in full while they fit; the first level that does not fit is
+// rationed with the marginal rule of spec §15.3 (intents first, pro-rata by
+// quantity, then solver levels by commit order) and every worse level gets
+// nothing. Normally that level is the marginal one (Limit == p) and this is
+// exactly fill rule 1 + 2. But when p* sits on the OTHER side's limit, the
+// strictly better orders of the excess side alone can exceed v (e.g. one sell
+// of 20,000 below p* against 15,000 of bids at p*); filling them in full - as
+// rule 1 reads literally - over-fills that side and breaks the base-quantity
+// balance (perp oi_long != oi_short, seen live by the testenv trading
+// simulator). [CORRECTION] in docs/survey/CORE-SURVEY-v4.0.1.md.
 func sideAllocation(side []Order, p math.LegacyDec, v math.Int, inExcess bool) map[string]math.Int {
 	out := make(map[string]math.Int, len(side))
 	if !inExcess {
@@ -237,22 +248,56 @@ func sideAllocation(side []Order, p math.LegacyDec, v math.Int, inExcess bool) m
 		return out
 	}
 	residual := v
-	var marginal []Order
-	for _, o := range side {
-		if !o.Limit.Equal(p) {
-			q := o.QtyAt(p)
-			out[o.Key] = q
-			residual = residual.Sub(q)
-		} else {
-			marginal = append(marginal, o)
+	for _, lvl := range priceLevels(side) {
+		total := math.ZeroInt()
+		for _, o := range lvl {
+			total = total.Add(o.QtyAt(p))
 		}
+		if total.LTE(residual) {
+			for _, o := range lvl {
+				out[o.Key] = o.QtyAt(p)
+			}
+			residual = residual.Sub(total)
+			continue
+		}
+		rationLevel(lvl, p, residual, out)
+		break
 	}
-	if residual.IsNegative() {
-		residual = math.ZeroInt()
+	return out
+}
+
+// priceLevels groups one side's orders by limit price, best price first (BUY:
+// highest limit; SELL: lowest). The order inside a level is the input order.
+func priceLevels(side []Order) [][]Order {
+	if len(side) == 0 {
+		return nil
 	}
-	// intents first, pro-rata with largest-remainder rounding; then solvers by index
+	buy := side[0].Side == types.SIDE_BUY
+	sorted := make([]Order, len(side))
+	copy(sorted, side)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if buy {
+			return sorted[i].Limit.GT(sorted[j].Limit)
+		}
+		return sorted[i].Limit.LT(sorted[j].Limit)
+	})
+	var levels [][]Order
+	for _, o := range sorted {
+		if n := len(levels); n > 0 && levels[n-1][0].Limit.Equal(o.Limit) {
+			levels[n-1] = append(levels[n-1], o)
+			continue
+		}
+		levels = append(levels, []Order{o})
+	}
+	return levels
+}
+
+// rationLevel allocates `residual` (less than the level's total) inside one
+// price level: intents first, pro-rata with largest-remainder rounding; then
+// solver levels by commit index.
+func rationLevel(lvl []Order, p math.LegacyDec, residual math.Int, out map[string]math.Int) {
 	var intents, solvers []Order
-	for _, o := range marginal {
+	for _, o := range lvl {
 		if o.Kind == KindIntent {
 			intents = append(intents, o)
 		} else {
@@ -274,7 +319,6 @@ func sideAllocation(side []Order, p math.LegacyDec, v math.Int, inExcess bool) m
 		out[o.Key] = take
 		residual = residual.Sub(take)
 	}
-	return out
 }
 
 // prorata rations `residual` among orders proportionally to their quantity,
