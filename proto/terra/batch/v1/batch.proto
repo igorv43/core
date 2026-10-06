@@ -38,15 +38,19 @@ message Params {
   // intent_ttl_blocks bounds expiry_height − submission height.
   int64 intent_ttl_blocks = 3;
   // intent_fee is the non-refundable anti-spam fee charged on submission.
+  // In the settlement denom it is paid from the sender's bank balance and,
+  // for a perp intent, from its x/perp free collateral when the bank
+  // balance is short.
   cosmos.base.v1beta1.Coin intent_fee = 4 [(gogoproto.nullable) = false];
   uint32 max_intents_per_batch = 5;
   uint32 max_solvers_per_batch = 6;
   uint32 max_levels_per_bid = 7;
   uint32 max_active_markets = 8;
   uint32 max_resolution_passes = 9;
-  // spot_fee_bps is the protocol fee on the amount received by each participant.
+  // spot_fee_bps is the protocol fee on the amount received by each user intent.
   uint32 spot_fee_bps = 10;
-  // builder_fee_max_bps caps the fee an integrator may charge on top (§23.2).
+  // builder_fee_max_bps caps the fee an integrator may charge on top of a
+  // perp fill (§23.2); see builder_fee_max_spot_bps for spot.
   uint32 builder_fee_max_bps = 11;
   // solver_bond_min is the minimum bond to register a solver.
   cosmos.base.v1beta1.Coin solver_bond_min = 12 [(gogoproto.nullable) = false];
@@ -60,6 +64,15 @@ message Params {
   int64 prune_delay_blocks = 16;
   // max_frontend_approvals bounds simultaneous integrator approvals per account.
   uint32 max_frontend_approvals = 17;
+  // spot_solver_fee_bps is the protocol fee on the amount a solver level
+  // receives in a spot fill (liquidity supplied); spot_fee_bps applies to
+  // user intents (liquidity taken). Never above spot_fee_bps (spec §23).
+  uint32 spot_solver_fee_bps = 18;
+  // builder_fee_max_spot_bps caps the integrator fee charged on spot fills;
+  // builder_fee_max_bps caps it on perp fills (§23.2: spot has its own,
+  // higher cap). A frontend registers one fee_bps, applied up to the cap of
+  // the market type it trades.
+  uint32 builder_fee_max_spot_bps = 19;
 }
 
 // Market is a trading pair served by the auction engine.

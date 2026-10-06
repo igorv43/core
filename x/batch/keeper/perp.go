@@ -77,7 +77,7 @@ func (k Keeper) SubmitPerpIntent(ctx sdk.Context, o PerpOrder) (uint64, uint64, 
 		return 0, 0, err
 	}
 	if o.ChargeFee {
-		if err := k.chargeIntentFee(ctx, sender, params.IntentFee); err != nil {
+		if err := k.chargeIntentFee(ctx, sender, params.IntentFee, true); err != nil {
 			return 0, 0, err
 		}
 	}

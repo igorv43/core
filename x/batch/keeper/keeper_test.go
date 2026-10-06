@@ -116,9 +116,10 @@ func TestPipelineClearsIntentAgainstSolverLevel(t *testing.T) {
 	userUsdBefore := f.balance(f.user, "uusdc.lf")
 	id, batch := f.submitBuy(t, 1_000_000, pref)
 	require.Equal(t, uint64(10), batch)
-	require.Equal(t, userUsdBefore.SubRaw(1_000_000).String(), f.balance(f.user, "uusdc.lf").String())
-	// the anti-spam intent fee left the account
-	require.Equal(t, userLunaBefore.Sub(f.params.IntentFee.Amount).String(), f.balance(f.user, "uluna").String())
+	// the escrow and the anti-spam intent fee (settlement asset) left the account
+	require.Equal(t, "uusdc.lf", f.params.IntentFee.Denom)
+	require.Equal(t, userUsdBefore.SubRaw(1_000_000).Sub(f.params.IntentFee.Amount).String(), f.balance(f.user, "uusdc.lf").String())
+	require.Equal(t, userLunaBefore.String(), f.balance(f.user, "uluna").String())
 
 	// the solver offers exactly the demand at P_ref
 	f.commitAndReveal(t, batch, []types.Level{{Side: types.SIDE_SELL, Price: pref, Qty: math.NewInt(10_000_000_000)}}, true)
@@ -133,23 +134,23 @@ func TestPipelineClearsIntentAgainstSolverLevel(t *testing.T) {
 	require.Equal(t, "10000000000", res.Volume.String())
 	require.Equal(t, uint32(2), res.Fills)
 
-	// user: 10,000 LUNC minus the 10 bps protocol fee; intent closed
-	got := f.balance(f.user, "uluna").Sub(userLunaBefore.Sub(f.params.IntentFee.Amount))
-	require.Equal(t, "9990000000", got.String())
+	// user: 10,000 LUNC minus the 5 bps protocol fee; intent closed
+	got := f.balance(f.user, "uluna").Sub(userLunaBefore)
+	require.Equal(t, "9995000000", got.String())
 	_, err = f.k.GetIntent(f.ctx, id)
 	require.ErrorIs(t, err, types.ErrIntentNotFound)
 
-	// solver escrow: base delivered, quote received minus fee
+	// solver escrow: base delivered, quote received minus spot_solver_fee_bps (0 by default)
 	esc, err := f.k.SolverEscrowBalances(f.ctx, f.solver.String())
 	require.NoError(t, err)
 	require.Equal(t, "40000000000", esc.AmountOf("uluna").String())
-	require.Equal(t, "10999000", esc.AmountOf("uusdc.lf").String())
+	require.Equal(t, "11000000", esc.AmountOf("uusdc.lf").String())
 
 	// the module holds exactly bond + escrow; nothing leaked
 	moduleLuna := f.balance(f.k.ModuleAddress(), "uluna")
 	moduleUsd := f.balance(f.k.ModuleAddress(), "uusdc.lf")
 	require.Equal(t, "40000000000", moduleLuna.String())
-	require.Equal(t, f.params.SolverBondMin.Amount.AddRaw(10_999_000).String(), moduleUsd.String())
+	require.Equal(t, f.params.SolverBondMin.Amount.AddRaw(11_000_000).String(), moduleUsd.String())
 
 	// commits of the batch were pruned
 	_, err = f.k.Commits.Get(f.ctx, collectionsJoin3(batch, marketID, f.solver.String()))
@@ -380,11 +381,12 @@ func TestExpiredIntentIsRefunded(t *testing.T) {
 	f := setup(t)
 	before := f.balance(f.user, "uusdc.lf")
 	id, _ := f.submitBuy(t, 1_000_000, math.LegacyNewDecWithPrec(1, 4))
-	require.Equal(t, before.SubRaw(1_000_000).String(), f.balance(f.user, "uusdc.lf").String())
+	require.Equal(t, before.SubRaw(1_000_000).Sub(f.params.IntentFee.Amount).String(), f.balance(f.user, "uusdc.lf").String())
 
 	f.at(110)
 	require.NoError(t, f.k.EndBlocker(f.ctx))
-	require.Equal(t, before.String(), f.balance(f.user, "uusdc.lf").String())
+	// the escrow comes back; the anti-spam intent fee is not refundable (§14.2 rule 5)
+	require.Equal(t, before.Sub(f.params.IntentFee.Amount).String(), f.balance(f.user, "uusdc.lf").String())
 	_, err := f.k.GetIntent(f.ctx, id)
 	require.ErrorIs(t, err, types.ErrIntentNotFound)
 }
@@ -398,7 +400,7 @@ func TestCancelRefundsAndOnlyOwner(t *testing.T) {
 	refund, err := f.k.CancelIntent(f.ctx, f.user.String(), id)
 	require.NoError(t, err)
 	require.Equal(t, "1000000uusdc.lf", refund.String())
-	require.Equal(t, before.String(), f.balance(f.user, "uusdc.lf").String())
+	require.Equal(t, before.Sub(f.params.IntentFee.Amount).String(), f.balance(f.user, "uusdc.lf").String())
 }
 
 func TestEscrowWithdrawRespectsRevealedReservation(t *testing.T) {
@@ -441,7 +443,7 @@ func TestFrontendFeeRequiresApproval(t *testing.T) {
 	f.registerSolver(t)
 	frontend := sdk.AccAddress([]byte("batch-frontend-------"))
 	require.NoError(t, f.k.RegisterFrontend(f.ctx, frontend.String(), 5))
-	require.ErrorIs(t, f.k.RegisterFrontend(f.ctx, frontend.String(), f.params.BuilderFeeMaxBps+1), types.ErrFrontendFeeTooHigh)
+	require.ErrorIs(t, f.k.RegisterFrontend(f.ctx, frontend.String(), max(f.params.BuilderFeeMaxBps, f.params.BuilderFeeMaxSpotBps)+1), types.ErrFrontendFeeTooHigh)
 	pref := math.LegacyNewDecWithPrec(1, 4)
 
 	// without approval the attribution is dropped
@@ -467,9 +469,56 @@ func TestFrontendFeeRequiresApproval(t *testing.T) {
 	f.commitAndReveal(t, batch, []types.Level{{Side: types.SIDE_SELL, Price: pref, Qty: math.NewInt(10_000_000_000)}}, true)
 	require.NoError(t, f.k.EndBlocker(f.ctx))
 
-	got := f.balance(f.user, "uluna").Sub(userLunaBefore.Sub(f.params.IntentFee.Amount))
-	require.Equal(t, "9985000000", got.String())
+	// 10,000 LUNC minus the 5 bps protocol fee and the 5 bps builder fee
+	got := f.balance(f.user, "uluna").Sub(userLunaBefore)
+	require.Equal(t, "9990000000", got.String())
 	require.Equal(t, "5000000", f.balance(frontend, "uluna").String())
+}
+
+// Spec §23.2 (v0.9.10): a frontend registers one fee, applied up to the cap
+// of the market type: builder_fee_max_spot_bps on spot fills.
+func TestBuilderFeeCappedBySpotCap(t *testing.T) {
+	f := setup(t)
+	f.registerSolver(t)
+	frontend := sdk.AccAddress([]byte("batch-frontend-------"))
+	require.NoError(t, f.k.RegisterFrontend(f.ctx, frontend.String(), 30))
+	require.NoError(t, f.k.ApproveFrontend(f.ctx, f.user.String(), frontend.String(), 30))
+	// governance lowers the spot cap below the registered fee
+	p := f.params
+	p.BuilderFeeMaxSpotBps = 20
+	require.NoError(t, f.k.SetParams(f.ctx, p))
+	pref := math.LegacyNewDecWithPrec(1, 4)
+	before := f.balance(f.user, "uluna")
+	_, batch, err := f.k.SubmitIntent(f.ctx, &types.MsgSubmitIntent{
+		Sender: f.user.String(), MarketId: marketID, Side: types.SIDE_BUY, AmountIn: sdk.NewCoin("uusdc.lf", math.NewInt(1_000_000)),
+		LimitPrice: pref, MinOut: math.ZeroInt(), ExpiryHeight: f.ctx.BlockHeight() + 100, Frontend: frontend.String(),
+	})
+	require.NoError(t, err)
+	f.commitAndReveal(t, batch, []types.Level{{Side: types.SIDE_SELL, Price: pref, Qty: math.NewInt(10_000_000_000)}}, true)
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	// builder fee at the 20 bps cap, not the registered 30
+	require.Equal(t, "20000000", f.balance(frontend, "uluna").String())
+	require.Equal(t, "9975000000", f.balance(f.user, "uluna").Sub(before).String())
+}
+
+// Spec §23 (v0.9.10): solver levels pay spot_solver_fee_bps on what they
+// receive, user intents spot_fee_bps.
+func TestSpotSolverFeeRate(t *testing.T) {
+	f := setup(t)
+	p := f.params
+	p.SpotSolverFeeBps = 1
+	require.NoError(t, f.k.SetParams(f.ctx, p))
+	f.params = p
+	f.registerSolver(t)
+	pref := math.LegacyNewDecWithPrec(1, 4)
+	before := f.balance(f.user, "uluna")
+	_, batch := f.submitBuy(t, 1_000_000, pref)
+	f.commitAndReveal(t, batch, []types.Level{{Side: types.SIDE_SELL, Price: pref, Qty: math.NewInt(10_000_000_000)}}, true)
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+	require.Equal(t, "9995000000", f.balance(f.user, "uluna").Sub(before).String()) // intent: 5 bps
+	esc, err := f.k.SolverEscrowBalances(f.ctx, f.solver.String())
+	require.NoError(t, err)
+	require.Equal(t, "10999900", esc.AmountOf("uusdc.lf").String()) // level: 1 bps of 1 USDC received
 }
 
 func TestPerpMarketNeedsMarginHook(t *testing.T) {

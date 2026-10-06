@@ -110,8 +110,12 @@ func (k *Keeper) SetIntentFeeSponsor(s types.IntentFeeSponsor) { k.intentFeeSpon
 func (k *Keeper) SetIntentFillHook(h types.IntentFillHook) { k.fillHook = h }
 
 // chargeIntentFee pays the anti-spam intent fee to the chain fee collector:
-// through the sponsor when it covers the sender, otherwise from the sender.
-func (k Keeper) chargeIntentFee(ctx sdk.Context, sender sdk.AccAddress, fee sdk.Coin) error {
+// through the sponsor when it covers the sender, otherwise from the sender's
+// bank balance. For a perp intent whose sender holds less than the fee, the
+// margin hook may first move the shortfall from the sender's available
+// collateral (IntentFeeFunder), so the transfer to the fee collector is
+// always the sender's own.
+func (k Keeper) chargeIntentFee(ctx sdk.Context, sender sdk.AccAddress, fee sdk.Coin, perp bool) error {
 	if !fee.IsPositive() {
 		return nil
 	}
@@ -122,6 +126,15 @@ func (k Keeper) chargeIntentFee(ctx sdk.Context, sender sdk.AccAddress, fee sdk.
 		}
 		if sponsored {
 			return nil
+		}
+	}
+	if perp {
+		if funder, ok := k.marginHook.(types.IntentFeeFunder); ok {
+			if have := k.bankKeeper.GetBalance(ctx, sender, fee.Denom); have.IsLT(fee) {
+				if _, err := funder.FundIntentFee(ctx, sender, fee.Sub(have)); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, authtypes.FeeCollectorName, sdk.NewCoins(fee))

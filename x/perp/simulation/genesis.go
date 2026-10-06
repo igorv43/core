@@ -35,6 +35,7 @@ func RandomizedParams(r *rand.Rand) types.Params {
 	p.DispersionRestricted = math.LegacyNewDecWithPrec(restricted, 3)
 	p.DispersionReduceOnly = math.LegacyNewDecWithPrec(restricted+int64(r.Intn(20)), 3)
 	p.PerpFeeBps = uint32(r.Intn(100))
+	p.PerpSolverFeeBps = uint32(r.Intn(int(p.PerpFeeBps) + 1))
 	p.MaxOpenPositionsPerAccount = uint32(1 + r.Intn(types.MaxOpenPositionsAbsolute))
 	p.MaxTriggersPerAccount = uint32(1 + r.Intn(types.MaxTriggersPerAccountAbsolute))
 	p.TriggerSlippageDefault = math.LegacyNewDecWithPrec(int64(1+r.Intn(10)), 2)

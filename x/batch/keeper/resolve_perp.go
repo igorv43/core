@@ -165,7 +165,9 @@ func (k Keeper) settlePerp(ctx sdk.Context, params types.Params, market types.Ma
 		builderFee := math.ZeroInt()
 		if in.Frontend != "" {
 			if fe, err := k.Frontends.Get(ctx, in.Frontend); err == nil {
-				builderFee = math.LegacyNewDecFromInt(f.Qty).Mul(f.Price).MulInt64(int64(fe.FeeBps)).QuoInt64(10_000).TruncateInt()
+				// the registered fee applies up to the perp cap (§23.2)
+				bps := min(fe.FeeBps, params.BuilderFeeMaxBps)
+				builderFee = math.LegacyNewDecFromInt(f.Qty).Mul(f.Price).MulInt64(int64(bps)).QuoInt64(10_000).TruncateInt()
 			}
 		}
 		if err := k.marginHook.Fill(ctx, types.PerpFill{

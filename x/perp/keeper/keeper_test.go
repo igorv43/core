@@ -553,7 +553,8 @@ func TestAllocationCascadeAndBuyback(t *testing.T) {
 
 	// a seller of LUNC meets it; the uluna received is burned at the next EndBlock
 	seller := sdk.AccAddress([]byte("perp-luna-seller-----"))
-	lunas := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)))
+	// LUNC to sell plus the intent fee, in the settlement asset
+	lunas := sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(1_000_000_000_000)), f.bp.IntentFee)
 	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", lunas))
 	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", seller, lunas))
 	batch := f.ctx.BlockHeight()
@@ -597,4 +598,28 @@ func TestFundInsuranceAndLeverageFloor(t *testing.T) {
 	require.True(t, m2.EffectiveLeverage.LT(m.EffectiveLeverage), "leverage stepped down")
 	require.True(t, m2.EffectiveLeverage.GTE(math.LegacyOneDec()), m2.EffectiveLeverage.String())
 	require.True(t, m2.EffectiveOiCap.LT(m.EffectiveOiCap), "OI cap stepped down towards IF/IF_target")
+}
+
+// Spec v0.9.10 §23: user intents pay perp_fee_bps (5) on the notional,
+// solver (market-maker) levels the lower perp_solver_fee_bps (1).
+func TestSolverFillPaysSolverFeeRate(t *testing.T) {
+	f := setup(t)
+	require.Equal(t, uint32(5), f.params.PerpFeeBps)
+	require.Equal(t, uint32(1), f.params.PerpSolverFeeBps)
+	bm, err := f.bk.GetMarket(f.ctx, marketID)
+	require.NoError(t, err)
+	hook := keeper.NewMarginHook(f.k)
+	price := math.LegacyNewDec(60_000)
+	longBefore, _ := f.k.FreeCollateral(f.ctx, f.long.String())
+	shortBefore, _ := f.k.FreeCollateral(f.ctx, f.short.String())
+	require.NoError(t, hook.Fill(f.ctx, batchtypes.PerpFill{Batch: 1, Account: f.long, Market: bm, Side: batchtypes.SIDE_BUY, Qty: math.NewInt(1_000), Price: price, BuilderFee: math.ZeroInt()}))
+	require.NoError(t, hook.Fill(f.ctx, batchtypes.PerpFill{Batch: 1, Account: f.short, Market: bm, Side: batchtypes.SIDE_SELL, Qty: math.NewInt(1_000), Price: price, Solver: true, BuilderFee: math.ZeroInt()}))
+	longAfter, _ := f.k.FreeCollateral(f.ctx, f.long.String())
+	shortAfter, _ := f.k.FreeCollateral(f.ctx, f.short.String())
+	// notional 60,000,000; IM at 3x 20,000,000
+	require.Equal(t, "20030000", longBefore.Sub(longAfter).String(), "intent: IM + 5 bps")
+	require.Equal(t, "20006000", shortBefore.Sub(shortAfter).String(), "solver level: IM + 1 bps")
+	if msg, broken := f.k.CheckInvariants(f.ctx); broken {
+		t.Fatal(msg)
+	}
 }

@@ -10,13 +10,16 @@ import (
 )
 
 // RegisterFrontend registers or updates an integrator and its fee (spec §23.2).
+// The fee may go up to the higher of the perp and spot caps; at settlement
+// it is applied up to the cap of the market type (builder_fee_max_bps on
+// perp fills, builder_fee_max_spot_bps on spot fills).
 func (k Keeper) RegisterFrontend(ctx sdk.Context, addr string, feeBps uint32) error {
 	params, err := k.GetParams(ctx)
 	if err != nil {
 		return err
 	}
-	if feeBps > params.BuilderFeeMaxBps {
-		return errorsmod.Wrapf(types.ErrFrontendFeeTooHigh, "max %d bps", params.BuilderFeeMaxBps)
+	if maxBps := max(params.BuilderFeeMaxBps, params.BuilderFeeMaxSpotBps); feeBps > maxBps {
+		return errorsmod.Wrapf(types.ErrFrontendFeeTooHigh, "max %d bps", maxBps)
 	}
 	return k.Frontends.Set(ctx, addr, types.Frontend{Address: addr, FeeBps: feeBps})
 }

@@ -255,8 +255,9 @@ func TestFeeInLunaAtDiscountBurns(t *testing.T) {
 	burnAfter := f.app.BankKeeper.GetBalance(f.ctx, f.app.AccountKeeper.GetModuleAddress("burn"), "uluna").Amount
 	require.Equal(t, "240000000", burnAfter.Sub(burnBefore).String())
 	lunaAfter := f.app.BankKeeper.GetBalance(f.ctx, f.long, "uluna").Amount
-	// the intent fee (2 LUNC) and the discounted protocol fee left the bank balance
-	require.Equal(t, lunaBefore.Sub(f.bp.IntentFee.Amount).SubRaw(240_000_000).String(), lunaAfter.String())
+	// the discounted protocol fee left the bank balance (the intent fee is in the settlement asset)
+	require.Equal(t, "uusdc.lf", f.bp.IntentFee.Denom)
+	require.Equal(t, lunaBefore.SubRaw(240_000_000).String(), lunaAfter.String())
 	freeAfter, _ := f.k.FreeCollateral(f.ctx, f.long.String())
 	require.Equal(t, freeBefore.SubRaw(20_000_000).String(), freeAfter.String(), "only the initial margin left the collateral")
 	// the short (not opted in) paid in settlement as before

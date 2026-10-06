@@ -75,6 +75,18 @@ type IntentFeeSponsor interface {
 	SponsorIntentFee(ctx sdk.Context, sender sdk.AccAddress, fee sdk.Coin) (bool, error)
 }
 
+// IntentFeeFunder is optionally implemented by the MarginHook (x/perp). When
+// a perp intent's sender holds less than the intent fee in its bank balance,
+// FundIntentFee moves the shortfall from the sender's available collateral
+// (free settlement minus reservations) to its bank balance, so a trader whose
+// USDC is all in margin, such as a remote account, can still pay the fee in
+// the settlement denom. It returns false when it moved nothing (another
+// denom, or not enough available collateral); the fee is then charged to the
+// bank balance as usual and fails if that is short.
+type IntentFeeFunder interface {
+	FundIntentFee(ctx sdk.Context, account sdk.AccAddress, shortfall sdk.Coin) (bool, error)
+}
+
 // IntentFillHook observes the fills of spot intents. received is what the
 // intent's sender was actually paid for the fill (net of the protocol fee and
 // of the builder fee); x/perp uses it to book the proceeds of its own sale

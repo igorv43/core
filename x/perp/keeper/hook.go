@@ -60,6 +60,39 @@ func (h MarginHook) Reserve(ctx sdk.Context, account sdk.AccAddress, bm batchtyp
 	return k.setReservation(ctx, account.String(), market.Id, cur.Add(amount))
 }
 
+var _ batchtypes.IntentFeeFunder = MarginHook{}
+
+// FundIntentFee implements batchtypes.IntentFeeFunder: it moves the shortfall
+// of a perp intent's fee from the account's available collateral (free
+// settlement minus reservations, never stLUNC) to its bank balance, like a
+// withdrawal, so x/batch can charge the fee from the account itself. Nothing
+// moves when the fee is not in the settlement denom or the available
+// collateral does not cover the shortfall.
+func (h MarginHook) FundIntentFee(ctx sdk.Context, account sdk.AccAddress, shortfall sdk.Coin) (bool, error) {
+	k := h.k
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !shortfall.IsPositive() || shortfall.Denom != params.SettlementDenom {
+		return false, nil
+	}
+	avail, err := k.Available(ctx, account.String())
+	if err != nil {
+		return false, err
+	}
+	if avail.LT(shortfall.Amount) {
+		return false, nil
+	}
+	if err := k.addFree(ctx, account.String(), shortfall.Amount.Neg()); err != nil {
+		return false, err
+	}
+	if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, account, sdk.NewCoins(shortfall)); err != nil {
+		return false, err
+	}
+	return true, ctx.EventManager().EmitTypedEvent(&types.EventCollateralWithdrawn{Account: account.String(), Amount: shortfall.String()})
+}
+
 // Release implements batchtypes.MarginHook.
 func (h MarginHook) Release(ctx sdk.Context, account sdk.AccAddress, bm batchtypes.Market, _ batchtypes.Side, qty math.Int, limit math.LegacyDec) error {
 	k := h.k
@@ -153,7 +186,13 @@ func (h MarginHook) Fill(ctx sdk.Context, f batchtypes.PerpFill) error {
 	// fees (spec §23): protocol fee on the notional, builder fee on top
 	fee := math.ZeroInt()
 	if !isFund {
-		fee = math.LegacyNewDecFromInt(f.Qty).Mul(f.Price).MulInt64(int64(params.PerpFeeBps)).QuoInt64(10_000).Ceil().TruncateInt()
+		// user intents pay perp_fee_bps (liquidity taken), solver levels
+		// perp_solver_fee_bps (liquidity supplied), spec §23
+		feeBps := params.PerpFeeBps
+		if f.Solver {
+			feeBps = params.PerpSolverFeeBps
+		}
+		fee = math.LegacyNewDecFromInt(f.Qty).Mul(f.Price).MulInt64(int64(feeBps)).QuoInt64(10_000).Ceil().TruncateInt()
 		paidInLuna, err := k.tryFeeInLuna(ctx, params, val, f.Account, fee)
 		if err != nil {
 			return err

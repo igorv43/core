@@ -24,7 +24,8 @@ const (
 	// RevealRateWindowBlocks and MinRevealRate implement spec §16.2 (rate < 90% in 1,000 blocks).
 	RevealRateWindowBlocks = 1_000
 	MinRevealRateBps       = 9_000
-	// MaxBuilderFeeBpsAbsolute caps params.builder_fee_max_bps.
+	// MaxBuilderFeeBpsAbsolute caps params.builder_fee_max_bps and
+	// params.builder_fee_max_spot_bps.
 	MaxBuilderFeeBpsAbsolute = 100
 )
 

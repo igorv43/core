@@ -99,9 +99,9 @@ func TestSpotFeeInUlunaEntersTheCascade(t *testing.T) {
 	f.buyLuna(t, 200_000_000)
 	l, _ = f.k.GetLedger(f.ctx)
 	require.Zero(t, l.RevenueSellIntentId, "sale settled")
-	// the buyer's own spot fee (10 bps of the 50 LUNC it received) is new revenue in kind
-	require.Equal(t, "50000", l.RevenueUluna.String())
-	require.Equal(t, "50000", f.moduleUluna(t).String())
+	// the buyer's own spot fee (5 bps of the 50 LUNC it received) is new revenue in kind
+	require.Equal(t, "25000", l.RevenueUluna.String())
+	require.Equal(t, "25000", f.moduleUluna(t).String())
 	require.Equal(t, "50000000", l.RevenueSoldEpoch.String())
 	proceeds := l.Revenue.Sub(revenueBefore)
 	require.True(t, proceeds.IsPositive(), "settlement proceeds joined the epoch revenue")
@@ -141,9 +141,9 @@ func TestRevenueInKindKeepsTheFundFirst(t *testing.T) {
 	require.True(t, gained.IsPositive(), "if_fee_share of the proceeds went to the fund")
 	require.True(t, l.Insurance.LT(target))
 	require.Equal(t, burnBefore.String(), f.burned(t).String(), "nothing burned below target")
-	// the held buyback uluna plus the buyer's 10 bps spot fee in LUNC (revenue in kind)
-	require.Equal(t, "50000", l.RevenueUluna.String())
-	require.Equal(t, "3050000", f.moduleUluna(t).String())
+	// the held buyback uluna plus the buyer's 5 bps spot fee in LUNC (revenue in kind)
+	require.Equal(t, "25000", l.RevenueUluna.String())
+	require.Equal(t, "3025000", f.moduleUluna(t).String())
 
 	// the allocation epoch closes below target: everything to the fund, nothing passed on
 	p := f.params
@@ -169,8 +169,8 @@ func TestRevenueInKindKeepsTheFundFirst(t *testing.T) {
 	f.perpEndBlock(t)
 	require.Equal(t, burnBefore.AddRaw(3_000_000).String(), f.burned(t).String(), "held buyback uluna burned at target")
 	l, _ = f.k.GetLedger(f.ctx)
-	require.Equal(t, "7050000", l.RevenueUluna.String())
-	require.Equal(t, "7050000", f.moduleUluna(t).String(), "revenue in kind kept")
+	require.Equal(t, "7025000", l.RevenueUluna.String())
+	require.Equal(t, "7025000", f.moduleUluna(t).String(), "revenue in kind kept")
 }
 
 // QueryAllocation exposes, per epoch, the oracle LUNC price used and the

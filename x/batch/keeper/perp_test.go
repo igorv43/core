@@ -107,8 +107,8 @@ func TestPerpIntentReservesAndReleases(t *testing.T) {
 	require.True(t, in.AmountIn.IsZero())
 	require.Equal(t, "10000", in.Remaining.String())
 
-	// no escrow left the account
-	require.Equal(t, "100000000", f.balance(f.user, "uusdc.lf").String())
+	// no escrow left the account, only the intent fee (settlement asset)
+	require.Equal(t, math.NewInt(100_000_000).Sub(f.params.IntentFee.Amount).String(), f.balance(f.user, "uusdc.lf").String())
 
 	_, err = f.k.CancelIntent(f.ctx, f.user.String(), id)
 	require.NoError(t, err)
@@ -174,8 +174,8 @@ func TestPerpFillFailureExcludesAndReresolves(t *testing.T) {
 	other := sdk.AccAddress([]byte("batch-other----------"))
 	third := sdk.AccAddress([]byte("batch-third----------"))
 	for _, a := range []sdk.AccAddress{other, third} {
-		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(10_000_000)))))
-		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", a, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(10_000_000)))))
+		require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", sdk.NewCoins(f.params.IntentFee.AddAmount(math.NewInt(10_000_000)))))
+		require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", a, sdk.NewCoins(f.params.IntentFee.AddAmount(math.NewInt(10_000_000)))))
 	}
 
 	f.at(10)
@@ -204,4 +204,43 @@ func TestPerpFillFailureExcludesAndReresolves(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrIntentNotFound)
 	require.True(t, hook.reserved(f.ctx, other.String()).IsZero())
 	require.True(t, hook.reserved(f.ctx, third.String()).IsZero())
+}
+
+// Spec §23.2 (v0.9.10): a frontend registered above the perp cap (allowed up
+// to the spot cap) charges at most builder_fee_max_bps on perp fills.
+func TestPerpBuilderFeeCappedByPerpCap(t *testing.T) {
+	f := setup(t)
+	hook := f.perpSetup(t)
+	f.registerSolver(t)
+	frontend := sdk.AccAddress([]byte("batch-frontend-------"))
+	require.NoError(t, f.k.RegisterFrontend(f.ctx, frontend.String(), 30))
+	require.NoError(t, f.k.ApproveFrontend(f.ctx, f.user.String(), frontend.String(), 30))
+	pref := math.LegacyNewDecWithPrec(1, 4)
+	qty := math.NewInt(100_000_000_000) // notional 10,000,000 at P_ref
+
+	f.at(10)
+	_, batch, err := f.k.SubmitPerpIntent(f.ctx, keeper.PerpOrder{
+		Sender: f.user.String(), MarketID: perpMarketID, Side: types.SIDE_BUY, Qty: qty, LimitPrice: pref,
+		ExpiryHeight: f.ctx.BlockHeight() + 100, ChargeFee: true, Frontend: frontend.String(),
+	})
+	require.NoError(t, err)
+	bid := types.Bid{MarketId: perpMarketID, Levels: []types.Level{{Side: types.SIDE_SELL, Price: pref, Qty: qty}}}
+	salt := []byte("s")
+	commitment, err := types.Commitment(bid, salt, f.solver.String(), batch)
+	require.NoError(t, err)
+	f.at(int64(batch) + 1)
+	require.NoError(t, f.k.CommitBid(f.ctx, &types.MsgCommitBid{Solver: f.solver.String(), BatchId: batch, MarketId: perpMarketID, Commitment: commitment}))
+	f.at(int64(batch) + f.params.CommitWindow + 1)
+	require.NoError(t, f.k.RevealBid(f.ctx, &types.MsgRevealBid{Solver: f.solver.String(), BatchId: batch, Bid: bid, Salt: salt}))
+	require.NoError(t, f.k.EndBlocker(f.ctx))
+
+	require.Len(t, hook.fills, 2)
+	for _, fl := range hook.fills {
+		if fl.Solver {
+			require.True(t, fl.BuilderFee.IsZero())
+			continue
+		}
+		require.Equal(t, frontend.String(), fl.Frontend)
+		require.Equal(t, "10000", fl.BuilderFee.String()) // 10 bps of 10,000,000, not 30
+	}
 }

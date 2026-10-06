@@ -18,22 +18,31 @@ const DefaultSettlementDenom = "uusdc.lf"
 // phase. Changing this requires a software upgrade (§26.3 style limit in code).
 const ForbiddenBondDenom = "uusd"
 
-// DefaultParams returns the initial parameters of spec Annex B.
+// DefaultParams returns the initial parameters of spec Annex B. The fee
+// values follow the market comparison of spec v0.9.10 (Annex G, accessed
+// 2026-10-05): user intents pay spot_fee_bps, solver levels the lower
+// spot_solver_fee_bps (the batch has no resting book: solver levels are the
+// liquidity supplied, intents the liquidity taken).
 func DefaultParams() Params {
 	return Params{
-		CommitWindow:           2,
-		PriceBand:              math.LegacyNewDecWithPrec(2, 2), // 2%
-		IntentTtlBlocks:        600,
-		IntentFee:              sdk.NewCoin("uluna", math.NewInt(2_000_000)), // ~2x a simple tx fee
+		CommitWindow:    2,
+		PriceBand:       math.LegacyNewDecWithPrec(2, 2), // 2%
+		IntentTtlBlocks: 600,
+		// ~US$0.001 in the settlement asset: an anti-spam fee that does not
+		// drift with the LUNC price and that remote users pay from the USDC
+		// they brought (Hyperliquid prices an extra action at US$0.0005).
+		IntentFee:              sdk.NewCoin(DefaultSettlementDenom, math.NewInt(1_000)),
 		MaxIntentsPerBatch:     1_000,
 		MaxSolversPerBatch:     20,
 		MaxLevelsPerBid:        10,
 		MaxActiveMarkets:       2,
 		MaxResolutionPasses:    3,
-		SpotFeeBps:             10,
-		BuilderFeeMaxBps:       10,
-		SolverBondMin:          sdk.NewCoin(DefaultSettlementDenom, math.NewInt(10_000_000_000)), // 10,000 settlement units
-		SlashNoReveal:          sdk.NewCoin(DefaultSettlementDenom, math.NewInt(1_000_000_000)),  // 1,000
+		SpotFeeBps:             5,                                                                // protocol take of intent venues: CoW 2, UniswapX <= 5, Uniswap v2 5
+		SpotSolverFeeBps:       0,                                                                // solvers price the spread themselves (CoW solvers pay no fee)
+		BuilderFeeMaxBps:       10,                                                               // perp cap, = Hyperliquid builder codes on perps
+		BuilderFeeMaxSpotBps:   50,                                                               // spot cap, below Hyperliquid and CoW (100 bps)
+		SolverBondMin:          sdk.NewCoin(DefaultSettlementDenom, math.NewInt(20_000_000_000)), // 20,000 = 10x the largest slash (Annex B)
+		SlashNoReveal:          sdk.NewCoin(DefaultSettlementDenom, math.NewInt(1_000_000_000)),  // 1,000; inconsistent reveal = 2x
 		SolverUnbondBlocks:     100_800,                                                          // ~7 days at 6 s
 		SolverSuspensionBlocks: 14_400,                                                           // ~1 day
 		PruneDelayBlocks:       100_800,
@@ -73,8 +82,14 @@ func (p Params) Validate() error {
 	if p.SpotFeeBps > 1_000 {
 		return fmt.Errorf("spot_fee_bps must not exceed 1000")
 	}
+	if p.SpotSolverFeeBps > p.SpotFeeBps {
+		return fmt.Errorf("spot_solver_fee_bps must not exceed spot_fee_bps: solver levels never pay more than intents")
+	}
 	if p.BuilderFeeMaxBps > MaxBuilderFeeBpsAbsolute {
 		return fmt.Errorf("builder_fee_max_bps must not exceed %d", MaxBuilderFeeBpsAbsolute)
+	}
+	if p.BuilderFeeMaxSpotBps > MaxBuilderFeeBpsAbsolute {
+		return fmt.Errorf("builder_fee_max_spot_bps must not exceed %d", MaxBuilderFeeBpsAbsolute)
 	}
 	if err := p.SolverBondMin.Validate(); err != nil || !p.SolverBondMin.IsPositive() {
 		return fmt.Errorf("solver_bond_min must be a positive coin")

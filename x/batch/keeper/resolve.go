@@ -148,7 +148,13 @@ func (k Keeper) settle(ctx sdk.Context, params types.Params, market types.Market
 			quoteOut = quoteOut.Add(f.Out)
 		}
 
-		protocolFee := f.Out.MulRaw(int64(params.SpotFeeBps)).QuoRaw(10_000)
+		// user intents pay spot_fee_bps (liquidity taken), solver levels
+		// spot_solver_fee_bps (liquidity supplied), spec §23
+		feeBps := params.SpotFeeBps
+		if f.Kind == auction.KindSolver {
+			feeBps = params.SpotSolverFeeBps
+		}
+		protocolFee := f.Out.MulRaw(int64(feeBps)).QuoRaw(10_000)
 		net := f.Out.Sub(protocolFee)
 		if protocolFee.IsPositive() {
 			fees = fees.Add(sdk.NewCoin(recvDenom, protocolFee))
@@ -175,7 +181,8 @@ func (k Keeper) settle(ctx sdk.Context, params types.Params, market types.Market
 		builderFee := math.ZeroInt()
 		if in.Frontend != "" {
 			if fe, err := k.Frontends.Get(ctx, in.Frontend); err == nil {
-				builderFee = f.Out.MulRaw(int64(fe.FeeBps)).QuoRaw(10_000)
+				// the registered fee applies up to the spot cap (§23.2)
+				builderFee = f.Out.MulRaw(int64(min(fe.FeeBps, params.BuilderFeeMaxSpotBps))).QuoRaw(10_000)
 				if builderFee.IsPositive() {
 					builderFees[in.Frontend] = builderFees[in.Frontend].Add(sdk.NewCoin(recvDenom, builderFee))
 					net = net.Sub(builderFee)

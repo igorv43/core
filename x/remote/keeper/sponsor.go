@@ -15,10 +15,12 @@ var _ batchtypes.IntentFeeSponsor = Keeper{}
 
 // SponsorIntentFee pays the x/batch intent fee of a remote account from the
 // paymaster (spec §14.4 item 4: the protocol sponsors the local costs of
-// remote users and recovers them through the trading fee). A remote account
-// funded only with the settlement asset through a gateway holds no uluna, so
-// without this it could not submit spot or perp intents, directly or through
-// a session key.
+// remote users and recovers them through the trading fee). Since spec
+// v0.9.10 the default intent fee is in the settlement asset, which remote
+// accounts hold, so they pay it themselves and this only applies when
+// governance prices the fee in the paymaster_daily_cap denom (uluna): a
+// remote account funded only with USDC holds no uluna and could not submit
+// spot or perp intents otherwise.
 //
 // Only accounts with an x/remote record are sponsored; local users pay
 // themselves. Per remote account the sponsored intent fees are bounded by

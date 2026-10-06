@@ -25,10 +25,46 @@ func (f *fixture) spotIntent(sender sdk.AccAddress) *batchtypes.MsgSubmitIntent 
 	}
 }
 
-// spec §14.4 item 4: an account funded only with the settlement asset through
-// a gateway holds no uluna; its session key can still submit spot intents
-// because the paymaster pays the x/batch intent fee, within
-// paymaster_daily_cap per account and period. Local users pay themselves.
+// Spec v0.9.10 §14.2 rule 5: by default the intent fee is in the settlement
+// asset, so an account funded only with USDC through a gateway pays it
+// itself and the paymaster (whose cap is in uluna) is not involved.
+func TestSessionKeyIntentFeeInSettlementPaidByAccount(t *testing.T) {
+	f := setup(t)
+	pm := types.PaymasterAddress()
+	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(100_000_000))))
+	require.NoError(t, f.app.BatchKeeper.CreateMarket(f.ctx, batchtypes.Market{
+		Id: spotMarket, BaseDenom: "uluna", QuoteDenom: settle, Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
+	}))
+	bp, err := f.app.BatchKeeper.GetParams(f.ctx)
+	require.NoError(t, err)
+	require.Equal(t, settle, bp.IntentFee.Denom)
+
+	controller := util.CreateMockHexAddress("evm-user", 4)
+	acct := types.DeriveAddress(originDom, controller)
+	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, acct, sdk.NewCoins(sdk.NewCoin(settle, math.NewInt(50_000_000)))))
+	session := sdk.AccAddress([]byte("remote-session-key-y-"))
+	f.deliver(t, controller, f.payload(t, nil,
+		&perptypes.MsgDepositCollateral{Sender: acct.String(), Amount: sdk.NewCoin(settle, math.NewInt(20_000_000))},
+		&types.MsgGrantSessionKey{Controller: acct.String(), SessionKey: session.String()},
+	))
+	require.Empty(t, f.rejected(t))
+	pmBefore := f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount
+	m := authz.NewMsgExec(session, []sdk.Msg{f.spotIntent(acct)})
+	_, err = f.app.AuthzKeeper.Exec(f.ctx, &m)
+	require.NoError(t, err)
+	// escrow (1 USDC) and intent fee left the account's own settlement balance
+	require.Equal(t, math.NewInt(29_000_000).Sub(bp.IntentFee.Amount).String(), f.app.BankKeeper.GetBalance(f.ctx, acct, settle).Amount.String())
+	require.Equal(t, pmBefore.String(), f.app.BankKeeper.GetBalance(f.ctx, pm, "uluna").Amount.String(), "the paymaster paid nothing")
+	_, err = f.k.IntentFeeBudgets.Get(f.ctx, acct.String())
+	require.Error(t, err, "no sponsored budget consumed")
+}
+
+// spec §14.4 item 4: when governance prices the intent fee in uluna, an
+// account funded only with the settlement asset through a gateway holds no
+// uluna; its session key can still submit spot intents because the
+// paymaster pays the x/batch intent fee, within paymaster_daily_cap per
+// account and period. Local users pay themselves.
 func TestSessionKeyIntentFeeSponsoredForSettlementOnlyAccount(t *testing.T) {
 	f := setup(t)
 	pm := types.PaymasterAddress()
@@ -39,6 +75,8 @@ func TestSessionKeyIntentFeeSponsoredForSettlementOnlyAccount(t *testing.T) {
 	}))
 	bp, err := f.app.BatchKeeper.GetParams(f.ctx)
 	require.NoError(t, err)
+	bp.IntentFee = sdk.NewCoin("uluna", math.NewInt(2_000_000))
+	require.NoError(t, f.app.BatchKeeper.SetParams(f.ctx, bp))
 	intentFee := bp.IntentFee
 	require.Equal(t, "uluna", intentFee.Denom)
 	require.True(t, intentFee.IsPositive())

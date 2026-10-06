@@ -45,7 +45,8 @@ func DefaultParams() Params {
 		FundingRateMax:             math.LegacyNewDecWithPrec(5, 4),  // 0.05%
 		DispersionRestricted:       math.LegacyNewDecWithPrec(5, 3),  // 0.5%
 		DispersionReduceOnly:       math.LegacyNewDecWithPrec(15, 3), // 1.5%
-		PerpFeeBps:                 5,
+		PerpFeeBps:                 5,                                // user intents; base-tier perp takers charge 4.5-6 bps (spec Annex G)
+		PerpSolverFeeBps:           1,                                // solver levels; = dYdX maker, below Hyperliquid's 1.5 bps
 		MaxOpenPositionsPerAccount: 10,
 		MaxTriggersPerAccount:      20,
 		TriggerSlippageDefault:     math.LegacyNewDecWithPrec(1, 2),  // 1%
@@ -113,6 +114,9 @@ func (p Params) Validate() error {
 	}
 	if p.PerpFeeBps > 1_000 {
 		return fmt.Errorf("perp_fee_bps must not exceed 1000")
+	}
+	if p.PerpSolverFeeBps > p.PerpFeeBps {
+		return fmt.Errorf("perp_solver_fee_bps must not exceed perp_fee_bps: solver levels never pay more than intents")
 	}
 	if p.MaxOpenPositionsPerAccount == 0 || p.MaxOpenPositionsPerAccount > MaxOpenPositionsAbsolute {
 		return fmt.Errorf("max_open_positions_per_account must be within [1, %d]", MaxOpenPositionsAbsolute)

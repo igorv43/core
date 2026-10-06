@@ -50,7 +50,8 @@ message Params {
   // dispersion_restricted (d1) and dispersion_reduce_only (d2) drive the oracle states (spec §21.2).
   string dispersion_restricted = 11 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
   string dispersion_reduce_only = 12 [(cosmos_proto.scalar) = "cosmos.Dec", (gogoproto.customtype) = "cosmossdk.io/math.LegacyDec", (gogoproto.nullable) = false];
-  // perp_fee_bps is the protocol fee on the notional of every fill (spec §23).
+  // perp_fee_bps is the protocol fee on the notional of a user intent fill
+  // (spec §23); solver levels pay perp_solver_fee_bps.
   uint32 perp_fee_bps = 13;
   uint32 max_open_positions_per_account = 14;
   uint32 max_triggers_per_account = 15;
@@ -99,6 +100,10 @@ message Params {
   // settlement in the internal spot market per allocation epoch (spec §23.1,
   // §24.6; same gradual discipline as §18.3). Zero keeps the revenue in kind.
   string revenue_sell_cap = 37 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // perp_solver_fee_bps is the protocol fee on the notional of a solver
+  // (market-maker) level fill (liquidity supplied); perp_fee_bps applies to
+  // user intents (liquidity taken). Never above perp_fee_bps (spec §23).
+  uint32 perp_solver_fee_bps = 38;
 }
 
 // Market is a perpetual market (spec §19–§22). Governance sets the risk

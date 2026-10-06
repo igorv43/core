@@ -63,7 +63,7 @@ func (k Keeper) submitIntent(ctx sdk.Context, msg *types.MsgSubmitIntent, charge
 
 	// anti-spam fee to the chain fee collector, then the escrow
 	if chargeFee {
-		if err := k.chargeIntentFee(ctx, sender, params.IntentFee); err != nil {
+		if err := k.chargeIntentFee(ctx, sender, params.IntentFee, false); err != nil {
 			return 0, 0, err
 		}
 	}
