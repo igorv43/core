@@ -1,6 +1,8 @@
 package keeper_test
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -284,4 +286,59 @@ func TestSolverSlashGoesEntirelyToTheInsuranceFund(t *testing.T) {
 	l, err := f.k.GetLedger(f.ctx)
 	require.NoError(t, err)
 	require.True(t, l.Revenue.GT(after.Revenue), "a fee does reach the cascade revenue")
+}
+
+// EventRevenueSale.proceeds and the amount routed are what the sale intent's
+// fills paid the module (the sum of its EventIntentFilled.received), not the
+// module settlement balance minus the ledger: settlement that reaches the
+// module account without being booked (here a 7 USDC donation) stays out.
+func TestRevenueSaleProceedsAreTheSaleFills(t *testing.T) {
+	f := setup(t)
+	f.buybackSetup(t)
+	target, err := f.k.InsuranceTarget(f.ctx)
+	require.NoError(t, err)
+	f.setLedger(t, target, math.ZeroInt())
+	f.depositUlunaFee(t, 50_000_000)
+	f.perpEndBlock(t)
+	l, _ := f.k.GetLedger(f.ctx)
+	id := l.RevenueSellIntentId
+	require.NotZero(t, id)
+	require.True(t, l.RevenueSellProceeds.IsZero())
+	revenueBefore := l.Revenue
+
+	donation := math.NewInt(7_000_000)
+	f.mintToModule(t, sdk.NewCoins(sdk.NewCoin("uusdc.lf", donation)))
+	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
+	f.buyLuna(t, 200_000_000)
+
+	unquote := func(s string) string { return strings.Trim(s, `"`) }
+	filled, fees := math.ZeroInt(), math.ZeroInt()
+	for _, e := range f.eventsOf("terra.batch.v1.EventIntentFilled") {
+		if unquote(attr(e, "intent_id")) != strconv.FormatUint(id, 10) {
+			continue
+		}
+		r, ok := math.NewIntFromString(unquote(attr(e, "received")))
+		require.True(t, ok)
+		pf, ok := math.NewIntFromString(unquote(attr(e, "protocol_fee")))
+		require.True(t, ok)
+		filled, fees = filled.Add(r), fees.Add(pf)
+	}
+	require.True(t, filled.IsPositive(), "the sale was filled")
+
+	var proceeds string
+	for _, e := range f.eventsOf("terra.perp.v1.EventRevenueSale") {
+		if unquote(attr(e, "intent_id")) == strconv.FormatUint(id, 10) && unquote(attr(e, "proceeds")) != "0" {
+			proceeds = unquote(attr(e, "proceeds"))
+		}
+	}
+	require.Equal(t, filled.String(), proceeds, "the event reports what the fills paid")
+	l, _ = f.k.GetLedger(f.ctx)
+	require.Zero(t, l.RevenueSellIntentId)
+	require.True(t, l.RevenueSellProceeds.IsZero(), "reset for the next sale")
+	// fund at target: the proceeds and the sale's settlement spot fee (plus at
+	// most the quote dust of the batch) are the new revenue; the donation is not
+	gained := l.Revenue.Sub(revenueBefore)
+	require.True(t, gained.GTE(filled.Add(fees)), "gained %s, fills %s + fees %s", gained, filled, fees)
+	require.True(t, gained.LT(filled.Add(fees).AddRaw(10)), "gained %s", gained)
+	require.True(t, gained.LT(donation), "the unbooked donation is not revenue")
 }

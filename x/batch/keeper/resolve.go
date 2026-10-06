@@ -189,6 +189,11 @@ func (k Keeper) settle(ctx sdk.Context, params types.Params, market types.Market
 		}
 		in.Remaining = in.Remaining.Sub(f.In)
 		in.Received = in.Received.Add(f.Out)
+		if k.fillHook != nil {
+			if err := k.fillHook.AfterSpotIntentFilled(ctx, in, sdk.NewCoin(recvDenom, math.MaxInt(net, math.ZeroInt()))); err != nil {
+				return err
+			}
+		}
 		complete := k.intentComplete(market, in)
 		if complete {
 			if _, err := k.closeIntent(ctx, in); err != nil {

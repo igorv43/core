@@ -83,6 +83,9 @@ var (
 	AutoReturnCursorKey = collections.NewPrefix(21)
 	AutoReturnEpochKey  = collections.NewPrefix(22)
 	AutoReturnBudgetKey = collections.NewPrefix(23)
+	// IntentFeeBudgetKey holds, per remote account, the intent fees of x/batch
+	// the paymaster sponsored in the current paymaster period (§14.4 item 4).
+	IntentFeeBudgetKey = collections.NewPrefix(24)
 )
 
 // PaymasterAddress is the account that grants fee allowances to session keys.

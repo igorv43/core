@@ -27,7 +27,7 @@ func (k Keeper) EndBlocker(ctx sdk.Context) error {
 	}
 	// a closed revenue sale is booked first, so the epoch counts its proceeds
 	// and no other pipeline mistakes its refund or proceeds for its own
-	if err := k.settleRevenueSale(ctx, params); err != nil {
+	if err := k.settleRevenueSale(ctx); err != nil {
 		k.Logger(ctx).Error("revenue sale settlement failed", "err", err)
 	}
 	if err := k.runAllocation(ctx, params); err != nil {

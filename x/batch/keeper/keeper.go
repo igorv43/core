@@ -25,6 +25,11 @@ type Keeper struct {
 	oracleKeeper types.OracleKeeper
 	feeSink      types.FeeSink
 	marginHook   types.MarginHook
+	// intentFeeSponsor may pay the intent fee of remote accounts (x/remote
+	// paymaster); nil means every sender pays itself
+	intentFeeSponsor types.IntentFeeSponsor
+	// fillHook observes spot fills (x/perp books its sale proceeds); may be nil
+	fillHook types.IntentFillHook
 
 	Schema           collections.Schema
 	Params           collections.Item[types.Params]
@@ -96,6 +101,31 @@ func (k *Keeper) SetMarginHook(h types.MarginHook) { k.marginHook = h }
 // SetFeeSink replaces the fee sink (x/perp routes fees to the insurance fund
 // and the allocation cascade once it exists, spec §23).
 func (k *Keeper) SetFeeSink(s types.FeeSink) { k.feeSink = s }
+
+// SetIntentFeeSponsor registers the sponsor of intent fees (the x/remote
+// paymaster, spec §14.4 item 4).
+func (k *Keeper) SetIntentFeeSponsor(s types.IntentFeeSponsor) { k.intentFeeSponsor = s }
+
+// SetIntentFillHook registers the observer of spot intent fills (x/perp).
+func (k *Keeper) SetIntentFillHook(h types.IntentFillHook) { k.fillHook = h }
+
+// chargeIntentFee pays the anti-spam intent fee to the chain fee collector:
+// through the sponsor when it covers the sender, otherwise from the sender.
+func (k Keeper) chargeIntentFee(ctx sdk.Context, sender sdk.AccAddress, fee sdk.Coin) error {
+	if !fee.IsPositive() {
+		return nil
+	}
+	if k.intentFeeSponsor != nil {
+		sponsored, err := k.intentFeeSponsor.SponsorIntentFee(ctx, sender, fee)
+		if err != nil {
+			return err
+		}
+		if sponsored {
+			return nil
+		}
+	}
+	return k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, authtypes.FeeCollectorName, sdk.NewCoins(fee))
+}
 
 // MarginHookRegistered reports whether x/perp registered its hook.
 func (k Keeper) MarginHookRegistered() bool { return k.marginHook != nil }

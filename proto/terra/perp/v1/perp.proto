@@ -273,4 +273,8 @@ message Ledger {
   string revenue_uluna_mark = 19 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
   // revenue_sell_offered is the uluna offered by the open sale.
   string revenue_sell_offered = 20 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
+  // revenue_sell_proceeds is the settlement the open sale has received so
+  // far, summed from its x/batch fills (net of the spot fee): the proceeds
+  // the sale reports and routes when it closes.
+  string revenue_sell_proceeds = 21 [(cosmos_proto.scalar) = "cosmos.Int", (gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false];
 }

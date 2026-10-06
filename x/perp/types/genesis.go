@@ -33,14 +33,14 @@ func DefaultLedger() Ledger {
 		TrancheSt: math.ZeroInt(), TrancheUnbondingSt: math.ZeroInt(), TrancheUluna: math.ZeroInt(),
 		TrancheSoldEpoch: math.ZeroInt(), TrancheAdvanced: math.ZeroInt(),
 		RevenueUluna: math.ZeroInt(), RevenueSoldEpoch: math.ZeroInt(), RevenueUlunaEpoch: math.ZeroInt(),
-		RevenueUlunaMark: math.ZeroInt(), RevenueSellOffered: math.ZeroInt(),
+		RevenueUlunaMark: math.ZeroInt(), RevenueSellOffered: math.ZeroInt(), RevenueSellProceeds: math.ZeroInt(),
 	}
 }
 
 // Normalize sets the ledger fields added after the first release (the
 // revenue held in kind) to zero when a stored or genesis ledger lacks them.
 func (l *Ledger) Normalize() {
-	for _, v := range []*math.Int{&l.RevenueUluna, &l.RevenueSoldEpoch, &l.RevenueUlunaEpoch, &l.RevenueUlunaMark, &l.RevenueSellOffered} {
+	for _, v := range []*math.Int{&l.RevenueUluna, &l.RevenueSoldEpoch, &l.RevenueUlunaEpoch, &l.RevenueUlunaMark, &l.RevenueSellOffered, &l.RevenueSellProceeds} {
 		if v.IsNil() {
 			*v = math.ZeroInt()
 		}

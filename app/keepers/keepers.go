@@ -613,6 +613,8 @@ func NewAppKeepers(
 	)
 	appKeepers.BatchKeeper.SetMarginHook(perpkeeper.NewMarginHook(appKeepers.PerpKeeper))
 	appKeepers.BatchKeeper.SetFeeSink(perpkeeper.NewFeeSink(appKeepers.PerpKeeper))
+	// the revenue sale books its proceeds from its own fills (spec §23.1)
+	appKeepers.BatchKeeper.SetIntentFillHook(perpkeeper.NewSpotFillHook(appKeepers.PerpKeeper))
 	// spec §24.6: the x/liquidstake fee remainder (after the direct burn)
 	// enters the allocation cascade of §23.1 through the same sink
 	appKeepers.LiquidStakeKeeper.SetFeeSink(perpkeeper.NewFeeSink(appKeepers.PerpKeeper))
@@ -631,6 +633,10 @@ func NewAppKeepers(
 		&appKeepers.PerpKeeper,
 		bApp.MsgServiceRouter(),
 	)
+	// spec §14.4 item 4: the x/remote paymaster sponsors the x/batch intent fee
+	// of remote accounts (a gateway-funded account holds only the settlement
+	// asset); local users keep paying it themselves
+	appKeepers.BatchKeeper.SetIntentFeeSponsor(appKeepers.RemoteKeeper)
 
 	// x/ismbond (D-17): operator bonds for the ISM validators, evidence judged
 	// against the local merkle tree hook; feeds the bonded-cap rule of x/warpledger.

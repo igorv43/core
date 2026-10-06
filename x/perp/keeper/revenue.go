@@ -27,7 +27,11 @@ import (
 //
 // One sale of the module's uluna is open at a time: the revenue sale, the
 // stLUNC tranche sale and the buyback exclude each other, because each one
-// books what comes back to the module account by balance difference.
+// books the uluna that comes back to the module account (its unfilled part)
+// by balance difference. The settlement proceeds of the revenue sale are
+// not inferred from the module balance: they are summed from the sale
+// intent's own fills (SpotFillHook), so the event and the routing carry
+// exactly what the sale received.
 
 // lunaDenom is the denom of LUNC, the base of the internal spot market.
 const lunaDenom = "uluna"
@@ -62,7 +66,7 @@ func (k Keeper) untrackedUluna(ctx sdk.Context, l types.Ledger) math.Int {
 // back to the revenue held in kind and the settlement received takes the
 // spot-fee path (routeFee). It runs before the other module pipelines of the
 // block so that none of them mistakes the refund or the proceeds for its own.
-func (k Keeper) settleRevenueSale(ctx sdk.Context, params types.Params) error {
+func (k Keeper) settleRevenueSale(ctx sdk.Context) error {
 	l, err := k.GetLedger(ctx)
 	if err != nil {
 		return err
@@ -77,14 +81,13 @@ func (k Keeper) settleRevenueSale(ctx sdk.Context, params types.Params) error {
 	refund := math.MaxInt(math.ZeroInt(), k.untrackedUluna(ctx, l).Sub(l.RevenueUlunaMark))
 	refund = math.MinInt(refund, l.RevenueSellOffered)
 	sold := l.RevenueSellOffered.Sub(refund)
+	// what the sale's fills paid the module (net of the spot fee), never the
+	// module balance minus the ledger, which also holds unbooked inflows
+	proceeds := l.RevenueSellProceeds
 	l.RevenueUluna = l.RevenueUluna.Add(refund)
 	l.RevenueSoldEpoch = math.MaxInt(math.ZeroInt(), l.RevenueSoldEpoch.Sub(refund))
 	l.RevenueSellIntentId, l.RevenueUlunaMark, l.RevenueSellOffered = 0, math.ZeroInt(), math.ZeroInt()
-	expected, err := k.ledgerTotal(ctx, l)
-	if err != nil {
-		return err
-	}
-	proceeds := math.MaxInt(math.ZeroInt(), k.bankKeeper.GetBalance(ctx, k.ModuleAddress(), params.SettlementDenom).Amount.Sub(expected))
+	l.RevenueSellProceeds = math.ZeroInt()
 	if err := k.Ledger.Set(ctx, l); err != nil {
 		return err
 	}
@@ -135,10 +138,44 @@ func (k Keeper) placeRevenueSale(ctx sdk.Context, params types.Params) error {
 	}
 	l.RevenueUluna = l.RevenueUluna.Sub(amount)
 	l.RevenueSoldEpoch = l.RevenueSoldEpoch.Add(amount)
-	l.RevenueSellIntentId, l.RevenueSellOffered = id, amount
+	l.RevenueSellIntentId, l.RevenueSellOffered, l.RevenueSellProceeds = id, amount, math.ZeroInt()
 	l.RevenueUlunaMark = k.untrackedUluna(ctx, l)
 	if err := k.Ledger.Set(ctx, l); err != nil {
 		return err
 	}
 	return ctx.EventManager().EmitTypedEvent(&types.EventRevenueSale{IntentId: id, Offered: amount.String(), Sold: "0", Proceeds: "0"})
+}
+
+// SpotFillHook books the settlement each fill of the open revenue sale pays
+// the module (x/batch calls it on every spot fill, after the payment).
+type SpotFillHook struct{ k Keeper }
+
+var _ batchtypes.IntentFillHook = SpotFillHook{}
+
+// NewSpotFillHook returns the x/batch fill observer of x/perp.
+func NewSpotFillHook(k Keeper) SpotFillHook { return SpotFillHook{k: k} }
+
+// AfterSpotIntentFilled adds the settlement received by a fill of the open
+// revenue sale to Ledger.revenue_sell_proceeds; fills of other intents are
+// ignored.
+func (h SpotFillHook) AfterSpotIntentFilled(ctx sdk.Context, intent batchtypes.Intent, received sdk.Coin) error {
+	if !received.IsPositive() || intent.Sender != h.k.ModuleAddress().String() {
+		return nil
+	}
+	l, err := h.k.GetLedger(ctx)
+	if err != nil {
+		return err
+	}
+	if l.RevenueSellIntentId == 0 || l.RevenueSellIntentId != intent.Id {
+		return nil
+	}
+	params, err := h.k.GetParams(ctx)
+	if err != nil {
+		return err
+	}
+	if received.Denom != params.SettlementDenom {
+		return nil
+	}
+	l.RevenueSellProceeds = l.RevenueSellProceeds.Add(received.Amount)
+	return h.k.Ledger.Set(ctx, l)
 }

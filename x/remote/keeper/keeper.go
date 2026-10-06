@@ -73,6 +73,9 @@ type Keeper struct {
 	AutoReturnCursor collections.Item[string]
 	AutoReturnEpoch  collections.Item[uint64]
 	AutoReturnBudget collections.Item[types.AutoReturnBudget]
+	// IntentFeeBudgets are the x/batch intent fees the paymaster sponsored per
+	// remote account in the current paymaster period (spec §14.4 item 4).
+	IntentFeeBudgets collections.Map[string, types.AutoReturnBudget]
 }
 
 // lateSources are the collaborators of SetBeaconSources (spec §14.6 item 3:
@@ -135,6 +138,8 @@ func NewKeeper(
 		AutoReturnCursor: collections.NewItem(sb, types.AutoReturnCursorKey, "auto_return_cursor", collections.StringValue),
 		AutoReturnEpoch:  collections.NewItem(sb, types.AutoReturnEpochKey, "auto_return_epoch", collections.Uint64Value),
 		AutoReturnBudget: collections.NewItem(sb, types.AutoReturnBudgetKey, "auto_return_budget", codec.CollValue[types.AutoReturnBudget](cdc)),
+		IntentFeeBudgets: collections.NewMap(sb, types.IntentFeeBudgetKey, "intent_fee_budgets", collections.StringKey,
+			codec.CollValue[types.AutoReturnBudget](cdc)),
 	}
 	schema, err := sb.Build()
 	if err != nil {

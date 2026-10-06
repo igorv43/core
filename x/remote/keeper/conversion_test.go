@@ -206,3 +206,56 @@ func TestWithdrawTokenOutNeedsExitFactory(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, rs, "plain withdrawals write no receipt")
 }
+
+// With a withdrawal fee on the executor, min_accepted stays in token_out units
+// (wei for the native sentinel): the fee only lowers the settlement amount sent
+// to the exit, and the exit contract enforces min_accepted on the origin. A
+// port user's default CCTP exit (USDC units) gets the net amount as its floor.
+func TestWithdrawFeeKeepsMinAcceptedInTokenOutUnits(t *testing.T) {
+	f, _, factory, initCodeHash := exitFixture(t)
+	gov := f.k.GetAuthority()
+	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(1_000_000_000))))
+	f.deliver(t, f.controller, f.payload(t, nil, &perptypes.MsgSetAutoTopUp{Sender: f.derived.String(), Enabled: true}))
+	require.NoError(t, f.k.Executors.Set(f.ctx, originDom, types.Executor{
+		AppId: f.appId, Domain: originDom, Address: util.CreateMockHexAddress("executor", 1), TokenId: f.token,
+		MinCollateral: math.ZeroInt(), TargetCollateral: math.NewInt(1), WithdrawFeeBps: 100, NetRebalanced: math.ZeroInt(),
+	}))
+
+	native, err := util.DecodeHexAddress(types.NativeTokenSentinel)
+	require.NoError(t, err)
+	// 0.02 ETH in wei: far above the settlement amount, which must not clamp it
+	minWei, ok := math.NewIntFromString("20000000000000000")
+	require.True(t, ok)
+	want := types.ExitAddress(factory, initCodeHash, f.controller, native, minWei, 1)
+
+	supplyBefore := f.app.BankKeeper.GetSupply(f.ctx, "uluna").Amount
+	_, err = f.k.Withdraw(f.ctx, f.derived.String(), f.token, math.NewInt(400_000_000), types.NativeTokenSentinel, &minWei)
+	require.NoError(t, err)
+	require.Equal(t, "4000000", supplyBefore.Sub(f.app.BankKeeper.GetSupply(f.ctx, "uluna").Amount).String(), "1 % fee burned")
+	rs, err := f.k.ReceiptsOf(f.ctx, f.derived.String())
+	require.NoError(t, err)
+	require.Len(t, rs, 1)
+	require.Equal(t, "20000000000000000", rs[0].MinAccepted, "min_accepted keeps its token_out units")
+	require.Equal(t, "396000000", rs[0].UsdcAmount, "the net settlement amount goes to the exit")
+	require.Equal(t, want, rs[0].ExitAddress, "the exit is derived from the caller's min_accepted")
+	ledger, _, err := f.app.WarpLedgerKeeper.GetLedger(f.ctx, f.token, originDom)
+	require.NoError(t, err)
+	require.Equal(t, "396000000", ledger.Sent.String())
+
+	// a port user's default exit: USDC units, floor = the net amount
+	user := util.CreateMockHexAddress("solana-user", 1)
+	portAccount := types.DeriveAddress(portSo, user)
+	require.NoError(t, f.k.SetPort(f.ctx, &types.MsgSetPort{Authority: gov, PortDomain: portSo, VaultDomain: originDom, CctpDomain: 5}))
+	require.NoError(t, f.k.Accounts.Set(f.ctx, portAccount.String(), types.RemoteAccount{
+		Address: portAccount.String(), Domain: portSo, Controller: user,
+	}))
+	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, portAccount, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)))))
+	_, err = f.k.Withdraw(f.ctx, portAccount.String(), f.token, math.NewInt(40_000_000), "", nil)
+	require.NoError(t, err)
+	rs, err = f.k.ReceiptsOf(f.ctx, portAccount.String())
+	require.NoError(t, err)
+	require.Len(t, rs, 1)
+	require.Equal(t, "39600000", rs[0].MinAccepted)
+	require.Equal(t, "39600000", rs[0].UsdcAmount)
+	require.Equal(t, types.ExitAddress(factory, initCodeHash, user, types.PortSentinel(portSo), math.NewInt(39_600_000), 1), rs[0].ExitAddress)
+}

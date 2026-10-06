@@ -8,7 +8,6 @@ import (
 	"cosmossdk.io/math"
 	"github.com/classic-terra/core/v4/x/batch/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 // SubmitIntent escrows amount_in and records a limit order for the batch
@@ -63,8 +62,8 @@ func (k Keeper) submitIntent(ctx sdk.Context, msg *types.MsgSubmitIntent, charge
 	}
 
 	// anti-spam fee to the chain fee collector, then the escrow
-	if chargeFee && params.IntentFee.IsPositive() {
-		if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, authtypes.FeeCollectorName, sdk.NewCoins(params.IntentFee)); err != nil {
+	if chargeFee {
+		if err := k.chargeIntentFee(ctx, sender, params.IntentFee); err != nil {
 			return 0, 0, err
 		}
 	}

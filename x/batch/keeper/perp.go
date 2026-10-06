@@ -6,7 +6,6 @@ import (
 	"cosmossdk.io/math"
 	"github.com/classic-terra/core/v4/x/batch/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 // Perpetual orders (spec §14.3): the same engine, a different collateral
@@ -77,8 +76,8 @@ func (k Keeper) SubmitPerpIntent(ctx sdk.Context, o PerpOrder) (uint64, uint64, 
 	if err != nil {
 		return 0, 0, err
 	}
-	if o.ChargeFee && params.IntentFee.IsPositive() {
-		if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, authtypes.FeeCollectorName, sdk.NewCoins(params.IntentFee)); err != nil {
+	if o.ChargeFee {
+		if err := k.chargeIntentFee(ctx, sender, params.IntentFee); err != nil {
 			return 0, 0, err
 		}
 	}

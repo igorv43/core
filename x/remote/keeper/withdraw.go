@@ -39,13 +39,15 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 	// dynamic withdrawal fee of the vault (spec §11.5.4): burned, so the
 	// vault keeps the collateral as an unallocated reserve
 	destination := account.Domain
+	// a port user who names no token_out withdraws USDC by CCTP from the vault
+	// to their own address; that exit's min_accepted is in USDC units and is
+	// set below to the net settlement amount (after the withdrawal fee)
+	portDefault := false
 	if port, err := k.Ports.Get(ctx, account.Domain); err == nil {
 		destination = port.VaultDomain
 		if tokenOut == "" {
-			// a port user withdraws by CCTP from the vault to their own address
 			tokenOut = types.PortSentinel(account.Domain).String()
-			m := amount
-			minAccepted = &m
+			portDefault = true
 		}
 	}
 	if ex, err := k.Executors.Get(ctx, destination); err == nil && ex.WithdrawFeeBps > 0 {
@@ -62,12 +64,16 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 			if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, coins); err != nil {
 				return util.HexAddress{}, err
 			}
+			// the fee only reduces the settlement amount sent to the exit;
+			// a caller's min_accepted is in token_out units (e.g. wei for the
+			// native sentinel), so it is never compared with this USDC amount:
+			// the exit contract enforces it on the origin
 			amount = amount.Sub(fee)
-			if minAccepted != nil && minAccepted.GT(amount) {
-				m := amount
-				minAccepted = &m
-			}
 		}
+	}
+	if portDefault {
+		m := amount
+		minAccepted = &m
 	}
 	recipient := account.Controller
 	var exit util.HexAddress

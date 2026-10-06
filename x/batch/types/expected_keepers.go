@@ -65,3 +65,20 @@ type MarginHook interface {
 	// order is then excluded and the batch re-resolved, spec §14.3).
 	Fill(ctx sdk.Context, fill PerpFill) error
 }
+
+// IntentFeeSponsor may pay the intent fee on behalf of a sender (spec §14.4
+// item 4: the paymaster of x/remote sponsors the local costs of remote users
+// and recovers them through the trading fee). Sponsor returns true when it
+// paid the fee to the fee collector, false when the sender must pay itself
+// (a local account, or a sponsor out of budget or float).
+type IntentFeeSponsor interface {
+	SponsorIntentFee(ctx sdk.Context, sender sdk.AccAddress, fee sdk.Coin) (bool, error)
+}
+
+// IntentFillHook observes the fills of spot intents. received is what the
+// intent's sender was actually paid for the fill (net of the protocol fee and
+// of the builder fee); x/perp uses it to book the proceeds of its own sale
+// intents exactly, instead of inferring them from its module balance.
+type IntentFillHook interface {
+	AfterSpotIntentFilled(ctx sdk.Context, intent Intent, received sdk.Coin) error
+}
