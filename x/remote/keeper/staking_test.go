@@ -712,3 +712,35 @@ func TestAutoReturnPaymasterCap(t *testing.T) {
 	_, _, err = s.app.LiquidStakeKeeper.Claim(s.ctx, acc3)
 	require.NoError(t, err, "never lost: the user can still claim manually")
 }
+
+// Regression (testenv, 2026-10-05): NewKeeper registers &k with the Hyperlane
+// app router and returns a copy; SetBeaconSources runs later on the app's copy.
+// A gateway payload whose deposit was already credited executes on arrival in
+// Handle of the ROUTER's copy, which must see x/liquidstake and x/warpledger
+// too (before the fix: "result ...stluna is not the denom 0x... of the warp
+// token"). The payload goes through MsgProcessMessage, not s.k.Handle.
+func TestStakeOnArrivalThroughTheMailboxRouter(t *testing.T) {
+	s := setupStaking(t)
+	acc := s.derived
+	s.warpIn(t, s.token, s.lunaRtr, acc, 100_000_000) // deposit first: credited
+	s.fresh()
+	body := s.adPayload(t, &types.AfterDeposit{TokenId: s.token, Amount: math.NewInt(100_000_000)},
+		&lstypes.MsgStake{Sender: acc.String(), Amount: luna(100_000_000)},
+		s.refWithdraw(s.stToken, amount(1)),
+	)
+	s.nonce++
+	msg := util.HyperlaneMessage{
+		Version: 3, Nonce: s.nonce, Origin: originDom, Sender: s.gateway, Destination: localDomain, Recipient: s.appId, Body: body,
+	}
+	process := &coretypes.MsgProcessMessage{MailboxId: s.mailbox, Relayer: s.owner.String(), Metadata: "0x00", Message: msg.String()}
+	res, err := s.app.MsgServiceRouter().Handler(process)(s.ctx, process)
+	require.NoError(t, err)
+	s.ctx.EventManager().EmitEvents(res.GetEvents())
+	require.Empty(t, s.rejected(t))
+	require.Equal(t, 0, s.count("terra.remote.v1.EventRemotePending"), "the deposit was credited: executed on arrival")
+	require.Equal(t, "100000000uluna", s.attr("terra.remote.v1.EventRemoteStake", "uluna"))
+	require.True(t, s.bal(acc, lstypes.StDenom).IsZero(), "the minted stLUNC left through warp")
+	ledger, _, err := s.app.WarpLedgerKeeper.GetLedger(s.ctx, s.stToken, originDom)
+	require.NoError(t, err)
+	require.Equal(t, s.attr("terra.remote.v1.EventRemoteStake", "minted"), ledger.Sent.String()+lstypes.StDenom)
+}

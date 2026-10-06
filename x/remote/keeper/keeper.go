@@ -31,11 +31,13 @@ type Keeper struct {
 	feegrantKeeper feegrantkeeper.Keeper
 	perpKeeper     types.PerpKeeper
 	router         baseapp.MessageRouter
-	// optional collaborators of the beacons (spec §14.6 item 3)
-	lsKeeper     types.LiquidStakeKeeper
-	ledgerKeeper types.WarpLedgerKeeper
-	roots        types.RootRecorder
-	warpAddress  sdk.AccAddress
+	// optional collaborators set after construction (SetBeaconSources). They
+	// live behind a pointer shared by every copy of the keeper: NewKeeper
+	// registers &k with the Hyperlane app router and returns a copy, so a field
+	// set later on the app's copy must reach the router's copy too (otherwise
+	// Handle runs without x/liquidstake and x/warpledger: result references of
+	// payloads executed on arrival fail, cross-chain liquid staking §4.2).
+	*lateSources
 
 	Schema   collections.Schema
 	Params   collections.Item[types.Params]
@@ -73,6 +75,16 @@ type Keeper struct {
 	AutoReturnBudget collections.Item[types.AutoReturnBudget]
 }
 
+// lateSources are the collaborators of SetBeaconSources (spec §14.6 item 3:
+// beacons; also the warp token / router data of withdrawals and the liquid
+// staking keeper of the result references and auto-returns).
+type lateSources struct {
+	lsKeeper     types.LiquidStakeKeeper
+	ledgerKeeper types.WarpLedgerKeeper
+	roots        types.RootRecorder
+	warpAddress  sdk.AccAddress
+}
+
 // NewKeeper creates the x/remote keeper and registers it as Hyperlane app 3.
 func NewKeeper(
 	cdc codec.Codec,
@@ -91,7 +103,7 @@ func NewKeeper(
 	sb := collections.NewSchemaBuilder(storeService)
 	k := Keeper{
 		cdc: cdc, authority: authority, bankKeeper: bankKeeper, coreKeeper: coreKeeper, authzKeeper: authzKeeper,
-		feegrantKeeper: feegrantKeeper, perpKeeper: perpKeeper, router: router,
+		feegrantKeeper: feegrantKeeper, perpKeeper: perpKeeper, router: router, lateSources: &lateSources{},
 		Params: collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
 		Apps:   collections.NewMap(sb, types.AppsKey, "apps", collections.Uint64Key, codec.CollValue[types.RemoteApp](cdc)),
 		Gateways: collections.NewMap(sb, types.GatewaysKey, "gateways",
