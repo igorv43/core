@@ -154,7 +154,7 @@ func (k Keeper) settle(ctx sdk.Context, params types.Params, market types.Market
 		if f.Kind == auction.KindSolver {
 			feeBps = params.SpotSolverFeeBps
 		}
-		protocolFee := f.Out.MulRaw(int64(feeBps)).QuoRaw(10_000)
+		protocolFee := bpsCeil(f.Out, feeBps)
 		net := f.Out.Sub(protocolFee)
 		if protocolFee.IsPositive() {
 			fees = fees.Add(sdk.NewCoin(recvDenom, protocolFee))
@@ -182,7 +182,7 @@ func (k Keeper) settle(ctx sdk.Context, params types.Params, market types.Market
 		if in.Frontend != "" {
 			if fe, err := k.Frontends.Get(ctx, in.Frontend); err == nil {
 				// the registered fee applies up to the spot cap (§23.2)
-				builderFee = f.Out.MulRaw(int64(min(fe.FeeBps, params.BuilderFeeMaxSpotBps))).QuoRaw(10_000)
+				builderFee = bpsCeil(f.Out, min(fe.FeeBps, params.BuilderFeeMaxSpotBps))
 				if builderFee.IsPositive() {
 					builderFees[in.Frontend] = builderFees[in.Frontend].Add(sdk.NewCoin(recvDenom, builderFee))
 					net = net.Sub(builderFee)
@@ -271,4 +271,11 @@ func (k Keeper) finishCommits(ctx sdk.Context, params types.Params, batch uint64
 		}
 	}
 	return nil
+}
+
+// bpsCeil returns amount x bps / 10,000 rounded up: a fee is never rounded in the
+// user's favour (same rule as the perp fee in x/perp/keeper/hook.go). amount >= 0
+// and bps <= 10,000, so the result never exceeds amount.
+func bpsCeil(amount math.Int, bps uint32) math.Int {
+	return amount.MulRaw(int64(bps)).AddRaw(9_999).QuoRaw(10_000)
 }
