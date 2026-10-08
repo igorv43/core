@@ -39,6 +39,10 @@ const (
 	MaxPendingTTLBlocksAbsolute     = 100_800 // ~7 days at 6 s
 	MaxPendingExecsPerBlockAbsolute = 50
 	MaxAutoReturnsPerEpochAbsolute  = 200
+	// MaxPortExitFeeToleranceBpsAbsolute is the code maximum of
+	// params.port_exit_fee_tolerance_bps (spec §11.6, v0.9.12): 1 %. A larger
+	// allowance would let a port exit settle far below the user's net amount.
+	MaxPortExitFeeToleranceBpsAbsolute = 100
 	// AutoReturnScanFactor bounds the opted-in accounts examined per epoch
 	// to this multiple of max_auto_returns_per_epoch (accounts with nothing
 	// matured cost a read, not a return).

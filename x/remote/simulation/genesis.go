@@ -40,6 +40,7 @@ func RandomizedParams(r *rand.Rand) types.Params {
 	p.PendingTtlBlocks = int64(1 + r.Intn(types.MaxPendingTTLBlocksAbsolute))
 	p.MaxPendingExecsPerBlock = uint32(1 + r.Intn(types.MaxPendingExecsPerBlockAbsolute))
 	p.MaxAutoReturnsPerEpoch = uint32(1 + r.Intn(types.MaxAutoReturnsPerEpochAbsolute))
+	p.PortExitFeeToleranceBps = uint32(r.Intn(types.MaxPortExitFeeToleranceBpsAbsolute + 1))
 	if err := p.Validate(); err != nil {
 		panic(err)
 	}

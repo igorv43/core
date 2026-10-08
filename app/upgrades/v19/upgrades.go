@@ -16,6 +16,10 @@ import (
 // x/warpledger bonded_cap_threshold once operators have bonded. The
 // warpledger parameter set gains bonded_cap_threshold = 0 (rule disabled)
 // without migration: the stored proto decodes the new field as zero.
+// x/remote is created here from DefaultGenesis, so its parameter
+// port_exit_fee_tolerance_bps (spec v0.9.12 §11.6) starts at the default 10
+// bps; a chain that already ran a pre-v0.9.12 v19 binary decodes the absent
+// field as 0, the previous floor (full net amount), until governance sets it.
 //
 // RunMigrations also carries the 04/10/2026 conformance fixes that need it:
 // x/liquidstake ConsensusVersion 1 -> 2 (Migrate1to2 rebuilds the owed

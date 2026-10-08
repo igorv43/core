@@ -59,6 +59,14 @@ message Params {
   // max_auto_returns_per_epoch bounds the matured claims returned to their
   // controllers at one liquid-staking epoch (cross-chain liquid staking §4.4).
   uint32 max_auto_returns_per_epoch = 18;
+  // port_exit_fee_tolerance_bps is the allowance for the CCTP minimum fee of
+  // the vault chain's TokenMessengerV2 in the default exit of a port account
+  // (spec §11.6, v0.9.12): the exit's min_accepted is
+  // net - ceil(net x bps / 10,000) instead of the full net amount, so a
+  // minimum fee within the tolerance does not revert the exit. The user
+  // receives net minus the fee actually charged by the issuer. Absolute
+  // maximum in code: 100 (1 %).
+  uint32 port_exit_fee_tolerance_bps = 19;
 }
 
 // BeaconKind is the fact a beacon transmits (spec §14.6 item 3): only chain

@@ -242,7 +242,7 @@ func TestWithdrawFeeKeepsMinAcceptedInTokenOutUnits(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "396000000", ledger.Sent.String())
 
-	// a port user's default exit: USDC units, floor = the net amount
+	// a port user's default exit: USDC units, floor = the net amount less the CCTP fee allowance
 	user := util.CreateMockHexAddress("solana-user", 1)
 	portAccount := types.DeriveAddress(portSo, user)
 	require.NoError(t, f.k.SetPort(f.ctx, &types.MsgSetPort{Authority: gov, PortDomain: portSo, VaultDomain: originDom, CctpDomain: 5}))
@@ -258,7 +258,8 @@ func TestWithdrawFeeKeepsMinAcceptedInTokenOutUnits(t *testing.T) {
 	rs, err = f.k.ReceiptsOf(f.ctx, portAccount.String())
 	require.NoError(t, err)
 	require.Len(t, rs, 1)
-	require.Equal(t, "39600000", rs[0].MinAccepted)
+	// 39,600,000 - ceil(39,600,000 x 10 / 10,000) = 39,560,400
+	require.Equal(t, "39560400", rs[0].MinAccepted)
 	require.Equal(t, "39600000", rs[0].UsdcAmount)
-	require.Equal(t, types.ExitAddress(factory, initCodeHash, user, types.PortSentinel(portSo), math.NewInt(39_600_000), 1), rs[0].ExitAddress)
+	require.Equal(t, types.ExitAddress(factory, initCodeHash, user, types.PortSentinel(portSo), math.NewInt(39_560_400), 1), rs[0].ExitAddress)
 }

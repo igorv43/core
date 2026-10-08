@@ -28,6 +28,7 @@ func DefaultParams() Params {
 		PendingTtlBlocks:        600, // ~1 h at 6 s
 		MaxPendingExecsPerBlock: 10,
 		MaxAutoReturnsPerEpoch:  50,
+		PortExitFeeToleranceBps: 10, // 0.1 %: allowance for the vault chain's CCTP minimum fee in a default port exit
 	}
 }
 
@@ -87,5 +88,37 @@ func (p Params) Validate() error {
 	if p.MaxAutoReturnsPerEpoch == 0 || p.MaxAutoReturnsPerEpoch > MaxAutoReturnsPerEpochAbsolute {
 		return fmt.Errorf("max_auto_returns_per_epoch must be within [1, %d]", MaxAutoReturnsPerEpochAbsolute)
 	}
+	if p.PortExitFeeToleranceBps > MaxPortExitFeeToleranceBpsAbsolute {
+		return fmt.Errorf("port_exit_fee_tolerance_bps must be at most %d", MaxPortExitFeeToleranceBpsAbsolute)
+	}
 	return nil
+}
+
+// PortExitMinAccepted is the min_accepted of the default exit of a port
+// account (spec §11.6, v0.9.12): net - ceil(net x toleranceBps / 10,000).
+//
+// The exit on the vault chain burns all its USDC by CCTP with maxFee =
+// TokenMessengerV2.getMinFeeAmount(net) and checks net - maxFee >= min_accepted;
+// the user receives net minus the fee the issuer actually executes (at most
+// maxFee). min_accepted moves no value: it is the user's guaranteed floor and
+// the condition under which the exit can settle at all.
+//
+// Rounding: the fee allowance is rounded UP, so the floor is rounded DOWN.
+// The rule "never round in the user's favour" means the protocol never
+// promises or pays the user more than it can guarantee. Rounding the floor up
+// would promise a minimum that a CCTP fee exactly at the tolerance cannot
+// honour (Circle's getMinFeeAmount is floor(amount x minFee / 1e7) but at
+// least 1 unit: with net = 999 and 10 bps a truncated allowance of 0 would
+// demand 999 while the issuer charges 1), so the exit would revert and, for a
+// non-EVM controller, the USDC would be stranded in it. Rounding the floor
+// down widens the user's protection by less than one base unit and never
+// changes what the user is paid. This is the convention of the module's other
+// amounts: every fee or allowance rounds up (withdrawFee), every promised
+// amount rounds down.
+func PortExitMinAccepted(net math.Int, toleranceBps uint32) math.Int {
+	if toleranceBps == 0 || !net.IsPositive() {
+		return net
+	}
+	allowance := net.MulRaw(int64(toleranceBps)).AddRaw(9_999).QuoRaw(10_000)
+	return net.Sub(allowance)
 }

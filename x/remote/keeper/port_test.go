@@ -104,8 +104,9 @@ func TestPortWithdrawRouting(t *testing.T) {
 	require.Equal(t, "176543211", f.app.BankKeeper.GetBalance(f.ctx, acc, "uluna").Amount.String())
 
 	// 2. the settlement token goes to the vault and leaves by CCTP: the 1 %
-	// fee (400,000 of 40,000,000) is burned, 39,600,000 cross to the vault and
-	// are the exit's floor; the exit pays the controller on the port chain
+	// fee (400,000 of 40,000,000) is burned, 39,600,000 cross to the vault; the
+	// exit's floor is 39,600,000 - ceil(39,600 CCTP fee allowance at 10 bps) =
+	// 39,560,400; the exit pays the controller on the port chain
 	supplyBefore := f.app.BankKeeper.GetSupply(f.ctx, usdcDenom).Amount
 	id, err := f.k.Withdraw(f.ctx, acc.String(), usdc, math.NewInt(40_000_000), "", nil)
 	require.NoError(t, err)
@@ -118,9 +119,9 @@ func TestPortWithdrawRouting(t *testing.T) {
 	require.Equal(t, id, rs[0].MessageId)
 	require.Equal(t, uint32(originDom), rs[0].OriginDomain, "the vault serves it")
 	require.Equal(t, types.PortSentinel(portSo).String(), rs[0].TokenOut)
-	require.Equal(t, "39600000", rs[0].MinAccepted)
+	require.Equal(t, "39560400", rs[0].MinAccepted)
 	require.Equal(t, "39600000", rs[0].UsdcAmount)
-	require.Equal(t, types.ExitAddress(factory, initCodeHash, user, types.PortSentinel(portSo), math.NewInt(39_600_000), 2), rs[0].ExitAddress)
+	require.Equal(t, types.ExitAddress(factory, initCodeHash, user, types.PortSentinel(portSo), math.NewInt(39_560_400), 2), rs[0].ExitAddress)
 
 	// the vault's confirmation of the CCTP exit carries port_domain and lands on the port account's
 	// receipt (amount_out = what the exit burned to the port chain)

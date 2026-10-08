@@ -43,7 +43,7 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 	// the port's vault (spec §11.6.2, v0.9.11). A port user who names no
 	// token_out withdraws it by CCTP from the vault to their own address; that
 	// exit's min_accepted is in USDC units and is set below to the net
-	// settlement amount (after the withdrawal fee)
+	// settlement amount (after the withdrawal fee) less the CCTP fee allowance
 	destination, viaVault, err := k.destinationOf(ctx, account, tokenId)
 	if err != nil {
 		return util.HexAddress{}, err
@@ -75,7 +75,10 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 		}
 	}
 	if portDefault {
-		m := amount
+		// the floor leaves room for the vault chain's CCTP minimum fee within
+		// port_exit_fee_tolerance_bps (spec §11.6, v0.9.12): the exit pays the
+		// net minus the issuer's fee, never less than this floor
+		m := types.PortExitMinAccepted(amount, params.PortExitFeeToleranceBps)
 		minAccepted = &m
 	}
 	recipient := account.Controller

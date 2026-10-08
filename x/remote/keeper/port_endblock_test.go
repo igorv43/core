@@ -158,12 +158,13 @@ func TestPortSettlementExitFromEndBlock(t *testing.T) {
 	require.Equal(t, "9999999", s.bal(acc, usdcDenom).String())
 	require.Equal(t, "39600000", sentTo(t, s.fixture, usdc, originDom))
 	sentinel := types.PortSentinel(portSo)
-	exit := types.ExitAddress(factory, initCodeHash, user, sentinel, math.NewInt(39_600_000), 2)
+	// floor = 39,600,000 - ceil(39,600,000 x 10 / 10,000) = 39,560,400 (port_exit_fee_tolerance_bps 10)
+	exit := types.ExitAddress(factory, initCodeHash, user, sentinel, math.NewInt(39_560_400), 2)
 	rs, err = s.k.ReceiptsOf(s.ctx, acc.String())
 	require.NoError(t, err)
 	require.Len(t, rs, 1)
 	require.Equal(t, sentinel.String(), rs[0].TokenOut)
-	require.Equal(t, "39600000", rs[0].MinAccepted)
+	require.Equal(t, "39560400", rs[0].MinAccepted)
 	require.Equal(t, "39600000", rs[0].UsdcAmount)
 	require.Equal(t, exit, rs[0].ExitAddress)
 	require.Equal(t, uint32(originDom), rs[0].OriginDomain)
@@ -172,7 +173,8 @@ func TestPortSettlementExitFromEndBlock(t *testing.T) {
 	require.Equal(t, 1, s.count("terra.remote.v1.EventRemoteExecuted"))
 	require.Equal(t, "CONVERSION_WITHDRAW", s.attr("terra.remote.v1.EventConversionReceiptCreated", "direction"))
 	require.Equal(t, sentinel.String(), s.attr("terra.remote.v1.EventConversionReceiptCreated", "token_out"))
-	require.Equal(t, "39600000", s.attr("terra.remote.v1.EventConversionReceiptCreated", "min_accepted"))
+	require.Equal(t, "39560400", s.attr("terra.remote.v1.EventConversionReceiptCreated", "min_accepted"))
+	require.Equal(t, "39600000", s.attr("terra.remote.v1.EventConversionReceiptCreated", "usdc_amount"))
 	require.Equal(t, exit.String(), s.attr("terra.remote.v1.EventConversionReceiptCreated", "exit_address"))
 	require.Equal(t, rs[0].MessageId.String(), s.attr("terra.remote.v1.EventConversionReceiptCreated", "message_id"))
 	require.Equal(t, acc.String(), s.attr("terra.remote.v1.EventConversionReceiptCreated", "account"))
@@ -197,7 +199,7 @@ func TestPortSettlementExitFromEndBlock(t *testing.T) {
 			"exit":        exit.String(),
 			"account":     acc.String(),
 			"controller":  user.String(),
-			"minAccepted": "39600000",
+			"minAccepted": "39560400",
 			"messageId":   rs[0].MessageId.String(),
 			"seq":         2,
 		})
