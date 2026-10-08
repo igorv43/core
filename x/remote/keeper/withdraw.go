@@ -163,7 +163,7 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 			Account: controller, OriginDomain: destination, MessageId: out.MessageId, Direction: types.CONVERSION_WITHDRAW,
 			TokenIn: token, AmountIn: amount.String(), UsdcAmount: amount.String(), EffectiveRate: math.LegacyZeroDec(),
 			DexFee: "0", RouteFee: "0", MinAccepted: minAccepted.String(), TokenOut: tokenOutHex.String(), ExitAddress: exit,
-			RegisteredHeight: ctx.BlockHeight(),
+			RegisteredHeight: ctx.BlockHeight(), ExitNonce: seq, ExitMinAccepted: minAccepted.String(),
 		}); err != nil {
 			return util.HexAddress{}, err
 		}

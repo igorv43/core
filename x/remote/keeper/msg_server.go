@@ -58,6 +58,14 @@ func (ms msgServer) SetAutoReturn(goCtx context.Context, msg *types.MsgSetAutoRe
 	return &types.MsgSetAutoReturnResponse{}, nil
 }
 
+func (ms msgServer) RefloorPortExit(goCtx context.Context, msg *types.MsgRefloorPortExit) (*types.MsgRefloorPortExitResponse, error) {
+	id, nonce, err := ms.k.RefloorPortExit(sdk.UnwrapSDKContext(goCtx), msg.Controller, msg.MessageId, msg.NewMinAccepted)
+	if err != nil {
+		return nil, err
+	}
+	return &types.MsgRefloorPortExitResponse{ControlMessageId: id, Nonce: nonce}, nil
+}
+
 func (ms msgServer) FundPaymaster(goCtx context.Context, msg *types.MsgFundPaymaster) (*types.MsgFundPaymasterResponse, error) {
 	if err := ms.k.FundPaymaster(sdk.UnwrapSDKContext(goCtx), sdk.MustAccAddressFromBech32(msg.Sender), msg.Amount); err != nil {
 		return nil, err

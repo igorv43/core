@@ -92,6 +92,20 @@ func (m MsgSetAutoReturn) ValidateBasic() error {
 }
 
 // ValidateBasic implements sdk.HasValidateBasic.
+func (m MsgRefloorPortExit) ValidateBasic() error {
+	if err := validAddr("controller", m.Controller); err != nil {
+		return err
+	}
+	if m.MessageId.IsZeroAddress() {
+		return errorsmod.Wrap(ErrInvalidConversion, "message_id must be the withdrawal's hyperlane id")
+	}
+	if m.NewMinAccepted.IsNil() || m.NewMinAccepted.IsNegative() {
+		return errorsmod.Wrap(ErrInvalidConversion, "new_min_accepted must be a non-negative integer")
+	}
+	return nil
+}
+
+// ValidateBasic implements sdk.HasValidateBasic.
 func (m AfterDeposit) ValidateBasic() error {
 	if m.TokenId.IsZeroAddress() {
 		return errorsmod.Wrap(ErrInvalidPayload, "after_deposit.token_id must be set")

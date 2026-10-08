@@ -272,6 +272,10 @@ enum ControlAction {
   CONTROL_ENROLL_LEG = 4;
   CONTROL_PAUSE_LEG = 5;
   CONTROL_UNPAUSE_LEG = 6;
+  // CONTROL_REFLOOR_EXIT lowers the minimum of one stuck port exit at the
+  // request of the account that withdrew (MsgRefloorPortExit, spec v0.9.13
+  // §11.6.4); never a governance order.
+  CONTROL_REFLOOR_EXIT = 7;
 }
 
 // ConversionData is measured by the gateway contract on the origin chain
@@ -330,6 +334,15 @@ message ConversionReceipt {
   bool confirmed = 17;
   // exit_address is the deterministic exit contract the withdrawal was sent to.
   string exit_address = 18 [(gogoproto.customtype) = "github.com/bcp-innovations/hyperlane-cosmos/util.HexAddress", (gogoproto.nullable) = false];
+  // exit_nonce is the withdrawal sequence in the exit's CREATE2 salt.
+  uint64 exit_nonce = 19;
+  // exit_min_accepted is the minimum in the exit's CREATE2 salt (the
+  // min_accepted at withdrawal time); min_accepted may later be lowered by
+  // MsgRefloorPortExit (spec v0.9.13 §11.6.4), the exit address never changes.
+  string exit_min_accepted = 20;
+  // refloors counts the consented re-floors of a port exit (at most
+  // MaxPortExitRefloors).
+  uint32 refloors = 21;
 }
 
 enum ConversionDirection {

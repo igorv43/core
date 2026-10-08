@@ -55,7 +55,8 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{RpcMethod: "RevokeOwnSessionKey", Skip: true},
 				{RpcMethod: "Withdraw", Skip: true},
 				{RpcMethod: "FundPaymaster", Skip: true},
-				{RpcMethod: "SetAutoReturn", Skip: true}, // payload message only
+				{RpcMethod: "SetAutoReturn", Skip: true},   // payload message only
+				{RpcMethod: "RefloorPortExit", Skip: true}, // payload message only (spec v0.9.13 §11.6.4)
 				{RpcMethod: "CreateRemoteApp", Skip: true},
 				{RpcMethod: "SetGateway", Skip: true},
 				{RpcMethod: "SetBeacon", Skip: true},

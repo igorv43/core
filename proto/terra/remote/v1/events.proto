@@ -73,6 +73,25 @@ message EventControlSent {
   string params = 5;
 }
 
+// EventPortExitRefloored is emitted when the owner of a stuck port exit lowers
+// its minimum (spec v0.9.13 §11.6.4, MsgRefloorPortExit): the receipt's
+// min_accepted becomes new_min_accepted and the REFLOOR_EXIT control order
+// control_message_id (nonce) carries it to the vault chain.
+message EventPortExitRefloored {
+  string account = 1;
+  string message_id = 2;
+  string exit_address = 3;
+  uint32 vault_domain = 4;
+  string usdc_amount = 5;
+  string previous_min_accepted = 6;
+  string new_min_accepted = 7;
+  // lowest_allowed is net - ceil(net x MaxPortExitFeeToleranceBpsAbsolute / 10,000).
+  string lowest_allowed = 8;
+  uint32 refloors = 9;
+  string control_message_id = 10;
+  uint64 nonce = 11;
+}
+
 // EventRemotePending is emitted when a payload waits for its deposit (§4.3).
 message EventRemotePending {
   string account = 1;

@@ -65,6 +65,22 @@ func EnrollLegParams(domain uint32, router, bridge util.HexAddress) []byte {
 	return out
 }
 
+// RefloorExitParams is abi.encode(bytes32 controller, bytes32 tokenOut,
+// uint256 saltMinOut, uint64 nonce, uint256 newMinOut, address exit): the
+// REFLOOR_EXIT order of spec v0.9.13 §11.6.4. The exit is named by its
+// CREATE2 parameters and its address; ExitFactory.refloorPortExit checks they
+// match, so the order reaches exactly one exit.
+func RefloorExitParams(controller, tokenOut util.HexAddress, saltMinOut math.Int, nonce uint64, newMinOut math.Int, exit util.HexAddress) []byte {
+	out := make([]byte, 0, 6*32)
+	out = append(out, controller.Bytes()...)
+	out = append(out, tokenOut.Bytes()...)
+	out = append(out, wordInt(saltMinOut)...)
+	out = append(out, wordUint(nonce)...)
+	out = append(out, wordInt(newMinOut)...)
+	out = append(out, word(exit.Bytes()[12:])...)
+	return out
+}
+
 // PortSentinel is the token_out that routes a withdrawal to a port-of-entry
 // chain by CCTP (spec §11.6.2): bytes 0..27 zero, byte 27 = 0xcc, bytes
 // 28..32 = big-endian hyperlane domain of the port.

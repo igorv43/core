@@ -43,6 +43,12 @@ const (
 	// params.port_exit_fee_tolerance_bps (spec §11.6, v0.9.12): 1 %. A larger
 	// allowance would let a port exit settle far below the user's net amount.
 	MaxPortExitFeeToleranceBpsAbsolute = 100
+	// MaxPortExitRefloors bounds the consented re-floors of one port exit
+	// (MsgRefloorPortExit, spec v0.9.13 §11.6.4). Each one is a control
+	// message whose interchain gas the paymaster advances; three consents
+	// cover an issuer fee that rises in steps, and the lowest minimum is
+	// bounded anyway by MaxPortExitFeeToleranceBpsAbsolute.
+	MaxPortExitRefloors = 3
 	// AutoReturnScanFactor bounds the opted-in accounts examined per epoch
 	// to this multiple of max_auto_returns_per_epoch (accounts with nothing
 	// matured cost a read, not a return).
@@ -136,6 +142,9 @@ func PayloadMsgTypeURLs() map[string]bool {
 		sdk.MsgTypeURL(&lstypes.MsgUnstake{}): true,
 		sdk.MsgTypeURL(&lstypes.MsgClaim{}):   true,
 		sdk.MsgTypeURL(&MsgSetAutoReturn{}):   true,
+		// consented re-floor of the account's own stuck port exit (spec
+		// v0.9.13 §11.6.4): a principal decision, never in the session scope
+		sdk.MsgTypeURL(&MsgRefloorPortExit{}): true,
 	}
 	for _, u := range SessionMsgTypeURLs() {
 		urls[u] = true
