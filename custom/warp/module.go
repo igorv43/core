@@ -5,6 +5,7 @@ import (
 	warpkeeper "github.com/bcp-innovations/hyperlane-cosmos/x/warp/keeper"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	warpledgerkeeper "github.com/classic-terra/core/v4/x/warpledger/keeper"
+	warpledgertypes "github.com/classic-terra/core/v4/x/warpledger/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/types/module"
 )
@@ -24,6 +25,7 @@ type AppModule struct {
 	keeper warpkeeper.Keeper
 	ledger warpledgerkeeper.Keeper
 	roots  RootRecorder
+	ports  warpledgertypes.PortRegistry
 }
 
 // NewAppModule creates a new wrapped warp AppModule; the optional recorder
@@ -40,14 +42,21 @@ func NewAppModule(cdc codec.Codec, keeper warpkeeper.Keeper, ledger warpledgerke
 	return am
 }
 
+// WithPortRegistry returns the module with x/remote's port registry, which
+// guards router enrollment of settlement basket tokens (spec §11.6 D-33).
+func (am AppModule) WithPortRegistry(ports warpledgertypes.PortRegistry) AppModule {
+	am.ports = ports
+	return am
+}
+
 // RegisterServices registers the wrapped message server and the upstream query
 // server.
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	upstream := warpkeeper.NewMsgServerImpl(am.keeper)
 	if am.roots != nil {
-		warptypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServer(upstream, am.ledger, am.roots))
+		warptypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServerWithPorts(upstream, am.ledger, am.ports, am.roots))
 	} else {
-		warptypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServer(upstream, am.ledger))
+		warptypes.RegisterMsgServer(cfg.MsgServer(), NewMsgServerWithPorts(upstream, am.ledger, am.ports))
 	}
 	warptypes.RegisterQueryServer(cfg.QueryServer(), warpkeeper.NewQueryServerImpl(am.keeper))
 }

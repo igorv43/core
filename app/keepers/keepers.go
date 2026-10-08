@@ -649,6 +649,9 @@ func NewAppKeepers(
 		appKeepers.DistrKeeper,
 	)
 	appKeepers.WarpLedgerKeeper.SetIsmBondKeeper(appKeepers.IsmBondKeeper)
+	// spec §11.6 (D-33, v0.9.11): a settlement basket token is never routed to
+	// a port-of-entry domain of x/remote (set before the copy x/remote keeps)
+	appKeepers.WarpLedgerKeeper.SetPortRegistry(appKeepers.RemoteKeeper)
 	// beacons of x/remote read the liquid staking rate, the warp ledger and the
 	// perp positions, and record outbound roots for x/ismbond
 	appKeepers.RemoteKeeper.SetBeaconSources(appKeepers.LiquidStakeKeeper, appKeepers.WarpLedgerKeeper, appKeepers.IsmBondKeeper,

@@ -38,20 +38,23 @@ func (k Keeper) Withdraw(ctx sdk.Context, controller string, tokenId util.HexAdd
 	seq++
 	// dynamic withdrawal fee of the vault (spec §11.5.4): burned, so the
 	// vault keeps the collateral as an unallocated reserve
-	destination := account.Domain
-	// a port user who names no token_out withdraws USDC by CCTP from the vault
-	// to their own address; that exit's min_accepted is in USDC units and is
-	// set below to the net settlement amount (after the withdrawal fee)
+	// a token with a route to the account's domain withdraws there, port or
+	// not; on a port domain the settlement asset (no route to a port) goes to
+	// the port's vault (spec §11.6.2, v0.9.11). A port user who names no
+	// token_out withdraws it by CCTP from the vault to their own address; that
+	// exit's min_accepted is in USDC units and is set below to the net
+	// settlement amount (after the withdrawal fee)
+	destination, viaVault, err := k.destinationOf(ctx, account, tokenId)
+	if err != nil {
+		return util.HexAddress{}, err
+	}
 	portDefault := false
-	if port, err := k.Ports.Get(ctx, account.Domain); err == nil {
-		destination = port.VaultDomain
-		if tokenOut == "" {
-			tokenOut = types.PortSentinel(account.Domain).String()
-			portDefault = true
-		}
+	if viaVault && tokenOut == "" {
+		tokenOut = types.PortSentinel(account.Domain).String()
+		portDefault = true
 	}
 	if ex, err := k.Executors.Get(ctx, destination); err == nil && ex.WithdrawFeeBps > 0 {
-		fee := amount.MulRaw(int64(ex.WithdrawFeeBps)).QuoRaw(10_000)
+		fee := withdrawFee(amount, ex.WithdrawFeeBps)
 		if fee.IsPositive() {
 			denom, err := k.warpToken(ctx, tokenId)
 			if err != nil {
@@ -224,4 +227,11 @@ func (k Keeper) WithdrawalsOf(ctx sdk.Context, controller string) ([]types.Withd
 			return false, nil
 		})
 	return out, err
+}
+
+// withdrawFee is the vault withdrawal fee amount x bps / 10,000 rounded up: a fee
+// is never rounded in the user's favour. bps comes from the dynamic fee band
+// (< 10,000), so the fee never exceeds amount.
+func withdrawFee(amount math.Int, bps uint32) math.Int {
+	return amount.MulRaw(int64(bps)).AddRaw(9_999).QuoRaw(10_000)
 }

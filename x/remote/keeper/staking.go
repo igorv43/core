@@ -456,13 +456,36 @@ func (k *Keeper) processPending(ctx sdk.Context, params types.Params) error {
 // ---------------------------------------------------------------------------
 // §4.4 auto-return of matured claims
 
-// destinationOf is the domain withdrawals of an account go to (the vault
-// domain for a port user).
-func (k Keeper) destinationOf(ctx sdk.Context, account types.RemoteAccount) uint32 {
-	if port, err := k.Ports.Get(ctx, account.Domain); err == nil {
-		return port.VaultDomain
+// destinationOf is the domain a withdrawal of the token goes to, and whether
+// it leaves through the vault of a port (spec §11.6.2, v0.9.11). An account
+// of a non-port domain withdraws to its own domain. On a port domain a token
+// with a route to that domain (LUNC, stLUNC) also withdraws directly; only the
+// settlement asset, which has no route to a port, goes to the port's vault and
+// leaves by CCTP. Any other token has no way to the port chain: refused, since
+// a CCTP exit could not carry it and it would be stranded on the vault chain.
+func (k Keeper) destinationOf(ctx sdk.Context, account types.RemoteAccount, tokenId util.HexAddress) (uint32, bool, error) {
+	port, err := k.Ports.Get(ctx, account.Domain)
+	if errors.Is(err, collections.ErrNotFound) {
+		return account.Domain, false, nil
 	}
-	return account.Domain
+	if err != nil {
+		return 0, false, err
+	}
+	if k.ledgerKeeper == nil {
+		return 0, false, errorsmod.Wrap(types.ErrInvalidWithdraw, "warp ledger not available to route a port withdrawal")
+	}
+	if _, err := k.ledgerKeeper.GetRemoteRouter(ctx, tokenId, account.Domain); err == nil {
+		return account.Domain, false, nil
+	}
+	basket, err := k.ledgerKeeper.IsBasket(ctx, tokenId)
+	if err != nil {
+		return 0, false, err
+	}
+	if !basket {
+		return 0, false, errorsmod.Wrapf(types.ErrPortConflict,
+			"token %s has no route to port domain %d and only the settlement asset leaves a port through its vault", tokenId.String(), account.Domain)
+	}
+	return port.VaultDomain, true, nil
 }
 
 // SetAutoReturn opts a remote account in (through a warp token routed to its
@@ -481,8 +504,12 @@ func (k Keeper) SetAutoReturn(ctx sdk.Context, controller string, enabled bool, 
 	if k.ledgerKeeper == nil {
 		return errorsmod.Wrap(types.ErrInvalidParams, "warp ledger not available")
 	}
-	if _, err := k.ledgerKeeper.GetRemoteRouter(ctx, tokenId, k.destinationOf(ctx, account)); err != nil {
-		return errorsmod.Wrapf(types.ErrInvalidParams, "token %s has no router to domain %d", tokenId, k.destinationOf(ctx, account))
+	destination, _, err := k.destinationOf(ctx, account, tokenId)
+	if err != nil {
+		return err
+	}
+	if _, err := k.ledgerKeeper.GetRemoteRouter(ctx, tokenId, destination); err != nil {
+		return errorsmod.Wrapf(types.ErrInvalidParams, "token %s has no router to domain %d", tokenId, destination)
 	}
 	if err := k.AutoReturns.Set(ctx, controller, types.AutoReturn{Account: controller, TokenId: tokenId, SetHeight: ctx.BlockHeight()}); err != nil {
 		return err
@@ -595,7 +622,11 @@ func (k *Keeper) autoReturnOne(ctx sdk.Context, params types.Params, ar types.Au
 	if err != nil {
 		return false, false, nil
 	}
-	destination := k.destinationOf(ctx, account)
+	destination, _, err := k.destinationOf(ctx, account, ar.TokenId)
+	if err != nil {
+		k.Logger(ctx).Info("auto-return has no destination", "account", ar.Account, "err", err)
+		return false, false, nil
+	}
 	fee, err := k.quoteInterchainFee(ctx, ar.TokenId, destination, params.WithdrawFeeCap)
 	if err != nil {
 		k.Logger(ctx).Info("auto-return not quoted", "account", ar.Account, "err", err)

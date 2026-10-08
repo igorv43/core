@@ -26,3 +26,9 @@ type CircuitKeeper interface {
 type IsmBondKeeper interface {
 	IsmBondedForToken(ctx sdk.Context, ismId *util.HexAddress, mailboxId util.HexAddress) (bool, error)
 }
+
+// PortRegistry is x/remote: the port-of-entry domains of spec §11.6 (D-33).
+// A settlement basket token never has a direct route to one of them.
+type PortRegistry interface {
+	IsPort(ctx sdk.Context, domain uint32) (bool, error)
+}

@@ -249,8 +249,11 @@ func TestWithdrawFeeKeepsMinAcceptedInTokenOutUnits(t *testing.T) {
 	require.NoError(t, f.k.Accounts.Set(f.ctx, portAccount.String(), types.RemoteAccount{
 		Address: portAccount.String(), Domain: portSo, Controller: user,
 	}))
-	require.NoError(t, f.app.BankKeeper.SendCoins(f.ctx, f.owner, portAccount, sdk.NewCoins(sdk.NewCoin("uluna", math.NewInt(100_000_000)))))
-	_, err = f.k.Withdraw(f.ctx, portAccount.String(), f.token, math.NewInt(40_000_000), "", nil)
+	// the settlement basket token has no route to the port: it leaves through the vault (v0.9.11)
+	usdc, usdcDenom := f.basketToken(t)
+	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", sdk.NewCoins(sdk.NewCoin(usdcDenom, math.NewInt(100_000_000)))))
+	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", portAccount, sdk.NewCoins(sdk.NewCoin(usdcDenom, math.NewInt(100_000_000)))))
+	_, err = f.k.Withdraw(f.ctx, portAccount.String(), usdc, math.NewInt(40_000_000), "", nil)
 	require.NoError(t, err)
 	rs, err = f.k.ReceiptsOf(f.ctx, portAccount.String())
 	require.NoError(t, err)

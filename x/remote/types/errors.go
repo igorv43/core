@@ -24,6 +24,7 @@ const (
 	CodeInvalidConversion // 15
 	CodeInvalidReference  // 16
 	CodePendingFull       // 17
+	CodePortConflict      // 18
 )
 
 // Uint32 returns the numeric code for the SDK error registry.
@@ -55,3 +56,9 @@ var (
 	ErrInvalidReference = errorsmod.Register(ModuleName, CodeInvalidReference.Uint32(), "invalid result reference")
 	ErrPendingFull      = errorsmod.Register(ModuleName, CodePendingFull.Uint32(), "too many pending payloads")
 )
+
+// ErrPortConflict is returned when a port-of-entry registration conflicts with
+// a direct route of the settlement asset (spec §11.6 D-33, v0.9.11), or when a
+// port account withdraws a token that neither has a route to its domain nor
+// can leave through the vault's CCTP exit.
+var ErrPortConflict = errorsmod.Register(ModuleName, CodePortConflict.Uint32(), "port-of-entry conflict")

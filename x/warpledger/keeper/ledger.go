@@ -303,7 +303,48 @@ func (k Keeper) SetBasketToken(ctx sdk.Context, tokenId util.HexAddress, enabled
 	if token.TokenType != warptypes.HYP_TOKEN_TYPE_SYNTHETIC {
 		return errorsmod.Wrapf(types.ErrNotSyntheticToken, "%s is %s", tokenId.String(), token.TokenType)
 	}
+	// spec §11.6 (D-33, v0.9.11): the settlement asset reaches a port only by
+	// CCTP from a vault, so a token already routed to a port domain cannot
+	// become a basket
+	if k.ports != nil {
+		var conflict uint32
+		err := k.warpKeeper.EnrolledRouters.Walk(ctx, collections.NewPrefixedPairRange[uint64, uint32](tokenId.GetInternalId()),
+			func(key collections.Pair[uint64, uint32], _ warptypes.RemoteRouter) (bool, error) {
+				port, err := k.ports.IsPort(ctx, key.K2())
+				if err != nil || port {
+					conflict = key.K2()
+					return true, err
+				}
+				return false, nil
+			})
+		if err != nil {
+			return err
+		}
+		if conflict != 0 {
+			return errorsmod.Wrapf(types.ErrSettlementToPort, "%s has a route to port domain %d", tokenId.String(), conflict)
+		}
+	}
 	return k.Baskets.Set(ctx, tokenId.GetInternalId())
+}
+
+// BasketRoutedTo returns a basket token with a router enrolled for the domain,
+// if any (spec §11.6 D-33: such a domain cannot be a port).
+func (k Keeper) BasketRoutedTo(ctx sdk.Context, domain uint32) (util.HexAddress, bool, error) {
+	var found util.HexAddress
+	ok := false
+	err := k.Baskets.Walk(ctx, nil, func(id uint64) (bool, error) {
+		has, err := k.warpKeeper.EnrolledRouters.Has(ctx, collections.Join(id, domain))
+		if err != nil || !has {
+			return err != nil, err
+		}
+		token, err := k.warpKeeper.HypTokens.Get(ctx, id)
+		if err != nil {
+			return true, err
+		}
+		found, ok = token.Id, true
+		return true, nil
+	})
+	return found, ok, err
 }
 
 // SetOriginPolicy sets the share cap override (nil keeps the default) and the

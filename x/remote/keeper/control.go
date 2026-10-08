@@ -87,6 +87,14 @@ func (k Keeper) ExecutorControl(ctx sdk.Context, msg *types.MsgExecutorControl) 
 }
 
 // SetPort registers or removes a port-of-entry chain (spec §11.6).
+//
+// A port is a chain without a vault of its own (D-33): the settlement asset
+// reaches it only by CCTP from the vault that received it. A domain where a
+// settlement basket token already has a direct warp route is a vault (leg) of
+// that basket, not a port, and is refused (v0.9.11): its USDC withdrawals
+// would take the direct route and drain a leg the port deposits never
+// funded. Routes of other tokens (LUNC, stLUNC) are allowed: they keep
+// withdrawing directly to the port chain.
 func (k Keeper) SetPort(ctx sdk.Context, msg *types.MsgSetPort) error {
 	if msg.VaultDomain == 0 {
 		return k.Ports.Remove(ctx, msg.PortDomain)
@@ -94,7 +102,24 @@ func (k Keeper) SetPort(ctx sdk.Context, msg *types.MsgSetPort) error {
 	if msg.PortDomain == 0 || msg.PortDomain == msg.VaultDomain {
 		return errorsmod.Wrap(types.ErrInvalidParams, "port_domain must be set and differ from vault_domain")
 	}
+	if k.ledgerKeeper == nil {
+		return errorsmod.Wrap(types.ErrInvalidParams, "warp ledger not available to check the port's routes")
+	}
+	token, routed, err := k.ledgerKeeper.BasketRoutedTo(ctx, msg.PortDomain)
+	if err != nil {
+		return err
+	}
+	if routed {
+		return errorsmod.Wrapf(types.ErrPortConflict, "settlement token %s already has a route to domain %d: a port has no vault of its own",
+			token.String(), msg.PortDomain)
+	}
 	return k.Ports.Set(ctx, msg.PortDomain, types.Port{PortDomain: msg.PortDomain, VaultDomain: msg.VaultDomain, CctpDomain: msg.CctpDomain})
+}
+
+// IsPort reports whether a domain is a registered port-of-entry chain (the
+// x/warpledger and custom/warp guards of spec §11.6 D-33).
+func (k Keeper) IsPort(ctx sdk.Context, domain uint32) (bool, error) {
+	return k.Ports.Has(ctx, domain)
 }
 
 // dispatchControl sends one control order to the executor of a domain with

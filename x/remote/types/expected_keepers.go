@@ -51,6 +51,10 @@ type WarpLedgerKeeper interface {
 	GetLedger(ctx sdk.Context, tokenId util.HexAddress, domain uint32) (warpledgertypes.DomainLedger, bool, error)
 	EffectiveCap(ctx sdk.Context, ledger warpledgertypes.DomainLedger) (math.Int, error)
 	TotalExposure(ctx sdk.Context, tokenId util.HexAddress) (math.Int, error)
+	// IsBasket and BasketRoutedTo identify the settlement asset of the port
+	// rule (spec §11.6 D-33, v0.9.11).
+	IsBasket(ctx sdk.Context, tokenId util.HexAddress) (bool, error)
+	BasketRoutedTo(ctx sdk.Context, domain uint32) (util.HexAddress, bool, error)
 }
 
 // RootRecorder is x/ismbond: outbound roots are recorded after every dispatch.

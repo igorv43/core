@@ -175,9 +175,13 @@ func TestPortOfEntryDepositAndWithdraw(t *testing.T) {
 	free, _ := f.app.PerpKeeper.FreeCollateral(f.ctx, portAccount.String())
 	require.Equal(t, "1000000", free.String())
 
-	// a port user's withdrawal leaves the vault chain by CCTP: exit on the vault with the port sentinel
+	// a port user's settlement withdrawal (no route to the port) leaves the vault chain by CCTP: exit on
+	// the vault with the port sentinel
+	usdc, usdcDenom := f.basketToken(t)
+	require.NoError(t, f.app.BankKeeper.MintCoins(f.ctx, "mint", sdk.NewCoins(sdk.NewCoin(usdcDenom, math.NewInt(40_000_000)))))
+	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", portAccount, sdk.NewCoins(sdk.NewCoin(usdcDenom, math.NewInt(40_000_000)))))
 	f.ctx = f.ctx.WithEventManager(sdk.NewEventManager())
-	id, err := f.k.Withdraw(f.ctx, portAccount.String(), f.token, math.NewInt(40_000_000), "", nil)
+	id, err := f.k.Withdraw(f.ctx, portAccount.String(), usdc, math.NewInt(40_000_000), "", nil)
 	require.NoError(t, err)
 	rs, err := f.k.ReceiptsOf(f.ctx, portAccount.String())
 	require.NoError(t, err)
@@ -188,9 +192,10 @@ func TestPortOfEntryDepositAndWithdraw(t *testing.T) {
 	require.Equal(t, "40000000", rs[0].MinAccepted)
 	want := types.ExitAddress(factory, initCodeHash, user, types.PortSentinel(portSo), math.NewInt(40_000_000), 1)
 	require.Equal(t, want, rs[0].ExitAddress)
-	ledger, _, err := f.app.WarpLedgerKeeper.GetLedger(f.ctx, f.token, originDom)
+	ledger, _, err := f.app.WarpLedgerKeeper.GetLedger(f.ctx, usdc, originDom)
 	require.NoError(t, err)
-	require.Equal(t, "40000000", ledger.Sent.String(), "collateral leaves the vault domain")
+	require.Equal(t, "40000000", ledger.Sent.String(), "the settlement leaves through the vault domain")
+	require.Equal(t, "0", f.app.BankKeeper.GetBalance(f.ctx, portAccount, usdcDenom).Amount.String())
 	ports, err := keeper.NewQueryServerImpl(f.k).Ports(f.ctx, &types.QueryPortsRequest{})
 	require.NoError(t, err)
 	require.Len(t, ports.Ports, 1)

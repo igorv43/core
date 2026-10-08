@@ -31,6 +31,8 @@ type Keeper struct {
 	router baseapp.MessageRouter
 	// ismBond is optional: when set, caps above bonded_cap_threshold require a bonded ISM (spec §7.2).
 	ismBond types.IsmBondKeeper
+	// ports is optional: when set, a basket token cannot be routed to a port domain (spec §11.6 D-33).
+	ports types.PortRegistry
 
 	Schema  collections.Schema
 	Params  collections.Item[types.Params]
@@ -113,3 +115,7 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) error {
 
 // SetIsmBondKeeper registers x/ismbond for the bonded-cap rule of spec §7.2.
 func (k *Keeper) SetIsmBondKeeper(b types.IsmBondKeeper) { k.ismBond = b }
+
+// SetPortRegistry registers x/remote for the port rule of spec §11.6 (D-33,
+// v0.9.11): a token with a route to a port domain cannot become a basket.
+func (k *Keeper) SetPortRegistry(p types.PortRegistry) { k.ports = p }

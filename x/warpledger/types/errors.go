@@ -23,6 +23,7 @@ const (
 	CodeSourceCapExceeded  // 11
 	CodeOriginPaused       // 12
 	CodeNotSyntheticToken  // 13
+	CodeSettlementToPort   // 14
 )
 
 // Uint32 returns the numeric code for the SDK error registry.
@@ -47,3 +48,9 @@ var (
 	ErrOriginPaused      = errorsmod.Register(ModuleName, CodeOriginPaused.Uint32(), "origin is paused for deposits and redemptions")
 	ErrNotSyntheticToken = errorsmod.Register(ModuleName, CodeNotSyntheticToken.Uint32(), "warp token is not a synthetic token")
 )
+
+// ErrSettlementToPort is returned when a settlement basket token would get a
+// direct route to a port-of-entry domain (spec §11.6 D-33, v0.9.11): a port is
+// a chain without a vault of its own, so the settlement asset reaches it only
+// by CCTP from the vault that received it.
+var ErrSettlementToPort = errorsmod.Register(ModuleName, CodeSettlementToPort.Uint32(), "a settlement basket token cannot be routed to a port-of-entry domain")
