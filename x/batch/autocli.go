@@ -4,6 +4,12 @@ import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
 )
 
+// positional argument fields shared by several queries
+const (
+	argAddress  = "address"
+	argMarketId = "market_id"
+)
+
 // AutoCLIOptions exposes the query commands; transactions are hand-written
 // in client/cli because this AutoCLI version cannot parse Coin arguments.
 func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
@@ -15,7 +21,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{RpcMethod: "Markets", Use: "markets", Short: "List markets"},
 				{
 					RpcMethod: "Market", Use: "market [market-id]", Short: "Query a market, its reference price and last result",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "market_id"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argMarketId}},
 				},
 				{
 					RpcMethod: "Intent", Use: "intent [intent-id]", Short: "Query an intent",
@@ -23,7 +29,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod: "IntentsByAccount", Use: "intents [address]", Short: "List the open intents of an account",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argAddress}},
 				},
 				{
 					RpcMethod: "Batch", Use: "batch [batch-id]", Short: "Query the results and commits of a batch",
@@ -31,16 +37,16 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod: "Solver", Use: "solver [address]", Short: "Query a solver and its escrow",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argAddress}},
 				},
 				{RpcMethod: "Solvers", Use: "solvers", Short: "List solvers"},
 				{
 					RpcMethod: "Frontend", Use: "frontend [address]", Short: "Query a registered integrator",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argAddress}},
 				},
 				{
 					RpcMethod: "Approvals", Use: "approvals [address]", Short: "List the integrator approvals of an account",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argAddress}},
 				},
 				{RpcMethod: "Pipeline", Use: "pipeline", Short: "Show the batch schedule at the current height"},
 			},

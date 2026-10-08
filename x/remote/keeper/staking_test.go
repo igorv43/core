@@ -16,6 +16,7 @@ import (
 	coretypes "github.com/bcp-innovations/hyperlane-cosmos/x/core/types"
 	warpkeeper "github.com/bcp-innovations/hyperlane-cosmos/x/warp/keeper"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
+	terracore "github.com/classic-terra/core/v4/types"
 	lstypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	"github.com/classic-terra/core/v4/x/remote/keeper"
@@ -28,6 +29,9 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
 )
+
+// errMustFollow is the rejection of a PREVIOUS_RESULT withdrawal that follows no amount-producing message.
+const errMustFollow = "must follow"
 
 const (
 	lsEpochBlocks = 45
@@ -320,16 +324,16 @@ func TestResultReferencesForbidden(t *testing.T) {
 		msgs   []sdk.Msg
 		reason string
 	}{
-		{"first message", []sdk.Msg{s.refWithdraw(s.token, nil)}, "must follow"},
+		{"first message", []sdk.Msg{s.refWithdraw(s.token, nil)}, errMustFollow},
 		{"after a perp message", []sdk.Msg{
 			&perptypes.MsgDepositCollateral{Sender: acc.String(), Amount: sdk.NewCoin(settle, math.NewInt(1_000_000))},
 			s.refWithdraw(s.token, nil),
-		}, "must follow"},
+		}, errMustFollow},
 		{"not adjacent", []sdk.Msg{
 			&lstypes.MsgStake{Sender: acc.String(), Amount: luna(10_000_000)},
 			&perptypes.MsgSetAutoTopUp{Sender: acc.String(), Enabled: true},
 			s.refWithdraw(s.stToken, nil),
-		}, "must follow"},
+		}, errMustFollow},
 		{"below min_amount", []sdk.Msg{
 			&lstypes.MsgStake{Sender: acc.String(), Amount: luna(10_000_000)},
 			s.refWithdraw(s.stToken, amount(10_000_001)),
@@ -411,7 +415,7 @@ func TestDepositThenExecute(t *testing.T) {
 	// a malformed payload is rejected on arrival, it never waits
 	s.fresh()
 	s.fromGateway(t, s.adPayload(t, &types.AfterDeposit{TokenId: s.token, Amount: math.NewInt(1)}, s.refWithdraw(s.token, nil)))
-	require.Contains(t, s.rejected(t), "must follow")
+	require.Contains(t, s.rejected(t), errMustFollow)
 	require.Empty(t, s.pending(t, acc))
 }
 
@@ -631,7 +635,7 @@ func TestAutoReturnPaymasterCap(t *testing.T) {
 	owner := s.owner.String()
 	// a LUNC route on a mailbox whose IGP quotes 2,500,000 uluna per transfer
 	pdSrv := pdkeeper.NewMsgServerImpl(&s.app.HyperlaneKeeper.PostDispatchKeeper)
-	igp, err := pdSrv.CreateIgp(s.ctx, &pdtypes.MsgCreateIgp{Owner: owner, Denom: "uluna"})
+	igp, err := pdSrv.CreateIgp(s.ctx, &pdtypes.MsgCreateIgp{Owner: owner, Denom: terracore.MicroLunaDenom})
 	require.NoError(t, err)
 	_, err = pdSrv.SetDestinationGasConfig(s.ctx, &pdtypes.MsgSetDestinationGasConfig{
 		Owner: owner, IgpId: igp.Id,
@@ -651,7 +655,7 @@ func TestAutoReturnPaymasterCap(t *testing.T) {
 	})
 	require.NoError(t, err)
 	warpSrv := warpkeeper.NewMsgServerImpl(s.app.WarpKeeper)
-	tok, err := warpSrv.CreateCollateralToken(s.ctx, &warptypes.MsgCreateCollateralToken{Owner: owner, OriginMailbox: mb.Id, OriginDenom: "uluna"})
+	tok, err := warpSrv.CreateCollateralToken(s.ctx, &warptypes.MsgCreateCollateralToken{Owner: owner, OriginMailbox: mb.Id, OriginDenom: terracore.MicroLunaDenom})
 	require.NoError(t, err)
 	_, err = warpSrv.EnrollRemoteRouter(s.ctx, &warptypes.MsgEnrollRemoteRouter{
 		Owner: owner, TokenId: tok.Id,

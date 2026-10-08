@@ -17,6 +17,7 @@ import (
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
 	terraapp "github.com/classic-terra/core/v4/app"
 	apptesting "github.com/classic-terra/core/v4/app/testing"
+	terracore "github.com/classic-terra/core/v4/types"
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	lstypes "github.com/classic-terra/core/v4/x/liquidstake/types"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
@@ -82,7 +83,7 @@ func setup(t *testing.T) *fixture {
 	h.FundAcc(f.derived, sdk.NewCoins(sdk.NewCoin(settle, math.NewInt(50_000_000)), sdk.NewCoin("uluna", math.NewInt(1_000_000_000))))
 
 	warpSrv := warpkeeper.NewMsgServerImpl(app.WarpKeeper)
-	tok, err := warpSrv.CreateCollateralToken(ctx, &warptypes.MsgCreateCollateralToken{Owner: f.owner.String(), OriginMailbox: f.mailbox, OriginDenom: "uluna"})
+	tok, err := warpSrv.CreateCollateralToken(ctx, &warptypes.MsgCreateCollateralToken{Owner: f.owner.String(), OriginMailbox: f.mailbox, OriginDenom: terracore.MicroLunaDenom})
 	require.NoError(t, err)
 	f.token = tok.Id
 	_, err = warpSrv.EnrollRemoteRouter(ctx, &warptypes.MsgEnrollRemoteRouter{
@@ -310,7 +311,7 @@ func TestWithdrawAdvancesExactlyTheInterchainQuote(t *testing.T) {
 	f := setup(t)
 	owner := f.owner.String()
 	pdSrv := pdkeeper.NewMsgServerImpl(&f.app.HyperlaneKeeper.PostDispatchKeeper)
-	igp, err := pdSrv.CreateIgp(f.ctx, &pdtypes.MsgCreateIgp{Owner: owner, Denom: "uluna"})
+	igp, err := pdSrv.CreateIgp(f.ctx, &pdtypes.MsgCreateIgp{Owner: owner, Denom: terracore.MicroLunaDenom})
 	require.NoError(t, err)
 	_, err = pdSrv.SetDestinationGasConfig(f.ctx, &pdtypes.MsgSetDestinationGasConfig{
 		Owner: owner, IgpId: igp.Id,
@@ -330,7 +331,7 @@ func TestWithdrawAdvancesExactlyTheInterchainQuote(t *testing.T) {
 	})
 	require.NoError(t, err)
 	warpSrv := warpkeeper.NewMsgServerImpl(f.app.WarpKeeper)
-	tok, err := warpSrv.CreateCollateralToken(f.ctx, &warptypes.MsgCreateCollateralToken{Owner: owner, OriginMailbox: mb.Id, OriginDenom: "uluna"})
+	tok, err := warpSrv.CreateCollateralToken(f.ctx, &warptypes.MsgCreateCollateralToken{Owner: owner, OriginMailbox: mb.Id, OriginDenom: terracore.MicroLunaDenom})
 	require.NoError(t, err)
 	_, err = warpSrv.EnrollRemoteRouter(f.ctx, &warptypes.MsgEnrollRemoteRouter{
 		Owner: owner, TokenId: tok.Id,

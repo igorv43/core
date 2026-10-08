@@ -12,6 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// oracle asset denoms of the stage-2 whitelist tests (shared with abci_test.go)
+const (
+	denomBTC = "ubtc"
+	denomETH = "ueth"
+)
+
 // activateApprovedWhitelist runs the spec §26.3 schedule for the whitelist in
 // the parameters: it must be pending (not active) right after the approval
 // and active once the delay has elapsed. The vote targets are then synced by
@@ -69,7 +75,7 @@ func TestWhitelistChangeActivatesOnlyAfterDelay(t *testing.T) {
 
 	// governance approves a new asset at height 11
 	params := k.GetParams(input.Ctx)
-	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomBTC}}
 	k.SetParams(input.Ctx, params)
 	approval := input.Ctx.WithBlockHeight(11).WithBlockTime(t0).WithEventManager(sdk.NewEventManager())
 	oracle.EndBlocker(approval, k)
@@ -81,13 +87,13 @@ func TestWhitelistChangeActivatesOnlyAfterDelay(t *testing.T) {
 	require.Equal(t, int64(11), pending.ApprovedHeight)
 	require.Equal(t, int64(11)+types.WhitelistActivationDelay, pending.ActivationHeight)
 	require.True(t, pending.ActivationTime.Equal(t0.Add(types.WhitelistActivationPeriod)))
-	require.Equal(t, types.AssetList{{Name: "ubtc"}}, pending.AssetWhitelist)
+	require.Equal(t, types.AssetList{{Name: denomBTC}}, pending.AssetWhitelist)
 
 	// the query exposes the pending change and the constants
 	res, err := keeper.NewQuerier(k).PendingWhitelist(input.Ctx, &types.QueryPendingWhitelistRequest{})
 	require.NoError(t, err)
 	require.NotNil(t, res.Pending)
-	require.Equal(t, types.AssetList{{Name: "ubtc"}}, res.Pending.AssetWhitelist)
+	require.Equal(t, types.AssetList{{Name: denomBTC}}, res.Pending.AssetWhitelist)
 	require.Equal(t, pending.ActivationHeight, res.Pending.ActivationHeight)
 	require.NotNil(t, res.Active)
 	require.Empty(t, res.Active.AssetWhitelist)
@@ -110,12 +116,12 @@ func TestWhitelistChangeActivatesOnlyAfterDelay(t *testing.T) {
 	due := input.Ctx.WithBlockHeight(pending.ActivationHeight).WithBlockTime(pending.ActivationTime).WithEventManager(sdk.NewEventManager())
 	oracle.EndBlocker(due, k)
 	require.True(t, hasEvent(due, types.EventTypeWhitelistActivated))
-	require.Equal(t, types.AssetList{{Name: "ubtc"}}, k.GetAssetTargets(input.Ctx))
+	require.Equal(t, types.AssetList{{Name: denomBTC}}, k.GetAssetTargets(input.Ctx))
 	_, ok = k.GetPendingWhitelist(input.Ctx)
 	require.False(t, ok)
 	active, ok := k.GetActiveWhitelist(input.Ctx)
 	require.True(t, ok)
-	require.Equal(t, types.AssetList{{Name: "ubtc"}}, active.AssetWhitelist)
+	require.Equal(t, types.AssetList{{Name: denomBTC}}, active.AssetWhitelist)
 }
 
 // The denom whitelist follows the same schedule: removing a denom keeps it as
@@ -150,7 +156,7 @@ func TestWhitelistChangeReplacedAndCancelled(t *testing.T) {
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(10), k)
 	params := k.GetParams(input.Ctx)
 
-	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomBTC}}
 	k.SetParams(input.Ctx, params)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(11).WithBlockTime(t0), k)
 	first, ok := k.GetPendingWhitelist(input.Ctx)
@@ -163,7 +169,7 @@ func TestWhitelistChangeReplacedAndCancelled(t *testing.T) {
 	require.Equal(t, first.ActivationHeight, same.ActivationHeight)
 
 	// a new approval at 1000 replaces the change and restarts the clock
-	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomBTC}, {Name: denomETH}}
 	k.SetParams(input.Ctx, params)
 	t1 := t0.Add(2 * time.Hour)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1000).WithBlockTime(t1), k)
@@ -196,11 +202,11 @@ func TestGenesisWhitelistIsImmediate(t *testing.T) {
 	k := input.OracleKeeper
 
 	gs := types.DefaultGenesisState()
-	gs.Params.AssetWhitelist = types.AssetList{{Name: "ubtc"}}
+	gs.Params.AssetWhitelist = types.AssetList{{Name: denomBTC}}
 	require.NoError(t, types.ValidateGenesis(gs))
 	oracle.InitGenesis(input.Ctx, k, gs)
 
-	require.Equal(t, types.AssetList{{Name: "ubtc"}}, k.GetAssetTargets(input.Ctx))
+	require.Equal(t, types.AssetList{{Name: denomBTC}}, k.GetAssetTargets(input.Ctx))
 	active, ok := k.GetActiveWhitelist(input.Ctx)
 	require.True(t, ok)
 	require.True(t, active.Matches(gs.Params.Whitelist, gs.Params.AssetWhitelist))
@@ -210,11 +216,11 @@ func TestGenesisWhitelistIsImmediate(t *testing.T) {
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), k)
 	_, ok = k.GetPendingWhitelist(input.Ctx)
 	require.False(t, ok)
-	require.Equal(t, types.AssetList{{Name: "ubtc"}}, k.GetAssetTargets(input.Ctx))
+	require.Equal(t, types.AssetList{{Name: denomBTC}}, k.GetAssetTargets(input.Ctx))
 
 	// schedule a change, export, import into a fresh chain: same schedule
 	params := k.GetParams(input.Ctx)
-	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomBTC}, {Name: denomETH}}
 	k.SetParams(input.Ctx, params)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(2), k)
 	exported := oracle.ExportGenesis(input.Ctx, k)
@@ -224,7 +230,7 @@ func TestGenesisWhitelistIsImmediate(t *testing.T) {
 
 	fresh := keeper.CreateTestInput(t)
 	oracle.InitGenesis(fresh.Ctx, fresh.OracleKeeper, exported)
-	require.Equal(t, types.AssetList{{Name: "ubtc"}}, fresh.OracleKeeper.GetAssetTargets(fresh.Ctx), "import does not activate the pending change")
+	require.Equal(t, types.AssetList{{Name: denomBTC}}, fresh.OracleKeeper.GetAssetTargets(fresh.Ctx), "import does not activate the pending change")
 	imported, ok := fresh.OracleKeeper.GetPendingWhitelist(fresh.Ctx)
 	require.True(t, ok)
 	require.Equal(t, exported.PendingWhitelist.ActivationHeight, imported.ActivationHeight)
@@ -247,16 +253,16 @@ func TestGenesisWhitelistIsImmediate(t *testing.T) {
 func TestVoteOnPendingWhitelistEntryIsDropped(t *testing.T) {
 	input, h := setup(t)
 	k := input.OracleKeeper
-	enableAsset(t, input, "ubtc")
+	enableAsset(t, input, denomBTC)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(10), k) // record the active whitelist
 
 	params := k.GetParams(input.Ctx)
-	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomBTC}, {Name: denomETH}}
 	k.SetParams(input.Ctx, params)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(11), k)
 	_, ok := k.GetPendingWhitelist(input.Ctx)
 	require.True(t, ok)
-	require.False(t, k.IsAssetTarget(input.Ctx, "ueth"))
+	require.False(t, k.IsAssetTarget(input.Ctx, denomETH))
 
 	sdr := randomExchangeRate.String() + core.MicroSDRDenom
 	makeAggregatePrevoteAndVoteStr(t, input, h, 100, "65000.0ubtc,3000.0ueth,"+sdr, 0)
@@ -264,7 +270,7 @@ func TestVoteOnPendingWhitelistEntryIsDropped(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, vote.ExchangeRateTuples, 2)
 	for _, tuple := range vote.ExchangeRateTuples {
-		require.NotEqual(t, "ueth", tuple.Denom)
+		require.NotEqual(t, denomETH, tuple.Denom)
 	}
 
 	// a denom in neither the active nor the pending whitelist is rejected

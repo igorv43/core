@@ -7,6 +7,7 @@ import (
 	"cosmossdk.io/math"
 	terraapp "github.com/classic-terra/core/v4/app"
 	apptesting "github.com/classic-terra/core/v4/app/testing"
+	terracore "github.com/classic-terra/core/v4/types"
 	"github.com/classic-terra/core/v4/x/batch/keeper"
 	"github.com/classic-terra/core/v4/x/batch/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -46,7 +47,7 @@ func setup(t *testing.T) *fixture {
 	app.OracleKeeper.SetLunaExchangeRate(ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 
 	require.NoError(t, k.CreateMarket(ctx, types.Market{
-		Id: marketID, BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: types.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: marketID, BaseDenom: terracore.MicroLunaDenom, QuoteDenom: types.DefaultSettlementDenom, Type: types.MARKET_TYPE_SPOT, OracleDenom: terracore.MicroUSDDenom,
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 
@@ -524,7 +525,7 @@ func TestSpotSolverFeeRate(t *testing.T) {
 func TestPerpMarketNeedsMarginHook(t *testing.T) {
 	f := setup(t)
 	err := f.k.CreateMarket(f.ctx, types.Market{
-		Id: "uluna-perp/uusdc.lf", BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: types.MARKET_TYPE_PERP, OracleDenom: "uusd",
+		Id: "uluna-perp/uusdc.lf", BaseDenom: terracore.MicroLunaDenom, QuoteDenom: types.DefaultSettlementDenom, Type: types.MARKET_TYPE_PERP, OracleDenom: terracore.MicroUSDDenom,
 		Enabled: false, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	})
 	require.ErrorIs(t, err, types.ErrInvalidMarket)

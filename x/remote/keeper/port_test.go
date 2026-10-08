@@ -7,6 +7,7 @@ import (
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
 	warpkeeper "github.com/bcp-innovations/hyperlane-cosmos/x/warp/keeper"
 	warptypes "github.com/bcp-innovations/hyperlane-cosmos/x/warp/types"
+	terracore "github.com/classic-terra/core/v4/types"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	"github.com/classic-terra/core/v4/x/remote/keeper"
 	"github.com/classic-terra/core/v4/x/remote/types"
@@ -148,7 +149,7 @@ func TestPortWithdrawRouting(t *testing.T) {
 	// 3. a token with no route to the port and that is not the settlement
 	// asset has no way to the port chain: refused, nothing moves
 	other, err := warpkeeper.NewMsgServerImpl(f.app.WarpKeeper).CreateCollateralToken(f.ctx, &warptypes.MsgCreateCollateralToken{
-		Owner: f.owner.String(), OriginMailbox: f.mailbox, OriginDenom: "uluna",
+		Owner: f.owner.String(), OriginMailbox: f.mailbox, OriginDenom: terracore.MicroLunaDenom,
 	})
 	require.NoError(t, err)
 	require.NoError(t, f.enroll(other.Id, originDom))

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"cosmossdk.io/math"
+	core "github.com/classic-terra/core/v4/types"
 	"github.com/classic-terra/core/v4/x/oracle/types"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +22,7 @@ func TestRateSampleHistoryAndTwap(t *testing.T) {
 	base := time.Unix(1_700_000_000, 0).UTC()
 	for i := 1; i <= 3; i++ {
 		k.SetRateSample(ctx, types.RateSample{
-			Denom:        "uusd",
+			Denom:        core.MicroUSDDenom,
 			ExchangeRate: math.LegacyNewDec(int64(i)),
 			Dispersion:   math.LegacyNewDecWithPrec(int64(i), 3),
 			VotePeriod:   uint64(i),
@@ -64,7 +65,7 @@ func TestRateHistoryIsBounded(t *testing.T) {
 	k := input.OracleKeeper
 	for i := 1; i <= types.MaxRateHistory+25; i++ {
 		k.SetRateSample(ctx, types.RateSample{
-			Denom: "ukrw", ExchangeRate: math.LegacyOneDec(), Dispersion: math.LegacyZeroDec(),
+			Denom: core.MicroKRWDenom, ExchangeRate: math.LegacyOneDec(), Dispersion: math.LegacyZeroDec(),
 			VotePeriod: uint64(i), Height: int64(i), Time: time.Unix(int64(i), 0),
 		})
 	}

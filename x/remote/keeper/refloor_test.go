@@ -56,8 +56,10 @@ func TestRefloorPortExit(t *testing.T) {
 	require.NoError(t, f.app.BankKeeper.SendCoinsFromModuleToAccount(f.ctx, "mint", f.owner, sdk.NewCoins(sdk.NewCoin(usdcDenom, math.NewInt(1_000_000_000)))))
 	require.NoError(t, f.k.SetPort(f.ctx, &types.MsgSetPort{Authority: gov, PortDomain: portSo, VaultDomain: originDom, CctpDomain: 5}))
 	executor := util.CreateMockHexAddress("executor", 1)
-	require.NoError(t, f.k.SetExecutor(f.ctx, &types.MsgSetExecutor{Authority: gov, AppId: f.appId, Domain: originDom, Address: executor, TokenId: usdc,
-		MinCollateral: math.ZeroInt(), TargetCollateral: math.ZeroInt()}))
+	require.NoError(t, f.k.SetExecutor(f.ctx, &types.MsgSetExecutor{
+		Authority: gov, AppId: f.appId, Domain: originDom, Address: executor, TokenId: usdc,
+		MinCollateral: math.ZeroInt(), TargetCollateral: math.ZeroInt(),
+	}))
 	ex, err := f.k.Executors.Get(f.ctx, originDom)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), ex.Nonce, "SET_LEG_LIMITS")
@@ -217,8 +219,10 @@ func TestRefloorPortExitGuards(t *testing.T) {
 	require.Equal(t, "9990000", rs[0].MinAccepted)
 
 	// an exit with the sentinel of ANOTHER port domain (explicit token_out) is not this account's port exit
-	require.NoError(t, f.k.SetExecutor(f.ctx, &types.MsgSetExecutor{Authority: gov, AppId: f.appId, Domain: originDom, Address: util.CreateMockHexAddress("executor", 1),
-		TokenId: usdc, MinCollateral: math.ZeroInt(), TargetCollateral: math.ZeroInt()}))
+	require.NoError(t, f.k.SetExecutor(f.ctx, &types.MsgSetExecutor{
+		Authority: gov, AppId: f.appId, Domain: originDom, Address: util.CreateMockHexAddress("executor", 1),
+		TokenId: usdc, MinCollateral: math.ZeroInt(), TargetCollateral: math.ZeroInt(),
+	}))
 	m := math.NewInt(5_000_000)
 	id2, err := f.k.Withdraw(f.ctx, acc.String(), usdc, math.NewInt(5_000_000), types.PortSentinel(portSo+1).String(), &m)
 	require.NoError(t, err)

@@ -734,7 +734,7 @@ func enableAsset(t *testing.T, input keeper.TestInput, name string) {
 
 func TestAssetVoteTallyAndDepth(t *testing.T) {
 	input, h := setup(t)
-	enableAsset(t, input, "ubtc")
+	enableAsset(t, input, denomBTC)
 	sdr := randomExchangeRate.String() + core.MicroSDRDenom
 
 	// three validators of equal power inside the reward band: price median 65000, depth median 1500
@@ -744,13 +744,13 @@ func TestAssetVoteTallyAndDepth(t *testing.T) {
 
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
 
-	price, depth, err := input.OracleKeeper.GetAssetPrice(input.Ctx, "ubtc")
+	price, depth, err := input.OracleKeeper.GetAssetPrice(input.Ctx, denomBTC)
 	require.NoError(t, err)
 	require.Equal(t, "65000.000000000000000000", price.String())
 	require.Equal(t, "1500", depth.String())
 
 	// GetPrice resolves assets and denoms alike
-	p, err := input.OracleKeeper.GetPrice(input.Ctx, "ubtc")
+	p, err := input.OracleKeeper.GetPrice(input.Ctx, denomBTC)
 	require.NoError(t, err)
 	require.True(t, p.Equal(price))
 	p, err = input.OracleKeeper.GetPrice(input.Ctx, core.MicroSDRDenom)
@@ -758,7 +758,7 @@ func TestAssetVoteTallyAndDepth(t *testing.T) {
 	require.True(t, p.Equal(randomExchangeRate))
 
 	// the rate sample carries the depth for the listing criterion (§21.3)
-	sample, err := input.OracleKeeper.GetRateSample(input.Ctx, "ubtc")
+	sample, err := input.OracleKeeper.GetRateSample(input.Ctx, denomBTC)
 	require.NoError(t, err)
 	require.Equal(t, "1500", sample.Depth.String())
 	require.True(t, sample.Dispersion.IsPositive())
@@ -774,7 +774,7 @@ func TestAssetVoteTallyAndDepth(t *testing.T) {
 	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: randomExchangeRate}}, 1)
 	makeAggregatePrevoteAndVote(t, input, h, 0, sdk.DecCoins{{Denom: core.MicroSDRDenom, Amount: randomExchangeRate}}, 2)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
-	_, _, err = input.OracleKeeper.GetAssetPrice(input.Ctx, "ubtc")
+	_, _, err = input.OracleKeeper.GetAssetPrice(input.Ctx, denomBTC)
 	require.Error(t, err)
 	for i := 0; i < 3; i++ {
 		require.Equal(t, uint64(0), input.OracleKeeper.GetMissCounter(input.Ctx, keeper.ValAddrs[i]))
@@ -783,7 +783,7 @@ func TestAssetVoteTallyAndDepth(t *testing.T) {
 
 func TestAssetVoteMissAndDepthOptional(t *testing.T) {
 	input, h := setup(t)
-	enableAsset(t, input, "ueth")
+	enableAsset(t, input, denomETH)
 	sdr := randomExchangeRate.String() + core.MicroSDRDenom
 
 	// two validators vote the asset (ballot passes at 2/3 power), the third
@@ -794,7 +794,7 @@ func TestAssetVoteMissAndDepthOptional(t *testing.T) {
 
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
 
-	price, depth, err := input.OracleKeeper.GetAssetPrice(input.Ctx, "ueth")
+	price, depth, err := input.OracleKeeper.GetAssetPrice(input.Ctx, denomETH)
 	require.NoError(t, err)
 	require.Equal(t, "3000.000000000000000000", price.String())
 	require.Equal(t, "777", depth.String())
@@ -816,35 +816,35 @@ func TestAssetVoteRejectedWhenNotTarget(t *testing.T) {
 func TestAssetWhitelistApplyAndGenesis(t *testing.T) {
 	input, _ := setup(t)
 	params := input.OracleKeeper.GetParams(input.Ctx)
-	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomBTC}, {Name: denomETH}}
 	input.OracleKeeper.SetParams(input.Ctx, params)
 
 	// state without a schedule (no InitGenesis in the test input): the first
 	// EndBlock records the parameters as the active whitelist and syncs the
 	// targets at the end of the period, like the denom whitelist
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
-	require.Equal(t, types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
+	require.Equal(t, types.AssetList{{Name: denomBTC}, {Name: denomETH}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
 
 	// a later change waits for the spec §26.3 delay
-	params.AssetWhitelist = types.AssetList{{Name: "ueth"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomETH}}
 	input.OracleKeeper.SetParams(input.Ctx, params)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
-	require.Equal(t, types.AssetList{{Name: "ubtc"}, {Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
+	require.Equal(t, types.AssetList{{Name: denomBTC}, {Name: denomETH}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
 	activateApprovedWhitelist(t, input)
 	oracle.EndBlocker(input.Ctx.WithBlockHeight(1), input.OracleKeeper)
-	require.Equal(t, types.AssetList{{Name: "ueth"}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
+	require.Equal(t, types.AssetList{{Name: denomETH}}, input.OracleKeeper.GetAssetTargets(input.Ctx))
 
 	// genesis round-trip keeps targets and prices
-	input.OracleKeeper.SetAssetPrice(input.Ctx, "ueth", sdkmath.LegacyNewDec(3000))
+	input.OracleKeeper.SetAssetPrice(input.Ctx, denomETH, sdkmath.LegacyNewDec(3000))
 	gs := oracle.ExportGenesis(input.Ctx, input.OracleKeeper)
-	require.Equal(t, types.AssetList{{Name: "ueth"}}, gs.AssetTargets)
+	require.Equal(t, types.AssetList{{Name: denomETH}}, gs.AssetTargets)
 	require.Len(t, gs.AssetPrices, 1)
 	require.NoError(t, types.ValidateGenesis(gs))
 
 	// a name shared with the denom whitelist is invalid
 	params.AssetWhitelist = types.AssetList{{Name: core.MicroSDRDenom}}
 	require.Error(t, params.Validate())
-	params.AssetWhitelist = types.AssetList{{Name: "ubtc"}, {Name: "ubtc"}}
+	params.AssetWhitelist = types.AssetList{{Name: denomBTC}, {Name: denomBTC}}
 	require.Error(t, params.Validate())
 	params.AssetWhitelist = types.AssetList{{Name: core.MicroLunaDenom}}
 	require.Error(t, params.Validate())

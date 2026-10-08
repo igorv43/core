@@ -4,6 +4,11 @@ import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
 )
 
+// positional argument fields shared by several queries
+const (
+	argAddress = "address"
+)
+
 // AutoCLIOptions exposes the query commands; transactions are hand-written
 // in client/cli because this AutoCLI version cannot parse Coin/bytes arguments.
 func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
@@ -14,7 +19,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{RpcMethod: "Params", Use: "params", Short: "Query the x/ismbond parameters"},
 				{
 					RpcMethod: "Operator", Use: "operator [address]", Short: "Query a bonded operator",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argAddress}},
 				},
 				{RpcMethod: "Operators", Use: "operators", Short: "List the bonded operators"},
 				{

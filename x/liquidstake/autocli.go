@@ -4,6 +4,11 @@ import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
 )
 
+// positional argument fields shared by several queries
+const (
+	argAddress = "address"
+)
+
 // AutoCLIOptions implements autocli.HasAutoCLIConfig (this chain only
 // exposes AutoCLI commands for modules that declare their options).
 func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
@@ -16,7 +21,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{RpcMethod: "Delegations", Use: "delegations", Short: "Query the module delegations per validator and the eligibility set"},
 				{
 					RpcMethod: "UnstakeQueue", Use: "unstake-queue [address]", Short: "Query queued and matured redemptions (optionally of one address)",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address", Optional: true}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argAddress, Optional: true}},
 				},
 				{RpcMethod: "Epoch", Use: "epoch", Short: "Query the current epoch"},
 			},

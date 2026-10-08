@@ -5,6 +5,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 )
 
+// positional argument fields shared by several queries
+const (
+	argTokenId = "token_id"
+)
+
 // AutoCLIOptions implements autocli.HasAutoCLIConfig. The chain enhances the
 // root command with AutoCLI only for modules that declare their options, so
 // the descriptors below are what expose `terrad tx|query warpledger`.
@@ -22,7 +27,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					RpcMethod:      "WarpLedger",
 					Use:            "ledger [token-id]",
 					Short:          "Query the per-domain ledger and solvency figures of a warp token",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "token_id"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: argTokenId}},
 				},
 				{
 					RpcMethod: "WarpLedgers",
@@ -34,7 +39,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Use:       "deposit-address [token-id] [domain] [recipient]",
 					Short:     "Derive the migration deposit address for (token, domain, recipient)",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
-						{ProtoField: "token_id"},
+						{ProtoField: argTokenId},
 						{ProtoField: "domain"},
 						{ProtoField: "recipient"},
 					},
@@ -50,7 +55,7 @@ func (AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:     "Forward the balance of a migration deposit address through the native warp route (permissionless)",
 					Example:   version.AppName + " tx warpledger sweep-migration 0x726f757465725f61707000000000000000000001000000000000000000000000 56 0x000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcd --from anyone",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
-						{ProtoField: "token_id"},
+						{ProtoField: argTokenId},
 						{ProtoField: "domain"},
 						{ProtoField: "recipient"},
 					},

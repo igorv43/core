@@ -6,6 +6,7 @@ import (
 
 	"cosmossdk.io/math"
 	"github.com/bcp-innovations/hyperlane-cosmos/util"
+	terracore "github.com/classic-terra/core/v4/types"
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	perptypes "github.com/classic-terra/core/v4/x/perp/types"
 	"github.com/classic-terra/core/v4/x/remote/types"
@@ -33,7 +34,7 @@ func TestSessionKeyIntentFeeInSettlementPaidByAccount(t *testing.T) {
 	pm := types.PaymasterAddress()
 	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(100_000_000))))
 	require.NoError(t, f.app.BatchKeeper.CreateMarket(f.ctx, batchtypes.Market{
-		Id: spotMarket, BaseDenom: "uluna", QuoteDenom: settle, Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: spotMarket, BaseDenom: terracore.MicroLunaDenom, QuoteDenom: settle, Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: terracore.MicroUSDDenom,
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	bp, err := f.app.BatchKeeper.GetParams(f.ctx)
@@ -70,7 +71,7 @@ func TestSessionKeyIntentFeeSponsoredForSettlementOnlyAccount(t *testing.T) {
 	pm := types.PaymasterAddress()
 	require.NoError(t, f.k.FundPaymaster(f.ctx, f.owner, sdk.NewCoin("uluna", math.NewInt(100_000_000))))
 	require.NoError(t, f.app.BatchKeeper.CreateMarket(f.ctx, batchtypes.Market{
-		Id: spotMarket, BaseDenom: "uluna", QuoteDenom: settle, Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: spotMarket, BaseDenom: terracore.MicroLunaDenom, QuoteDenom: settle, Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: terracore.MicroUSDDenom,
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	bp, err := f.app.BatchKeeper.GetParams(f.ctx)

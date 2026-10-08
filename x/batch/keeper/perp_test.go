@@ -6,6 +6,7 @@ import (
 
 	"cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
+	terracore "github.com/classic-terra/core/v4/types"
 	"github.com/classic-terra/core/v4/x/batch/keeper"
 	"github.com/classic-terra/core/v4/x/batch/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -77,7 +78,7 @@ func (f *fixture) perpSetup(t *testing.T) *fakeHook {
 	hook := newFakeHook(f.app.GetKey(types.StoreKey))
 	f.k.SetMarginHook(hook)
 	require.NoError(t, f.k.CreateMarket(f.ctx, types.Market{
-		Id: perpMarketID, BaseDenom: "ubtc-perp", QuoteDenom: "uusdc.lf", Type: types.MARKET_TYPE_PERP, OracleDenom: "uusd",
+		Id: perpMarketID, BaseDenom: "ubtc-perp", QuoteDenom: types.DefaultSettlementDenom, Type: types.MARKET_TYPE_PERP, OracleDenom: terracore.MicroUSDDenom,
 		Enabled: false, MinQty: math.NewInt(1_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	// the fixture allows two active markets; the spot one is already enabled

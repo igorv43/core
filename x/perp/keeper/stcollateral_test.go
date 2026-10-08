@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"cosmossdk.io/math"
+	terracore "github.com/classic-terra/core/v4/types"
 	batchkeeper "github.com/classic-terra/core/v4/x/batch/keeper"
 	batchtypes "github.com/classic-terra/core/v4/x/batch/types"
 	lstypes "github.com/classic-terra/core/v4/x/liquidstake/types"
@@ -43,7 +44,7 @@ func (f *fixture) stSetup(t *testing.T) {
 	require.NoError(t, f.app.LiquidStakeKeeper.SetParams(f.ctx, lp))
 	f.app.OracleKeeper.SetLunaExchangeRate(f.ctx, "uusd", math.LegacyNewDecWithPrec(1, 4))
 	require.NoError(t, f.bk.CreateMarket(f.ctx, batchtypes.Market{
-		Id: lunaUsdSpotMarket, BaseDenom: "uluna", QuoteDenom: "uusdc.lf", Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: "uusd",
+		Id: lunaUsdSpotMarket, BaseDenom: terracore.MicroLunaDenom, QuoteDenom: types.DefaultSettlementDenom, Type: batchtypes.MARKET_TYPE_SPOT, OracleDenom: terracore.MicroUSDDenom,
 		Enabled: true, MinQty: math.NewInt(1_000_000), TickSize: math.LegacyNewDecWithPrec(1, 6),
 	}))
 	p := f.params
